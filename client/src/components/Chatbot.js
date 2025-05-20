@@ -27,7 +27,7 @@ import PaymentsIcon from '@mui/icons-material/Payments';
 import AssessmentIcon from '@mui/icons-material/Assessment';
 
 // Define MCP function schemas for OpenAI
-const MCP_FUNCTIONS = [
+export const MCP_FUNCTIONS = [
   {
     name: "getAllLoans",
     description: "Get a list of all loans in the system",
