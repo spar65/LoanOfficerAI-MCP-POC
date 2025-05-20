@@ -27,8 +27,6 @@ import {
   List,
   ListItem,
   ListItemText,
-  AppBar,
-  Toolbar,
   Stack
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
@@ -151,16 +149,7 @@ const Dashboard = () => {
 
   return (
     <Box sx={{ flexGrow: 1 }}>
-      <AppBar position="static" color="primary" sx={{ mb: 3 }}>
-        <Toolbar>
-          <AccountBalanceIcon sx={{ mr: 2 }} />
-          <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-            Loan Officer Dashboard
-          </Typography>
-        </Toolbar>
-      </AppBar>
-      
-      <Container maxWidth="xl">
+      <Container maxWidth="xl" sx={{ mt: 3 }}>
         {/* Summary Cards */}
         <Grid container spacing={3} sx={{ mb: 4 }}>
           <Grid sx={{ width: { xs: '100%', md: '25%' }, p: 1 }}>

@@ -175,6 +175,8 @@ app.use('/api', (req, res, next) => {
     return next();
   }
   
+  // POC auth bypass was removed to enforce proper authentication
+  
   // Apply authentication middleware
   authMiddleware.verifyToken(req, res, next);
 });

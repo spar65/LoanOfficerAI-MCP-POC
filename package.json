@@ -4,7 +4,7 @@
   "description": "Loan Officer AI MCP POC",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
+    "start": "cd server && node server.js",
     "server": "cd server && npm start",
     "client": "cd client && npm start",
     "dev": "concurrently \"npm run server\" \"npm run client\"",
