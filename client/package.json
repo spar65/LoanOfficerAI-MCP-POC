@@ -6,6 +6,7 @@
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
+    "test:auth": "react-scripts test auth.test.js client-api.test.js",
     "eject": "react-scripts eject"
   },
   "keywords": [],

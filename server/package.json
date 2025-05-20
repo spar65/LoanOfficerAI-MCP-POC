@@ -12,7 +12,8 @@
     "test:skip-auth": "jest --config jest.config.js --testPathIgnorePatterns=auth",
     "test:simple": "jest --config jest.config.js tests/unit/simple.test.js tests/unit/mock-data.test.js --passWithNoTests",
     "test:poc": "jest --config jest.config.js tests/unit/simple.test.js tests/unit/mock-data.test.js tests/unit/utils.test.js tests/unit/auth-utils.test.js tests/unit/auth --passWithNoTests --forceExit",
-    "test:poc-all": "jest --config jest.config.js --passWithNoTests"
+    "test:poc-all": "jest --config jest.config.js --passWithNoTests",
+    "test:auth": "jest --config jest.config.js tests/unit/auth-implementation.test.js tests/integration/auth-data-retrieval.test.js --passWithNoTests --forceExit"
   },
   "keywords": [],
   "author": "",

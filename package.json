@@ -10,7 +10,8 @@
     "dev": "concurrently \"npm run server\" \"npm run client\"",
     "test:server": "cd server && npm run test:poc",
     "test:client": "cd client && CI=true npm test -- --testMatch='**/simple.test.js'",
-    "test": "npm run test:server && npm run test:client"
+    "test": "npm run test:server && npm run test:client",
+    "test:auth": "cd server && npm run test:auth && cd ../client && CI=true npm run test:auth"
   },
   "dependencies": {
     "concurrently": "^8.2.2"
