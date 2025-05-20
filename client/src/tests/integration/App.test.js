@@ -1,15 +1,38 @@
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import App from '../../App';
-import mcpClientMock from '../mocks/mcpClientMock';
+import '@testing-library/jest-dom';
 
-// Mock the API client
-jest.mock('../../mcp/client', () => {
-  return {
-    __esModule: true,
-    default: mcpClientMock
-  };
-});
+// Mock the API client directly
+const mockGetLoanDetails = jest.fn().mockResolvedValue({});
+jest.mock('../../mcp/client', () => ({
+  getAllLoans: jest.fn().mockResolvedValue([
+    {
+      loan_id: 'L001',
+      borrower_id: 'B001',
+      loan_amount: 50000,
+      interest_rate: 3.5,
+      status: 'Active',
+      borrower: 'John Doe'
+    }
+  ]),
+  getLoanSummary: jest.fn().mockResolvedValue({
+    totalLoans: 10,
+    activeLoans: 8,
+    totalAmount: 500000,
+    delinquencyRate: 5.5
+  }),
+  getBorrowers: jest.fn().mockResolvedValue([
+    {
+      borrower_id: 'B001',
+      first_name: 'John',
+      last_name: 'Doe'
+    }
+  ]),
+  getLoanDetails: mockGetLoanDetails,
+  getLoanPayments: jest.fn().mockResolvedValue([]),
+  getActiveLoans: jest.fn().mockResolvedValue([])
+}));
 
 // Mock window.matchMedia
 window.matchMedia = window.matchMedia || function() {
@@ -22,6 +45,13 @@ window.matchMedia = window.matchMedia || function() {
   };
 };
 
+// Mock MUI components that might cause issues
+jest.mock('@mui/x-charts/PieChart', () => {
+  return function MockPieChart() {
+    return <div data-testid="mock-pie-chart" />;
+  };
+});
+
 describe('App Integration Tests', () => {
   beforeEach(() => {
     // Reset mock functions before each test
@@ -29,6 +59,17 @@ describe('App Integration Tests', () => {
     
     // Mock scrollIntoView
     Element.prototype.scrollIntoView = jest.fn();
+  });
+  
+  it('renders the Dashboard component', async () => {
+    await act(async () => {
+      render(<App />);
+    });
+
+    // Check if Dashboard is rendered
+    await waitFor(() => {
+      expect(screen.getByText(/Loan Officer Dashboard/i)).toBeInTheDocument();
+    });
   });
   
   it('renders both Dashboard and Chatbot components', async () => {
@@ -100,7 +141,7 @@ describe('App Integration Tests', () => {
     
     // Verify a response is received
     await waitFor(() => {
-      expect(mcpClientMock.getLoanDetails).toHaveBeenCalledWith('L001');
+      expect(jest.mock('../../mcp/client').getLoanDetails).toHaveBeenCalledWith('L001');
     }, { timeout: 2000 });
   });
 }); 

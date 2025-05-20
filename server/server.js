@@ -2,11 +2,23 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
+const cookieParser = require('cookie-parser');
 
 const app = express();
 
-app.use(cors());
+// Import auth middleware
+const authMiddleware = require('./auth/authMiddleware');
+
+// Import routes
+const authRoutes = require('./auth/authRoutes');
+
+// Middleware
+app.use(cors({
+  origin: process.env.CLIENT_URL || 'http://localhost:3000',
+  credentials: true // Allow cookies with CORS
+}));
 app.use(express.json());
+app.use(cookieParser()); // Add cookie-parser middleware
 
 // Data paths
 const dataDir = path.join(__dirname, 'data');
@@ -129,12 +141,73 @@ const getRelatedData = (id, data, foreignKey) => {
   return data.filter(item => item[foreignKey] === id);
 };
 
+// Load tenant data for multi-tenant support
+const getTenantFilteredData = (data, tenantId) => {
+  // If no tenant provided or data doesn't have tenant info, return all data
+  if (!tenantId || !data || !data[0] || !data[0].tenantId) {
+    return data;
+  }
+  
+  // Filter data by tenant ID
+  return data.filter(item => item.tenantId === tenantId || item.tenantId === 'global');
+};
+
+// API Auth routes
+app.use('/api/auth', authRoutes);
+
+// Public endpoints (no authentication required)
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// Protected routes middleware
+// Apply authentication to all /api routes except those explicitly public
+app.use('/api', (req, res, next) => {
+  // Skip authentication for public routes
+  const publicPaths = [
+    '/api/auth/login',
+    '/api/auth/refresh',
+    '/api/auth/logout',
+    '/api/health'
+  ];
+  
+  if (publicPaths.includes(req.path)) {
+    return next();
+  }
+  
+  // Apply authentication middleware
+  authMiddleware.verifyToken(req, res, next);
+});
+
+// Apply tenant context middleware to all authenticated API routes
+app.use('/api', (req, res, next) => {
+  // Skip tenant verification for public routes
+  const publicPaths = [
+    '/api/auth/login',
+    '/api/auth/refresh',
+    '/api/auth/logout',
+    '/api/health'
+  ];
+  
+  if (publicPaths.includes(req.path)) {
+    return next();
+  }
+  
+  authMiddleware.verifyTenant(req, res, next);
+});
+
 // Get all loans with borrower information
 app.get('/api/loans', (req, res) => {
   console.log('GET /api/loans - Fetching all loans with borrower info');
   
-  const loans = loadData(loansPath);
-  const borrowers = loadData(borrowersPath);
+  // Apply tenant filtering if tenant context exists
+  let loans = loadData(loansPath);
+  let borrowers = loadData(borrowersPath);
+  
+  if (req.tenantContext) {
+    loans = getTenantFilteredData(loans, req.tenantContext);
+    borrowers = getTenantFilteredData(borrowers, req.tenantContext);
+  }
   
   // Filter loans by status if status parameter is provided
   let filteredLoans = loans;
@@ -162,10 +235,18 @@ app.get('/api/loan/:id', (req, res) => {
   const loanId = req.params.id;
   console.log(`GET /api/loan/${loanId} - Fetching comprehensive loan details`);
   
-  const loans = loadData(loansPath);
-  const borrowers = loadData(borrowersPath);
-  const payments = loadData(paymentsPath);
-  const collaterals = loadData(collateralPath);
+  // Apply tenant filtering
+  let loans = loadData(loansPath);
+  let borrowers = loadData(borrowersPath);
+  let payments = loadData(paymentsPath);
+  let collaterals = loadData(collateralPath);
+  
+  if (req.tenantContext) {
+    loans = getTenantFilteredData(loans, req.tenantContext);
+    borrowers = getTenantFilteredData(borrowers, req.tenantContext);
+    payments = getTenantFilteredData(payments, req.tenantContext);
+    collaterals = getTenantFilteredData(collaterals, req.tenantContext);
+  }
   
   const loan = loans.find(l => l.loan_id === loanId);
   
@@ -515,6 +596,10 @@ if (process.env.NODE_ENV !== 'test') {
   app.listen(PORT, () => {
     console.log(`MCP server running on port ${PORT}`);
     console.log('Available endpoints:');
+    console.log('  POST /api/auth/login - Login and get access token');
+    console.log('  POST /api/auth/refresh - Refresh access token');
+    console.log('  POST /api/auth/logout - Logout and invalidate refresh token');
+    console.log('  GET /api/auth/verify - Verify token is valid');
     console.log('  GET /api/loans - Get all loans with borrower information');
     console.log('  GET /api/loan/:id - Get comprehensive loan details');
     console.log('  GET /api/loan/status/:id - Get loan status by ID');

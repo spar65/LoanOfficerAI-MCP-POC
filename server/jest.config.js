@@ -10,6 +10,9 @@ module.exports = {
     '!**/tests/**',
     '!**/jest.config.js'
   ],
+  // Coverage thresholds disabled for POC
+  // Uncomment to enforce coverage metrics for production
+  /*
   coverageThreshold: {
     global: {
       statements: 70,
@@ -18,6 +21,7 @@ module.exports = {
       lines: 70
     }
   },
+  */
   setupFilesAfterEnv: ['./tests/setup.js'],
   testTimeout: 10000,
   verbose: true

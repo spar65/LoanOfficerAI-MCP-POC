@@ -11,6 +11,7 @@ jest.mock('fs', () => ({
 // Import the server
 const server = require('../../server');
 
+// Tests for API Endpoints
 describe('API Endpoints', () => {
   // Reset all mocks before each test
   beforeEach(() => {

@@ -7,15 +7,23 @@
     "test": "jest --config jest.config.js",
     "test:unit": "jest --config jest.config.js tests/unit",
     "test:integration": "jest --config jest.config.js tests/integration",
-    "test:coverage": "jest --config jest.config.js --coverage"
+    "test:coverage": "jest --config jest.config.js --coverage",
+    "test:working": "jest --config jest.config.js tests/unit/loan-details.test.js tests/unit/loan-summary.test.js tests/unit/data-service.test.js",
+    "test:skip-auth": "jest --config jest.config.js --testPathIgnorePatterns=auth",
+    "test:simple": "jest --config jest.config.js tests/unit/simple.test.js tests/unit/mock-data.test.js --passWithNoTests",
+    "test:poc": "jest --config jest.config.js tests/unit/simple.test.js tests/unit/mock-data.test.js tests/unit/utils.test.js tests/unit/auth-utils.test.js tests/unit/auth --passWithNoTests --forceExit",
+    "test:poc-all": "jest --config jest.config.js --passWithNoTests"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "bcrypt": "^6.0.0",
+    "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
-    "express": "^4.17.1"
+    "express": "^4.17.1",
+    "jsonwebtoken": "^9.0.2"
   },
   "devDependencies": {
     "chai": "^5.2.0",

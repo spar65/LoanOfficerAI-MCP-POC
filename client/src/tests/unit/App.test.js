@@ -3,7 +3,7 @@ import App from '../../App';
 import { ThemeProvider } from '@mui/material/styles';
 import theme from '../../theme';
 
-// Mock the MCP client
+// Mock the MCP client directly (instead of importing from a file)
 jest.mock('../../mcp/client', () => ({
   getAllLoans: jest.fn().mockResolvedValue([]),
   getLoanSummary: jest.fn().mockResolvedValue({
@@ -17,6 +17,9 @@ jest.mock('../../mcp/client', () => ({
   getLoanPayments: jest.fn().mockResolvedValue([]),
   getActiveLoans: jest.fn().mockResolvedValue([])
 }));
+
+// Make sure we have the expect.toBeInTheDocument matcher
+import '@testing-library/jest-dom';
 
 describe('App Component', () => {
   test('renders the App component correctly', () => {

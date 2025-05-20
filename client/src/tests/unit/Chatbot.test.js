@@ -4,15 +4,22 @@ import userEvent from '@testing-library/user-event';
 import Chatbot from '../../components/Chatbot';
 import { ThemeProvider } from '@mui/material';
 import farmTheme from '../../theme';
-import mcpClientMock from '../mocks/mcpClientMock';
+import '@testing-library/jest-dom';
 
-// Mock the API client
-jest.mock('../../mcp/client', () => {
-  return {
-    __esModule: true,
-    default: mcpClientMock
-  };
-});
+// Mock the API client directly
+jest.mock('../../mcp/client', () => ({
+  getAllLoans: jest.fn().mockResolvedValue([]),
+  getLoanDetails: jest.fn().mockImplementation((loanId) => Promise.resolve({
+    loan_id: loanId || 'L001',
+    borrower_id: 'B001',
+    loan_amount: 50000,
+    interest_rate: 3.5,
+    status: 'Active',
+    borrower: 'John Doe'
+  })),
+  getActiveLoans: jest.fn().mockResolvedValue([]),
+  getBorrowers: jest.fn().mockResolvedValue([])
+}));
 
 describe('Chatbot Component', () => {
   beforeEach(() => {
