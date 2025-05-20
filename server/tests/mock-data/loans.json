@@ -1,0 +1,32 @@
+[
+  {
+    "loan_id": "L001",
+    "borrower_id": "B001",
+    "loan_amount": 50000,
+    "interest_rate": 4.5,
+    "term_months": 60,
+    "origination_date": "2024-01-15",
+    "maturity_date": "2029-01-15",
+    "status": "Active"
+  },
+  {
+    "loan_id": "L002",
+    "borrower_id": "B001",
+    "loan_amount": 25000,
+    "interest_rate": 5.0,
+    "term_months": 36,
+    "origination_date": "2024-02-20",
+    "maturity_date": "2027-02-20",
+    "status": "Active"
+  },
+  {
+    "loan_id": "L003",
+    "borrower_id": "B002",
+    "loan_amount": 75000,
+    "interest_rate": 3.75,
+    "term_months": 84,
+    "origination_date": "2023-11-10",
+    "maturity_date": "2030-11-10",
+    "status": "Active"
+  }
+] 

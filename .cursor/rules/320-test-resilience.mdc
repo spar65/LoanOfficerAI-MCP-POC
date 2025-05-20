@@ -1,0 +1,416 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Test Resilience
+
+**Cursor Rule**: 320-test-resilience
+**Priority**: P1 (Important)
+**Globs**: `**/*.test.*`, `**/*.spec.*`, `**/test/**`
+**Rule type**: Engineering Practice
+
+## Context
+
+Test flakiness and fragility can severely undermine the confidence in a test suite, erode trust in the CI/CD pipeline, and waste developer time debugging non-deterministic failures. This rule establishes standards for creating resilient tests that produce consistent results, resist environmental variations, and remain stable during refactoring of implementation details.
+
+## Requirements
+
+### REQUIRED:
+
+- Tests MUST be deterministic, producing the same result on every run with the same inputs
+- Tests MUST be independent, able to run in isolation or in any order without affecting other tests
+- Tests MUST handle asynchronous operations properly using appropriate waiting and assertion techniques
+- Tests MUST properly clean up resources and state between test runs
+- Tests MUST use stable selectors in UI tests (data-testid attributes vs. CSS selectors)
+- Tests involving time MUST use time mocking or explicit waiting strategies
+- Tests MUST implement proper error handling for async operations
+- Tests MUST consistently reset mock implementations between tests
+- Dependencies on external services MUST be properly mocked or containerized
+- Tests with random data MUST use seeded random generators for reproducibility
+
+### RECOMMENDED:
+
+- Use test isolation patterns appropriate for the testing domain
+- Implement retry logic for inherently flaky operations (network, animations, etc.)
+- Add explicit timeouts and failure messages for async assertions
+- Consider implementing quarantine mechanisms for temporarily unstable tests
+- Run flaky tests multiple times to detect inconsistency
+- Add logging for test environment state and conditions
+- Implement test health metrics to track flakiness over time
+- Review and refactor tests with consistent failures or false positives
+- Use controlled environments (Docker) for environment-sensitive tests
+- Implement date/time freezing for temporal tests
+
+## Examples
+
+**Good**:
+```typescript
+// Proper async/await handling with explicit timeouts
+import { screen, waitFor } from '@testing-library/react';
+
+test('shows data after loading', async () => {
+  render(<DataComponent />);
+  
+  // Explicit waiting with timeout and error message
+  await waitFor(() => screen.getByText('Data Loaded'), { 
+    timeout: 2000,
+    onTimeout: (error) => {
+      console.error('Data loading timeout', { 
+        error,
+        elementCount: document.querySelectorAll('*').length,
+        visibleText: document.body.textContent
+      });
+      return error;
+    }
+  });
+  
+  expect(screen.getByTestId('data-container')).toBeInTheDocument();
+});
+
+// Proper test isolation
+describe('UserService', () => {
+  // Reset state before each test
+  beforeEach(() => {
+    localStorage.clear();
+    jest.resetAllMocks();
+    mockUserApi.getUser.mockClear();
+  });
+  
+  // Explicit mock setup for each test
+  it('fetches user data correctly', async () => {
+    mockUserApi.getUser.mockResolvedValueOnce({ id: 'user1', name: 'Test User' });
+    const result = await userService.getCurrentUser();
+    expect(result.name).toBe('Test User');
+  });
+});
+
+// Stable time handling
+test('shows expiration message', () => {
+  // Freeze time for test
+  jest.useFakeTimers();
+  jest.setSystemTime(new Date('2023-01-01'));
+  
+  render(<ExpirationComponent expiryDate="2023-01-10" />);
+  expect(screen.getByText('Expires in 9 days')).toBeInTheDocument();
+  
+  // Move time forward
+  jest.setSystemTime(new Date('2023-01-09'));
+  expect(screen.getByText('Expires in 1 day')).toBeInTheDocument();
+  
+  // Restore real timers
+  jest.useRealTimers();
+});
+
+// Proper setup/teardown with controlled environment
+describe('DatabaseTests', () => {
+  let testDb;
+
+  beforeAll(async () => {
+    testDb = await initializeTestDatabase();
+    await testDb.migrate();
+  });
+
+  beforeEach(async () => {
+    await testDb.truncate(['users', 'orders']);
+    await testDb.seed([
+      { table: 'users', data: testUsers }
+    ]);
+  });
+
+  afterAll(async () => {
+    await testDb.close();
+  });
+
+  it('retrieves user orders correctly', async () => {
+    const userOrders = await orderRepository.getOrdersForUser('user1');
+    expect(userOrders).toHaveLength(0);
+  });
+});
+```
+
+**Bad**:
+```typescript
+// Brittle time dependency
+test('shows timer', () => {
+  render(<Timer duration={5000} />);
+  
+  // Bad: Depends on actual timing and is flaky
+  setTimeout(() => {
+    expect(screen.getByText('Timer complete')).toBeInTheDocument();
+  }, 5100);
+});
+
+// Missing error handling for async operations
+test('loads user data', async () => {
+  // Bad: No proper waiting or error handling
+  render(<UserProfile userId="123" />);
+  
+  // Might fail if rendering takes time
+  const userName = screen.getByText('John Doe');
+  expect(userName).toBeInTheDocument();
+});
+
+// Test with side effects affecting other tests
+describe('CartService', () => {
+  // Bad: Test creates state that affects others
+  it('adds items to cart', () => {
+    // Directly modifies global state
+    localStorage.setItem('cart', JSON.stringify([{ id: 1, quantity: 2 }]));
+    const cart = cartService.getCart();
+    expect(cart).toHaveLength(1);
+  });
+  
+  // This test might fail if run after the previous one
+  it('starts with empty cart', () => {
+    const cart = cartService.getCart();
+    // Will fail if previous test ran first
+    expect(cart).toHaveLength(0);
+  });
+});
+
+// Unstable selectors
+test('submits form correctly', async () => {
+  render(<ContactForm />);
+  
+  // Bad: Using unstable CSS selectors
+  fireEvent.change(document.querySelector('.name-field'), {
+    target: { value: 'John Doe' }
+  });
+  
+  // Bad: Implementation detail dependency
+  fireEvent.click(document.querySelector('.submit-btn'));
+  
+  // Might not wait properly for state updates
+  expect(formSubmitHandler).toHaveBeenCalled();
+});
+```
+
+## Implementation
+
+### Test Resilience Patterns
+
+#### 1. Proper Asynchronous Testing
+
+Use appropriate async testing techniques:
+
+```typescript
+// React Testing Library example
+test('loads and displays data', async () => {
+  render(<DataComponent />);
+  
+  // Wait for loading state first
+  expect(screen.getByText('Loading...')).toBeInTheDocument();
+  
+  // Wait for the data with a specific timeout
+  await waitFor(() => screen.getByText('Data loaded'), { timeout: 3000 });
+  
+  // Now verify the data
+  expect(screen.getByTestId('data-container')).not.toBeEmpty();
+});
+```
+
+#### 2. Stable Test Data
+
+Create predictable, isolated test data:
+
+```typescript
+// Test data factory with predictable seeds
+import { faker } from '@faker-js/faker';
+
+export const createTestUsers = (count = 3) => {
+  // Set a fixed seed for reproducible "random" data
+  faker.seed(12345);
+  
+  return Array.from({ length: count }, (_, index) => ({
+    id: `user-${index + 1}`,
+    name: faker.person.fullName(),
+    email: faker.internet.email(),
+    createdAt: new Date(`2023-01-${index + 1}`).toISOString()
+  }));
+};
+```
+
+#### 3. Test Environment Isolation
+
+Isolate test environments properly:
+
+```typescript
+// Jest test setup file
+import 'jest-environment-jsdom';
+import { configure } from '@testing-library/react';
+import { mockLocalStorage, mockFetch } from '../testHelpers';
+
+// Configure test library
+configure({
+  testIdAttribute: 'data-testid',
+  asyncUtilTimeout: 2000,
+});
+
+// Setup global test environment
+beforeAll(() => {
+  // Mock APIs
+  global.fetch = mockFetch;
+  global.localStorage = mockLocalStorage();
+  
+  // Silence console in tests
+  jest.spyOn(console, 'error').mockImplementation(() => {});
+});
+
+// Reset between tests
+beforeEach(() => {
+  mockFetch.mockClear();
+  localStorage.clear();
+  document.body.innerHTML = '';
+});
+
+// Cleanup global mocks
+afterAll(() => {
+  jest.restoreAllMocks();
+});
+```
+
+#### 4. Temporal Testing
+
+Handle time-dependent tests reliably:
+
+```typescript
+// Date testing utilities
+import { advanceTo, clear } from 'jest-date-mock';
+
+describe('Expiration features', () => {
+  beforeEach(() => {
+    // Set fixed date for all tests
+    advanceTo(new Date('2023-06-15T12:00:00Z'));
+  });
+
+  afterEach(() => {
+    // Reset date mock
+    clear();
+  });
+
+  test('shows expired status', () => {
+    const expiredItem = { 
+      name: 'Test Item', 
+      expiresAt: '2023-06-10T00:00:00Z' 
+    };
+    
+    render(<ExpiryLabel item={expiredItem} />);
+    expect(screen.getByText('Expired')).toBeInTheDocument();
+  });
+
+  test('shows time until expiry', () => {
+    const futureItem = { 
+      name: 'Future Item', 
+      expiresAt: '2023-06-20T00:00:00Z' 
+    };
+    
+    render(<ExpiryLabel item={futureItem} />);
+    expect(screen.getByText('Expires in 5 days')).toBeInTheDocument();
+  });
+});
+```
+
+### CI Integration for Test Resilience
+
+Configure CI systems to detect and manage flaky tests:
+
+```yaml
+# GitHub Actions example with flaky test handling
+name: Test with Flaky Detection
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run tests with retry for flakiness detection
+        run: |
+          # Run tests multiple times to detect flakiness
+          npm test || npm test || npm test
+        
+      - name: Generate flaky test report
+        if: always()
+        run: node scripts/generate-flaky-report.js
+      
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: test-reports
+          path: test-reports/
+```
+
+### Test Resilience Dashboard
+
+Implement a test resilience dashboard to track and improve test reliability:
+
+```typescript
+// scripts/generate-flaky-report.js
+const fs = require('fs');
+const path = require('path');
+
+// Read test results from multiple runs
+const testRuns = JSON.parse(fs.readFileSync('./test-results.json', 'utf8'));
+
+// Identify tests with inconsistent results
+const flakyTests = [];
+const testResults = {};
+
+testRuns.forEach(run => {
+  run.testResults.forEach(test => {
+    const testId = `${test.file}::${test.name}`;
+    
+    if (!testResults[testId]) {
+      testResults[testId] = [];
+    }
+    
+    testResults[testId].push(test.status);
+    
+    // If this test has mixed results (some pass, some fail)
+    if (
+      testResults[testId].includes('passed') && 
+      testResults[testId].includes('failed')
+    ) {
+      flakyTests.push({
+        id: testId,
+        file: test.file,
+        name: test.name,
+        results: testResults[testId],
+        failurePercentage: 
+          testResults[testId].filter(r => r === 'failed').length / 
+          testResults[testId].length * 100
+      });
+    }
+  });
+});
+
+// Generate report
+const report = {
+  summary: {
+    totalTests: Object.keys(testResults).length,
+    flakyTests: flakyTests.length,
+    flakyPercentage: (flakyTests.length / Object.keys(testResults).length) * 100
+  },
+  flakyTests
+};
+
+fs.writeFileSync('./test-reports/flaky-tests.json', JSON.stringify(report, null, 2));
+console.log(`Found ${flakyTests.length} flaky tests out of ${Object.keys(testResults).length} total tests`);
+```
+
+## Full Documentation Access
+
+- [Test Flakiness Root Cause Analysis Guide](mdc:examples/testing/TestFlakinessRootCauseGuide.md)
+- [Asynchronous Testing Best Practices](mdc:examples/testing/AsyncTestingBestPractices.md)
+- [Environment Isolation Techniques](mdc:examples/testing/TestEnvironmentIsolation.md)

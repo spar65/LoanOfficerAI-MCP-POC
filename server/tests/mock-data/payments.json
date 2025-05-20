@@ -1,0 +1,72 @@
+[
+  {
+    "payment_id": "P001",
+    "loan_id": "L001",
+    "amount": 1000,
+    "date": "2024-02-15",
+    "status": "Completed"
+  },
+  {
+    "payment_id": "P002",
+    "loan_id": "L001",
+    "amount": 1000,
+    "date": "2024-03-15",
+    "status": "Completed"
+  },
+  {
+    "payment_id": "P003",
+    "loan_id": "L001",
+    "amount": 1000,
+    "date": "2024-04-15",
+    "status": "Completed"
+  },
+  {
+    "payment_id": "P004",
+    "loan_id": "L002",
+    "amount": 750,
+    "date": "2024-03-20",
+    "status": "Completed"
+  },
+  {
+    "payment_id": "P005",
+    "loan_id": "L002",
+    "amount": 750,
+    "date": "2024-04-20",
+    "status": "Completed"
+  },
+  {
+    "payment_id": "P006",
+    "loan_id": "L003",
+    "amount": 1200,
+    "date": "2023-12-10",
+    "status": "Completed"
+  },
+  {
+    "payment_id": "P007",
+    "loan_id": "L003",
+    "amount": 1200,
+    "date": "2024-01-10",
+    "status": "Completed"
+  },
+  {
+    "payment_id": "P008",
+    "loan_id": "L003",
+    "amount": 1200,
+    "date": "2024-02-10",
+    "status": "Completed"
+  },
+  {
+    "payment_id": "P009",
+    "loan_id": "L003",
+    "amount": 1200,
+    "date": "2024-03-10",
+    "status": "Completed"
+  },
+  {
+    "payment_id": "P010",
+    "loan_id": "L003",
+    "amount": 1200,
+    "date": "2024-04-10",
+    "status": "Completed"
+  }
+] 

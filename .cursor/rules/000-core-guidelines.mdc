@@ -1,0 +1,283 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+description: Use ALWAYS as the primary source of development guidelines for all projects
+globs: "**/*"
+
+# Enterprise Cursor Development Guidelines
+
+This file serves as the main entry point for all development guidelines across the organization. It includes references to specialized guideline documents organized according to the Enterprise Cursor Rules Management Framework.
+
+## Table of Contents
+
+- [Coding Patterns](mdc:#coding-patterns)
+- [Testing Framework](mdc:#testing-framework)
+- [Workflow Guidelines](mdc:#workflow-guidelines)
+- [Deployment & Infrastructure](mdc:#deployment-and-infrastructure)
+- [Integration & Third-Party Dependencies](mdc:#integration-and-third-party-dependencies)
+- [Operations & Incident Management](mdc:#operations-and-incident-management)
+- [Security & Compliance](mdc:#security-and-compliance)
+- [Technical Stack](mdc:#technical-stack)
+- [UX & Design Standards](mdc:#ux-and-design-standards)
+- [Frontend Development](mdc:#frontend-development)
+- [Performance & Optimization](mdc:#performance-and-optimization)
+- [Logging Standards](mdc:#logging-standards)
+- [Troubleshooting Standards](mdc:#troubleshooting-standards)
+- [Multi-tenancy & Platform Structure](mdc:#multi-tenancy-and-platform-structure)
+- [Rules Management](mdc:#rules-management)
+- [Key Development Principles](mdc:#key-development-principles)
+
+## Included Guidelines
+
+```mdc
+@include(001-security.mdc)
+@include(002-compliance.mdc)
+@include(../departments/engineering/coding-standards/100-coding-patterns.mdc)
+@include(../departments/engineering/coding-standards/103-do-no-harm.mdc)
+@include(../departments/engineering/coding-standards/104-stable-interfaces.mdc)
+@include(../departments/engineering/architecture/016-platform-hierarchy.mdc)
+@include(../technologies/platforms/200-deployment-infrastructure.mdc)
+@include(../technologies/frameworks/120-technical-stack.mdc)
+```
+
+## Key Development Principles
+
+The following critical principles have been incorporated across our development guidelines:
+
+### Code Quality & Maintenance
+- Always prefer simple solutions
+- Always look for existing code to iterate on instead of creating new code
+- Do not drastically change the patterns before trying to iterate on existing patterns
+- Avoid duplication of code whenever possible, checking for other areas with similar code
+- Keep the codebase very clean and organized
+- Avoid having files over 200-300 lines of code
+- Focus on the areas of code relevant to the task
+- Do not touch code that is unrelated to the task
+- When fixing an issue, exhaust all options before introducing new patterns
+
+### Environment Management
+- Write code that takes into account different environments: dev, test, and prod
+- After making changes, ALWAYS start up a new server to test
+- Always kill existing related servers before starting a new server
+- Never overwrite .env files without first asking and confirming
+- **NEVER expose sensitive environment variables in client-side code**
+- **NEVER share screenshots or recordings showing environment variables**
+- Clearly distinguish between client-side and server-side environment variables
+- Mocking data is only needed for tests, never mock data for dev or prod
+- Never add stubbing or fake data patterns to code affecting dev/prod environments
+
+### Testing & Quality Assurance
+- Follow the [Test-First Mandate](mdc:departments/engineering/testing/300-test-first-mandate.mdc) for all new features and significant changes
+- Write thorough tests for all major functionality
+- Ensure proper test coverage for new features and changes
+- **REQUIRED**: Test critical high-risk features extensively (payments, subscriptions, etc.)
+- **REQUIRED**: Always reference official documentation when testing third-party integrations
+- Always think about what other methods and areas might be affected by code changes
+- Be careful to only make changes that are requested or well understood
+- Run `npm audit` before deployments and resolve high/critical vulnerabilities
+- Execute tests in the appropriate [Testing Environments](mdc:departments/engineering/testing/116-testing-environments.mdc)
+
+### Security Requirements
+- Rate limit all API endpoints to prevent abuse
+- Use row-level security (RLS) for all data access in multi-tenant systems
+- Implement CAPTCHA on all authentication routes and signup pages
+- Enable WAF attack challenge modes on hosting platforms like Vercel
+- Follow proper API security protocols for all endpoints
+- Never expose sensitive data in responses or logs
+- **REQUIRED**: Use established authentication providers instead of custom solutions
+- **REQUIRED**: Run dependency security audits before deployments
+
+### Do No Harm Principle
+- **REQUIRED**: Never delete files or data without explicit confirmation
+- **REQUIRED**: Create backups before overwriting important files
+- **REQUIRED**: Respect code marked with protection annotations
+- **REQUIRED**: Follow VIBE (Value-Informed, Behavioral-Embedded) coding patterns
+- **REQUIRED**: Be especially careful with financial, security, and regulatory code
+- Document all changes to protected files with clear rationale
+- Use protection markers for critical business logic that shouldn't be modified
+
+### Stable Interfaces Principle
+- **REQUIRED**: Classify all interfaces according to stability level (Locked, Stable, Experimental, Internal)
+- **REQUIRED**: Do not modify Locked interfaces without formal approval process
+- **REQUIRED**: Maintain backward compatibility for Stable interfaces
+- **REQUIRED**: Document interface stability classification in code
+- **REQUIRED**: Use VIBE patterns to protect critical interfaces
+- **REQUIRED**: Include interfaces in centralized Interface Registry
+- Consider interface contracts as commitments to consumers
+- Test interface contracts explicitly to verify compliance
+
+## Coding Patterns
+
+Standards for code structure, organization, and implementation:
+
+```mdc
+@include(../departments/engineering/coding-standards/100-coding-patterns.mdc)
+@include(../departments/engineering/coding-standards/103-do-no-harm.mdc)
+@include(../departments/engineering/coding-standards/104-stable-interfaces.mdc)
+```
+
+## Testing Framework
+
+Our testing approach emphasizes visual consistency, test resilience, and comprehensive coverage:
+
+```mdc
+@include(../departments/engineering/testing/300-test-first-mandate.mdc)
+@include(../departments/engineering/testing/310-component-visual-testing.mdc)
+@include(../departments/engineering/testing/320-test-resilience.mdc)
+@include(../departments/engineering/testing/330-third-party-integration-testing.mdc)
+@include(../departments/engineering/testing/116-testing-environments.mdc)
+```
+
+## Security & Compliance
+
+Guidelines for maintaining security and compliance standards:
+
+```mdc
+@include(001-security.mdc)
+@include(002-compliance.mdc)
+@include(../departments/engineering/security/011-env-var-security.mdc)
+@include(../departments/engineering/security/012-api-security.mdc)
+```
+
+## UX & Design Standards
+
+Standards for user experience and visual design:
+
+```mdc
+@include(../departments/product/030-visual-style-consolidated.mdc)
+@include(../departments/product/040-ux-stability.mdc)
+@include(../departments/product/050-css-architecture.mdc)
+```
+
+## Frontend Development
+
+Guidelines for frontend implementation, including CSS and component structure:
+
+```mdc
+@include(../technologies/frameworks/042-ui-component-architecture.mdc)
+@include(../technologies/languages/javascript/054-accessibility-requirements.mdc)
+```
+
+## Performance & Optimization
+
+Standards for application performance and optimization:
+
+```mdc
+@include(../departments/engineering/performance/060-performance-metrics.mdc)
+@include(../departments/engineering/performance/061-code-splitting.mdc)
+```
+
+## Multi-tenancy & Platform Structure
+
+Guidelines for multi-tenancy, white-labeling, and platform organization:
+
+```mdc
+@include(../departments/engineering/architecture/025-multi-tenancy.mdc)
+```
+
+## Deployment & Infrastructure
+
+Guidelines for deployment processes and infrastructure management:
+
+```mdc
+@include(../technologies/platforms/200-deployment-infrastructure.mdc)
+@include(../technologies/platforms/220-security-monitoring.mdc)
+```
+
+## Operations & Incident Management
+
+Standards for operational procedures and incident handling:
+
+```mdc
+@include(../technologies/platforms/210-operations-incidents.mdc)
+```
+
+## Integration & Third-Party Dependencies
+
+Guidelines for integrating with external systems and managing dependencies:
+
+```mdc
+@include(../technologies/frameworks/110-integration-dependencies.mdc)
+@include(../technologies/platforms/mindstudio/115-mindstudio-integration.mdc)
+```
+
+## Technical Stack
+
+Standards for technology selection and usage:
+
+```mdc
+@include(../technologies/frameworks/120-technical-stack.mdc)
+```
+
+## Logging & Troubleshooting
+
+Guidelines for logging and troubleshooting:
+
+```mdc
+@include(../departments/engineering/operations/130-logging-standards.mdc)
+@include(../departments/engineering/operations/140-troubleshooting-standards.mdc)
+```
+
+## Workflow Guidelines
+
+Standards for development workflows:
+
+```mdc
+@include(../departments/engineering/workflow/800-workflow-guidelines.mdc)
+```
+
+## Rules Management
+
+For managing Cursor rules themselves, refer to:
+```mdc
+@include(../templates/001-cursor-rules-template.mdc)
+```
+
+The rule system works as follows:
+- Use this file (000-core-guidelines.mdc) as the primary source for development guidelines in all projects
+- For a complete registry of all rules, refer to the Rules Registry
+- For new repositories, apply these guidelines by default
+- For existing repositories, check for project-specific rules in the repository's `.cursor/rules/` directory
+- When creating or updating Cursor rules, follow the conventions in the rule templates
+
+## Implementation Examples
+
+For detailed implementation examples of the rules covered in this guide, refer to:
+```mdc
+@include(003-examples-guide.mdc)
+```
+
+The examples guide provides:
+- Practical implementation patterns for complex rules
+- Code examples that demonstrate best practices
+- Domain-specific reference implementations
+- Links to all available example documentation
+
+Each rule with complex implementation details includes links to its corresponding examples in the repository, and these examples are cataloged in the central Examples Guide for easy reference.
+
+## Usage in Enterprise Context
+
+These guidelines apply to all projects across the organization and should be followed by all team members. Use these guidelines as a reference when:
+
+1. Developing new features
+2. Fixing bugs
+3. Creating tests
+4. Reviewing code
+5. Setting up infrastructure
+6. Handling incidents
+7. Selecting technologies
+8. Implementing UI layouts or CSS
+
+The AI assistant has been trained to understand and follow these guidelines when providing assistance across the enterprise.
+
+## Deployment Instructions
+
+To deploy these rules to Cursor:
+
+1. Use the deployment script in `enterprise-cursor-rules/tools/deploy_cursor_rules.sh`
+2. For global rules: `./deploy_cursor_rules.sh --target global`
+3. For project-specific rules: `./deploy_cursor_rules.sh --target project`
+
+See the [Implementation Roadmap](mdc:../../README-Cursor-Rules.md#implementation-roadmap) for details on the phased deployment approach.

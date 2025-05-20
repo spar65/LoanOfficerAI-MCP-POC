@@ -1,0 +1,797 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+___
+description: ALWAYS APPLY when integrating with third-party libraries or services to ensure security, stability, and maintainability
+globs: "**/*.{json,js,jsx,ts,tsx,py,rb,java,go,cs,php}"
+___
+
+# Integration & Dependencies Management
+
+## Context
+
+- Modern applications rely heavily on third-party dependencies and integrations
+- Unmaintained or vulnerable dependencies create security risks
+- Dependency conflicts can cause unpredictable application behavior
+- Tight coupling to third-party services creates fragile integration points
+- Proper abstraction of dependencies improves application maintainability
+- Dependency management affects build performance and deployment size
+
+## Core Requirements
+
+### Dependency Selection Criteria
+
+- **REQUIRED**: Evaluate dependencies based on activity, community support, and last update date
+- **REQUIRED**: Validate compatibility with the project's license requirements
+- **REQUIRED**: Check security vulnerability history before adoption
+- **REQUIRED**: Consider package size impact on bundle size and load time
+- **REQUIRED**: Prefer dependencies with TypeScript definitions when applicable
+- **REQUIRED**: Evaluate documentation quality and completeness
+- **RECOMMENDED**: Choose mature dependencies with 1.0.0+ versioning when possible
+- **RECOMMENDED**: Consider community size and support channels
+
+```javascript
+// ✅ Good: Validate dependencies before adding to the project
+// package.json scripts
+{
+  "scripts": {
+    "validate:deps": "npx depcheck && npm audit",
+    "check:bundle": "npx bundlesize",
+    "check:licenses": "npx license-checker --summary"
+  }
+}
+```
+
+### Version Pinning and Updates
+
+- **REQUIRED**: Use exact versions (`1.2.3`) or limited range (`^1.2.3`) for dependencies
+- **REQUIRED**: Lock dependencies with lock files (package-lock.json, yarn.lock, etc.)
+- **REQUIRED**: Update dependencies on a regular schedule with proper testing
+- **REQUIRED**: Maintain a changelog of dependency updates with risk assessments
+- **REQUIRED**: Segment updates into critical security, bug fixes, and feature updates
+- **REQUIRED**: Test thoroughly after dependency updates
+- **REQUIRED**: Version control lock files to ensure consistent builds
+
+```json
+// ✅ Good: Proper versioning in package.json
+{
+  "dependencies": {
+    "react": "^18.2.0",
+    "axios": "1.3.5",
+    "lodash": "~4.17.21"
+  },
+  "devDependencies": {
+    "typescript": "5.0.4",
+    "jest": "29.5.0"
+  },
+  "resolutions": {
+    "some-package/vulnerable-dependency": "1.2.3"
+  }
+}
+
+// ❌ Bad: Loose versioning
+{
+  "dependencies": {
+    "react": "*",  // Any version
+    "axios": "latest", // Latest version
+    "lodash": ">=4.0.0" // Any version above 4.0.0
+  }
+}
+```
+
+### Dependency Abstraction
+
+- **REQUIRED**: Create abstraction layers around third-party dependencies
+- **REQUIRED**: Implement adapter patterns for external services
+- **REQUIRED**: Centralize dependency usage in dedicated modules
+- **REQUIRED**: Avoid direct imports of third-party libraries across the codebase
+- **RECOMMENDED**: Create facades for complex libraries to simplify usage
+
+```typescript
+// ✅ Good: Abstract third-party HTTP client
+// src/lib/http/client.ts
+import axios, { AxiosRequestConfig, AxiosResponse } from 'axios';
+
+export interface RequestConfig extends Omit<AxiosRequestConfig, 'url' | 'method'> {
+  // Custom configuration options
+  retries?: number;
+}
+
+export interface HttpResponse<T = any> {
+  data: T;
+  status: number;
+  headers: Record<string, string>;
+}
+
+class HttpClient {
+  private baseUrl: string;
+  
+  constructor(baseUrl: string) {
+    this.baseUrl = baseUrl;
+  }
+  
+  async get<T = any>(url: string, config?: RequestConfig): Promise<HttpResponse<T>> {
+    try {
+      const response = await axios.get<T>(`${this.baseUrl}${url}`, config);
+      return this.normalizeResponse(response);
+    } catch (error) {
+      return this.handleError(error);
+    }
+  }
+  
+  async post<T = any, D = any>(url: string, data?: D, config?: RequestConfig): Promise<HttpResponse<T>> {
+    try {
+      const response = await axios.post<T>(`${this.baseUrl}${url}`, data, config);
+      return this.normalizeResponse(response);
+    } catch (error) {
+      return this.handleError(error);
+    }
+  }
+  
+  // Other methods (put, delete, etc.)
+  
+  private normalizeResponse<T>(response: AxiosResponse<T>): HttpResponse<T> {
+    return {
+      data: response.data,
+      status: response.status,
+      headers: response.headers as Record<string, string>
+    };
+  }
+  
+  private handleError(error: any): never {
+    // Custom error handling logic
+    throw error;
+  }
+}
+
+export const createHttpClient = (baseUrl: string): HttpClient => {
+  return new HttpClient(baseUrl);
+};
+
+// ❌ Bad: Direct usage of third-party library throughout the codebase
+// src/features/users/api.ts
+import axios from 'axios';
+
+export async function getUsers() {
+  return axios.get('/api/users');
+}
+
+// src/features/products/api.ts
+import axios from 'axios';
+
+export async function getProducts() {
+  return axios.get('/api/products');
+}
+```
+
+### Dependency Security
+
+- **REQUIRED**: Run security audits (`npm audit`, `yarn audit`) regularly
+- **REQUIRED**: Configure automated vulnerability scanning in CI/CD
+- **REQUIRED**: Have a clear policy for addressing critical vulnerabilities
+- **REQUIRED**: Monitor security advisories for key dependencies
+- **REQUIRED**: Establish an emergency process for critical CVEs
+- **REQUIRED**: Implement a Software Bill of Materials (SBOM) for tracking dependencies
+- **RECOMMENDED**: Configure Dependabot or similar tools for vulnerability alerts
+
+```yaml
+# ✅ Good: GitHub Actions workflow for dependency auditing
+# .github/workflows/dependency-audit.yml
+name: Dependency Audit
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    - cron: '0 0 * * 1' # Weekly on Mondays
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+      - name: Install dependencies
+        run: npm ci
+      - name: Audit dependencies
+        run: npm audit --audit-level=high
+      - name: Generate SBOM
+        run: npx @cyclonedx/cyclonedx-npm --output sbom.json
+      - name: Upload SBOM
+        uses: actions/upload-artifact@v3
+        with:
+          name: sbom
+          path: sbom.json
+```
+
+### Build Optimization
+
+- **REQUIRED**: Analyze and optimize bundle size for frontend applications
+- **REQUIRED**: Eliminate duplicate dependencies
+- **REQUIRED**: Configure tree shaking for JavaScript/TypeScript projects
+- **REQUIRED**: Implement code splitting for large dependencies
+- **REQUIRED**: Use dynamic imports for conditional dependencies
+- **RECOMMENDED**: Consider micro-frontends for better dependency isolation
+
+```javascript
+// ✅ Good: Dynamic imports for code splitting
+// src/pages/Analytics.js
+import React, { lazy, Suspense } from 'react';
+
+// Heavy dependency loaded only when needed
+const Chart = lazy(() => import('../components/Chart'));
+
+function Analytics() {
+  return (
+    <div className="analytics-page">
+      <h1>Analytics Dashboard</h1>
+      <Suspense fallback={<div>Loading chart...</div>}>
+        <Chart data={someData} />
+      </Suspense>
+    </div>
+  );
+}
+```
+
+### Transitive Dependency Management
+
+- **REQUIRED**: Review transitive dependencies for security issues
+- **REQUIRED**: Resolve conflicting dependency versions explicitly
+- **REQUIRED**: Use dependency resolution when necessary to enforce specific versions
+- **REQUIRED**: Maintain awareness of indirect dependency impact on security
+- **RECOMMENDED**: Periodically audit full dependency tree
+
+```json
+// ✅ Good: Resolve transitive dependencies
+// package.json
+{
+  "dependencies": {
+    "some-library": "^2.0.0"
+  },
+  "resolutions": {
+    "some-library/problematic-dependency": "1.5.0"
+  },
+  "overrides": {
+    "vulnerability-package": "1.2.3"
+  }
+}
+```
+
+### API Integration Patterns
+
+- **REQUIRED**: Implement circuit breakers for external API calls
+- **REQUIRED**: Add retry logic with exponential backoff for transient failures
+- **REQUIRED**: Create configuration-driven integration points
+- **REQUIRED**: Log detailed API interaction for debugging
+- **REQUIRED**: Implement proper error handling for API failures
+- **REQUIRED**: Use appropriate timeouts for all external calls
+- **REQUIRED**: Create integration tests that mock external dependencies
+- **RECOMMENDED**: Implement feature flags for controlling integration points
+
+```typescript
+// ✅ Good: Circuit breaker pattern for API calls
+// src/lib/integration/circuitBreaker.ts
+import { callWithRetry } from './retry';
+
+interface CircuitBreakerOptions {
+  failureThreshold: number;
+  resetTimeout: number;
+  timeout: number;
+}
+
+enum CircuitState {
+  CLOSED,
+  OPEN,
+  HALF_OPEN
+}
+
+export class CircuitBreaker {
+  private state: CircuitState = CircuitState.CLOSED;
+  private failureCount: number = 0;
+  private nextAttempt: number = Date.now();
+  private readonly options: CircuitBreakerOptions;
+  
+  constructor(options: Partial<CircuitBreakerOptions> = {}) {
+    this.options = {
+      failureThreshold: 3,
+      resetTimeout: 30000, // 30 seconds
+      timeout: 10000, // 10 seconds
+      ...options
+    };
+  }
+  
+  async execute<T>(fn: () => Promise<T>): Promise<T> {
+    if (this.state === CircuitState.OPEN) {
+      if (Date.now() < this.nextAttempt) {
+        throw new Error('Circuit breaker is open');
+      }
+      this.state = CircuitState.HALF_OPEN;
+    }
+    
+    try {
+      // Execute with timeout and retry
+      const result = await callWithRetry(
+        () => this.executeWithTimeout(fn),
+        { retries: this.state === CircuitState.HALF_OPEN ? 1 : 3 }
+      );
+      
+      this.onSuccess();
+      return result;
+    } catch (error) {
+      this.onFailure();
+      throw error;
+    }
+  }
+  
+  private async executeWithTimeout<T>(fn: () => Promise<T>): Promise<T> {
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error('Operation timed out')), this.options.timeout);
+    });
+    
+    return Promise.race([fn(), timeoutPromise]);
+  }
+  
+  private onSuccess(): void {
+    this.failureCount = 0;
+    this.state = CircuitState.CLOSED;
+  }
+  
+  private onFailure(): void {
+    this.failureCount += 1;
+    
+    if (this.state === CircuitState.HALF_OPEN || 
+        this.failureCount >= this.options.failureThreshold) {
+      this.state = CircuitState.OPEN;
+      this.nextAttempt = Date.now() + this.options.resetTimeout;
+    }
+  }
+}
+
+// Usage
+// src/services/userService.ts
+import { CircuitBreaker } from '../lib/integration/circuitBreaker';
+import { httpClient } from '../lib/http/client';
+
+const userApiCircuit = new CircuitBreaker({
+  failureThreshold: 5,
+  resetTimeout: 60000
+});
+
+export async function fetchUserData(userId: string) {
+  return userApiCircuit.execute(() => 
+    httpClient.get(`/users/${userId}`)
+  );
+}
+```
+
+### Mocking Dependencies for Testing
+
+- **REQUIRED**: Create mock implementations of all external dependencies for testing
+- **REQUIRED**: Use dependency injection to facilitate mocking
+- **REQUIRED**: Establish clear boundary between application code and third-party code
+- **REQUIRED**: Test error handling for dependency failures
+- **RECOMMENDED**: Implement test doubles (stubs, spies, mocks) for complex dependencies
+
+```typescript
+// ✅ Good: Testable code with dependency injection
+// src/services/notificationService.ts
+export interface EmailProvider {
+  sendEmail(to: string, subject: string, body: string): Promise<void>;
+}
+
+export class NotificationService {
+  constructor(private emailProvider: EmailProvider) {}
+  
+  async sendWelcomeEmail(user: { email: string; name: string }): Promise<void> {
+    const subject = 'Welcome to our platform!';
+    const body = `Hello ${user.name}, welcome to our amazing platform.`;
+    
+    await this.emailProvider.sendEmail(user.email, subject, body);
+  }
+}
+
+// src/tests/notificationService.test.ts
+import { NotificationService, EmailProvider } from '../services/notificationService';
+
+// Mock implementation
+class MockEmailProvider implements EmailProvider {
+  public sentEmails: Array<{ to: string; subject: string; body: string }> = [];
+  
+  async sendEmail(to: string, subject: string, body: string): Promise<void> {
+    this.sentEmails.push({ to, subject, body });
+  }
+}
+
+describe('NotificationService', () => {
+  it('should send welcome email', async () => {
+    // Arrange
+    const mockEmailProvider = new MockEmailProvider();
+    const notificationService = new NotificationService(mockEmailProvider);
+    const user = { email: 'test@example.com', name: 'Test User' };
+    
+    // Act
+    await notificationService.sendWelcomeEmail(user);
+    
+    // Assert
+    expect(mockEmailProvider.sentEmails.length).toBe(1);
+    expect(mockEmailProvider.sentEmails[0].to).toBe('test@example.com');
+    expect(mockEmailProvider.sentEmails[0].subject).toBe('Welcome to our platform!');
+    expect(mockEmailProvider.sentEmails[0].body).toContain('Test User');
+  });
+});
+```
+
+### Third-Party Service Documentation
+
+- **REQUIRED**: Document all third-party service integrations
+- **REQUIRED**: Include configuration details, authentication methods, and failure modes
+- **REQUIRED**: Add versioning information for API dependencies
+- **REQUIRED**: Document SLAs and rate limits
+- **REQUIRED**: Provide fallback procedures for service outages
+- **RECOMMENDED**: Create architecture diagrams showing integration points
+
+```markdown
+# Payment Service Integration
+
+## Service Details
+- **Provider:** Stripe
+- **API Version:** 2022-11-15
+- **Documentation:** https://stripe.com/docs/api
+- **Dashboard:** https://dashboard.stripe.com
+
+## Configuration
+Environment variables:
+- `STRIPE_API_KEY` - Secret API key for authentication
+- `STRIPE_WEBHOOK_SECRET` - Secret for webhook signature verification
+- `STRIPE_CONNECT_CLIENT_ID` - Client ID for Connect applications
+
+## Integration Points
+1. **Payment Processing** - `/api/payments`
+   - Handles credit card payments via Stripe Payment Intents
+   - Rate limit: 100 requests/minute
+   - Timeout: 30 seconds
+
+2. **Subscription Management** - `/api/subscriptions`
+   - Creates and manages recurring subscriptions
+   - Webhooks: `customer.subscription.updated`, `customer.subscription.deleted`
+
+3. **Webhook Handler** - `/api/webhooks/stripe`
+   - Processes Stripe events via webhooks
+   - Validates webhook signatures
+   - Retry mechanism: Built-in Stripe retry with 3 attempts
+
+## Failure Modes
+1. **API Unavailable**
+   - Fallback: Queue payment attempts for later processing
+   - Alert: PagerDuty integration
+
+2. **Rate Limit Exceeded**
+   - Fallback: Implement exponential backoff
+   - Monitoring: Datadog metrics
+
+3. **Authentication Failure**
+   - Fallback: Use secondary API key
+   - Alert: Immediate Slack notification to security team
+
+## Error Handling
+All Stripe API errors are logged to:
+- Application logs with `stripe-error` tag
+- Error monitoring system (Sentry)
+- Admin dashboard alerts for critical failures
+```
+
+## Examples
+
+### Dependency Management in Package.json
+
+<example>
+```json
+// ✅ Good: Well-structured package.json with proper dependency management
+{
+  "name": "enterprise-application",
+  "version": "1.0.0",
+  "description": "Enterprise application with proper dependency management",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "audit:deps": "npm audit --production",
+    "audit:licenses": "license-checker --summary",
+    "check:deps": "depcheck",
+    "analyze:bundle": "webpack-bundle-analyzer stats.json",
+    "update:deps": "npm-check-updates -u && npm install",
+    "test": "jest",
+    "build": "webpack"
+  },
+  "dependencies": {
+    "axios": "1.3.4",
+    "lodash": "^4.17.21",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.0.28",
+    "@types/react-dom": "^18.0.11",
+    "depcheck": "^1.4.3",
+    "jest": "^29.5.0",
+    "license-checker": "^25.0.1",
+    "npm-check-updates": "^16.7.13",
+    "typescript": "^5.0.2",
+    "webpack": "^5.76.3",
+    "webpack-bundle-analyzer": "^4.8.0"
+  },
+  "resolutions": {
+    "minimist": "^1.2.6"
+  },
+  "overrides": {
+    "semver": "^7.5.2"
+  }
+}
+```
+</example>
+
+### API Abstraction Layer
+
+<example>
+```typescript
+// ✅ Good: Payment provider abstraction layer
+// src/lib/payment/types.ts
+export interface PaymentMethod {
+  id: string;
+  type: 'card' | 'bank_account' | 'wallet';
+  last4?: string;
+  expiryMonth?: number;
+  expiryYear?: number;
+}
+
+export interface PaymentRequest {
+  amount: number;
+  currency: string;
+  customerId: string;
+  paymentMethodId?: string;
+  description?: string;
+  metadata?: Record<string, string>;
+}
+
+export interface PaymentResponse {
+  id: string;
+  amount: number;
+  currency: string;
+  status: 'succeeded' | 'pending' | 'failed';
+  createdAt: Date;
+  errorMessage?: string;
+}
+
+export interface PaymentProvider {
+  createPayment(request: PaymentRequest): Promise<PaymentResponse>;
+  getPaymentById(paymentId: string): Promise<PaymentResponse>;
+  listPaymentMethods(customerId: string): Promise<PaymentMethod[]>;
+}
+
+// src/lib/payment/providers/stripe.ts
+import Stripe from 'stripe';
+import { PaymentProvider, PaymentRequest, PaymentResponse, PaymentMethod } from '../types';
+import { logger } from '../../logging';
+
+export class StripePaymentProvider implements PaymentProvider {
+  private client: Stripe;
+  
+  constructor(apiKey: string) {
+    this.client = new Stripe(apiKey, {
+      apiVersion: '2022-11-15',
+      timeout: 30000,
+    });
+  }
+  
+  async createPayment(request: PaymentRequest): Promise<PaymentResponse> {
+    try {
+      logger.info('Creating Stripe payment', { customerId: request.customerId });
+      
+      const paymentIntent = await this.client.paymentIntents.create({
+        amount: request.amount,
+        currency: request.currency,
+        customer: request.customerId,
+        payment_method: request.paymentMethodId,
+        description: request.description,
+        metadata: request.metadata,
+        confirm: true,
+      });
+      
+      return this.mapToPaymentResponse(paymentIntent);
+    } catch (error) {
+      logger.error('Stripe payment failed', {
+        error,
+        customerId: request.customerId,
+      });
+      
+      if (error instanceof Stripe.errors.StripeError) {
+        return {
+          id: error.payment_intent?.id || 'unknown',
+          amount: request.amount,
+          currency: request.currency,
+          status: 'failed',
+          createdAt: new Date(),
+          errorMessage: error.message,
+        };
+      }
+      
+      throw error;
+    }
+  }
+  
+  async getPaymentById(paymentId: string): Promise<PaymentResponse> {
+    const paymentIntent = await this.client.paymentIntents.retrieve(paymentId);
+    return this.mapToPaymentResponse(paymentIntent);
+  }
+  
+  async listPaymentMethods(customerId: string): Promise<PaymentMethod[]> {
+    const methods = await this.client.paymentMethods.list({
+      customer: customerId,
+      type: 'card',
+    });
+    
+    return methods.data.map(method => ({
+      id: method.id,
+      type: method.type as any,
+      last4: method.card?.last4,
+      expiryMonth: method.card?.exp_month,
+      expiryYear: method.card?.exp_year,
+    }));
+  }
+  
+  private mapToPaymentResponse(paymentIntent: Stripe.PaymentIntent): PaymentResponse {
+    return {
+      id: paymentIntent.id,
+      amount: paymentIntent.amount,
+      currency: paymentIntent.currency,
+      status: this.mapPaymentStatus(paymentIntent.status),
+      createdAt: new Date(paymentIntent.created * 1000),
+      errorMessage: paymentIntent.last_payment_error?.message,
+    };
+  }
+  
+  private mapPaymentStatus(status: string): 'succeeded' | 'pending' | 'failed' {
+    if (status === 'succeeded') return 'succeeded';
+    if (status === 'processing' || status === 'requires_action') return 'pending';
+    return 'failed';
+  }
+}
+
+// src/lib/payment/index.ts
+import { PaymentProvider } from './types';
+import { StripePaymentProvider } from './providers/stripe';
+import { MockPaymentProvider } from './providers/mock';
+import { config } from '../config';
+
+// Factory function to create the appropriate payment provider
+export function createPaymentProvider(): PaymentProvider {
+  if (config.environment === 'test') {
+    return new MockPaymentProvider();
+  }
+  
+  return new StripePaymentProvider(config.stripe.apiKey);
+}
+
+// Export public interfaces
+export * from './types';
+
+// Usage in application code
+// src/services/paymentService.ts
+import { createPaymentProvider, PaymentRequest } from '../lib/payment';
+
+export class PaymentService {
+  private paymentProvider = createPaymentProvider();
+  
+  async processPayment(userId: string, amount: number): Promise<string> {
+    // Business logic here
+    
+    const request: PaymentRequest = {
+      amount,
+      currency: 'usd',
+      customerId: userId,
+      description: 'Product purchase',
+    };
+    
+    const result = await this.paymentProvider.createPayment(request);
+    
+    if (result.status === 'failed') {
+      throw new Error(`Payment failed: ${result.errorMessage}`);
+    }
+    
+    return result.id;
+  }
+}
+```
+</example>
+
+### Invalid Dependency Practices
+
+<example type="invalid">
+```typescript
+// ❌ Bad: Direct use of third-party library spread throughout codebase
+// UserComponent.tsx
+import stripe from 'stripe';
+
+function UserComponent() {
+  const handlePayment = async () => {
+    // Directly using Stripe library in UI component
+    const stripeClient = new stripe('sk_test_123456789');
+    const payment = await stripeClient.paymentIntents.create({
+      amount: 2000,
+      currency: 'usd',
+    });
+    // Process payment...
+  };
+  
+  return <button onClick={handlePayment}>Pay Now</button>;
+}
+
+// ❌ Bad: Loose version constraints
+// package.json
+{
+  "dependencies": {
+    "lodash": "*", // Any version
+    "express": "latest", // Latest version - unpredictable
+    "react": ">=16" // Too broad of a range
+  }
+}
+
+// ❌ Bad: No error handling for third-party service
+async function fetchUserData(userId) {
+  // Direct API call with no error handling, retries, or circuit breaking
+  const response = await fetch(`https://api.example.com/users/${userId}`);
+  const data = await response.json();
+  return data;
+}
+
+// ❌ Bad: No abstraction or testing isolation
+// Directly imports and uses axios throughout codebase
+import axios from 'axios';
+
+export class UserService {
+  async getUsers() {
+    return axios.get('/api/users');
+  }
+  
+  async createUser(userData) {
+    return axios.post('/api/users', userData);
+  }
+}
+```
+</example>
+
+## Implementation Guidelines
+
+1. **Initial Setup**: Establish dependency management policies and scripts
+   - Create a standardized package.json structure
+   - Configure security scanning tools
+   - Document approved library list
+
+2. **Abstraction Development**: Create abstraction layers for critical dependencies
+   - Identify key third-party services
+   - Design interfaces and adapter implementations
+   - Document integration points
+
+3. **Integration Implementation**: Follow best practices when implementing integrations
+   - Follow interface contracts
+   - Implement proper error handling and circuit breakers
+   - Create thorough testing plan for each integration
+
+4. **Monitoring & Maintenance**: Establish ongoing maintenance processes
+   - Regular security audits
+   - Dependency update schedule
+   - Performance monitoring for integration points
+
+## Related Rules
+
+- [060-api-standards.mdc](mdc:departments/engineering/api/060-api-standards.mdc)
+- [013-dependency-auditing.mdc](mdc:departments/engineering/security/013-dependency-auditing.mdc)
+- [103-do-no-harm.mdc](mdc:departments/engineering/coding-standards/103-do-no-harm.mdc)
+- [200-deployment-infrastructure.mdc](mdc:technologies/platforms/200-deployment-infrastructure.mdc)

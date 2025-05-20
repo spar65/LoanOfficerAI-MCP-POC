@@ -1,0 +1,560 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+___
+description: VALIDATE user sessions when IMPLEMENTING authentication to PREVENT unauthorized access and ensure secure user management
+globs: "**/{auth,middleware}/**/*.{js,ts,tsx}, **/api/auth/**/*.{js,ts}"
+___
+
+# Session Validation & Security
+
+## Context
+- User sessions require proper validation to prevent unauthorized access
+- Sessions should have appropriate timeouts to reduce security risks
+- Authentication flows are common targets for brute force attacks
+- CAPTCHA and rate limiting provide essential protection for login endpoints
+- Session management is a critical security component that impacts user experience
+
+## Requirements
+
+### Session Validation
+
+- **REQUIRED**: Validate session tokens on all authenticated routes and API endpoints
+- **REQUIRED**: Use HTTP-only, secure cookies for storing session tokens
+- Store minimal data in client-side accessible session state
+- Implement proper CSRF protection for session management
+- Set appropriate cookie expiration and renewal mechanisms
+- Use consistent session validation across the application
+
+```typescript
+// GOOD: Middleware for session validation in Next.js
+// middleware.ts
+import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
+import { validateSession } from '@/lib/auth';
+
+export async function middleware(request: NextRequest) {
+  // Get session token from cookie
+  const sessionToken = request.cookies.get('session_token')?.value;
+  
+  // Skip validation for public routes
+  if (request.nextUrl.pathname.startsWith('/public') || 
+      request.nextUrl.pathname.startsWith('/api/public') || 
+      request.nextUrl.pathname === '/login') {
+    return NextResponse.next();
+  }
+  
+  // Validate session
+  const isValid = sessionToken ? await validateSession(sessionToken) : false;
+  
+  if (!isValid) {
+    // Redirect to login page for invalid/missing session
+    const loginUrl = new URL('/login', request.url);
+    loginUrl.searchParams.set('redirect', request.nextUrl.pathname);
+    return NextResponse.redirect(loginUrl);
+  }
+  
+  // Session is valid, proceed
+  return NextResponse.next();
+}
+
+export const config = {
+  matcher: [
+    '/((?!_next/static|_next/image|favicon.ico).*)',
+  ],
+};
+```
+
+<example type="invalid">
+// BAD: Missing session validation
+// pages/api/user-data.ts
+import type { NextApiRequest, NextApiResponse } from 'next';
+import { getUserData } from '@/lib/user';
+
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  // Missing authentication check
+  const userId = req.cookies.user_id;
+  
+  // Retrieving data without validating session
+  const userData = await getUserData(userId);
+  
+  return res.status(200).json(userData);
+}
+</example>
+
+### Session Timeout & Renewal
+
+- **REQUIRED**: Implement appropriate inactivity timeouts (15-30 minutes for sensitive applications)
+- **REQUIRED**: Provide session renewal mechanisms that don't disrupt user experience
+- Implement absolute session timeouts (e.g., 24 hours) regardless of activity
+- Notify users before session expiration with renewal option
+- Handle session timeout gracefully in the UI
+- Provide secure mechanisms for "remember me" functionality
+
+<example>
+// GOOD: Session timeout handling with refresh token
+// hooks/useSession.ts
+import { useState, useEffect } from 'react';
+
+export function useSession() {
+  const [isValid, setIsValid] = useState(true);
+  const [timeRemaining, setTimeRemaining] = useState(0);
+  
+  // Check session validity and refresh if needed
+  const checkSession = async () => {
+    try {
+      const response = await fetch('/api/auth/session');
+      
+      if (!response.ok) {
+        setIsValid(false);
+        return;
+      }
+      
+      const data = await response.json();
+      setTimeRemaining(data.expiresIn);
+      
+      // Show warning when session is about to expire
+      if (data.expiresIn < 120) { // Less than 2 minutes
+        showSessionExpirationWarning(data.expiresIn);
+      }
+    } catch (error) {
+      console.error('Session check failed:', error);
+      setIsValid(false);
+    }
+  };
+  
+  // Refresh session to extend timeout
+  const refreshSession = async () => {
+    try {
+      const response = await fetch('/api/auth/refresh', { method: 'POST' });
+      
+      if (!response.ok) {
+        setIsValid(false);
+        return false;
+      }
+      
+      const data = await response.json();
+      setTimeRemaining(data.expiresIn);
+      return true;
+    } catch (error) {
+      console.error('Session refresh failed:', error);
+      setIsValid(false);
+      return false;
+    }
+  };
+  
+  // Check session periodically (every 5 minutes)
+  useEffect(() => {
+    checkSession();
+    const interval = setInterval(checkSession, 5 * 60 * 1000);
+    
+    return () => clearInterval(interval);
+  }, []);
+  
+  return { isValid, timeRemaining, refreshSession };
+}
+</example>
+
+### CAPTCHA Protection
+
+- **REQUIRED**: Implement CAPTCHA on login forms after failed attempts (typically 3-5 failures)
+- **REQUIRED**: Use CAPTCHA for user registration
+- **REQUIRED**: Validate CAPTCHA server-side, not just client-side
+- Consider invisible CAPTCHA options for better user experience
+- Use progressive CAPTCHA that adjusts difficulty based on risk factors
+- Implement CAPTCHA for password reset and sensitive operations
+
+<example>
+// GOOD: Progressive CAPTCHA implementation
+// pages/api/auth/login.ts
+import { NextApiRequest, NextApiResponse } from 'next';
+import { verifyCaptcha } from '@/lib/captcha';
+
+export default async function loginHandler(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+  
+  const { email, password, captchaToken } = req.body;
+  
+  // Get login attempt count for this email/IP combination
+  const failedAttempts = await getFailedLoginAttempts(email, req.headers['x-forwarded-for'] as string);
+  
+  // Require CAPTCHA after 3 failed attempts
+  if (failedAttempts >= 3) {
+    // Verify CAPTCHA token
+    if (!captchaToken) {
+      return res.status(400).json({ 
+        error: 'CAPTCHA verification required',
+        requireCaptcha: true 
+      });
+    }
+    
+    const captchaValid = await verifyCaptcha(captchaToken);
+    if (!captchaValid) {
+      return res.status(400).json({ 
+        error: 'Invalid CAPTCHA. Please try again.',
+        requireCaptcha: true
+      });
+    }
+  }
+  
+  // Proceed with authentication
+  try {
+    const user = await authenticateUser(email, password);
+    
+    if (user) {
+      // Reset failed attempts on success
+      await resetFailedLoginAttempts(email, req.headers['x-forwarded-for'] as string);
+      
+      // Create session and return success
+      const session = await createSession(user);
+      return res.status(200).json({ success: true, session });
+    } else {
+      // Increment failed login attempts
+      await incrementFailedLoginAttempts(email, req.headers['x-forwarded-for'] as string);
+      
+      return res.status(401).json({ 
+        error: 'Invalid email or password',
+        requireCaptcha: failedAttempts + 1 >= 3 
+      });
+    }
+  } catch (error) {
+    console.error('Login error:', error);
+    return res.status(500).json({ error: 'Authentication failed' });
+  }
+}
+</example>
+
+<example type="invalid">
+// BAD: Client-side only CAPTCHA validation
+// components/LoginForm.tsx
+function LoginForm() {
+  const [formData, setFormData] = useState({ email: '', password: '' });
+  const [captchaToken, setCaptchaToken] = useState('');
+  
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    // ❌ Client-side only validation of CAPTCHA
+    if (!captchaToken) {
+      alert('Please complete the CAPTCHA');
+      return;
+    }
+    
+    // ❌ Not sending captchaToken to server for verification
+    const response = await fetch('/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(formData)
+    });
+    
+    // Process response...
+  };
+  
+  return (
+    <form onSubmit={handleSubmit}>
+      {/* Form fields */}
+      <ReCAPTCHA
+        sitekey={process.env.RECAPTCHA_SITE_KEY}
+        onChange={setCaptchaToken}
+      />
+      <button type="submit">Login</button>
+    </form>
+  );
+}
+</example>
+
+### Rate Limiting
+
+- **REQUIRED**: Implement IP-based rate limiting for login attempts
+- **REQUIRED**: Apply stricter rate limits for failed login attempts
+- **REQUIRED**: Implement account-based rate limiting to prevent distributed attacks
+- Use exponential backoff for repeated failures
+- Apply rate limiting to all authentication-related endpoints
+- Provide clear error messages for rate-limited requests
+
+<example>
+// GOOD: Rate limiting middleware for authentication endpoints
+// middleware/rateLimit.ts
+import rateLimit from 'express-rate-limit';
+import RedisStore from 'rate-limit-redis';
+import { redis } from '@/lib/redis';
+
+// General rate limiter for API endpoints
+export const apiLimiter = rateLimit({
+  store: new RedisStore({
+    sendCommand: (...args) => redis.call(...args),
+  }),
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per windowMs
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please try again later' },
+});
+
+// Stricter rate limiter for authentication endpoints
+export const authLimiter = rateLimit({
+  store: new RedisStore({
+    sendCommand: (...args) => redis.call(...args),
+  }),
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 10, // limit each IP to 10 login attempts per hour
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many login attempts, please try again after an hour' },
+});
+
+// Extra protection for password reset
+export const passwordResetLimiter = rateLimit({
+  store: new RedisStore({
+    sendCommand: (...args) => redis.call(...args),
+  }),
+  windowMs: 24 * 60 * 60 * 1000, // 24 hours
+  max: 3, // limit each IP to 3 password reset requests per day
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many password reset attempts, please try again tomorrow' },
+});
+</example>
+
+### Brute Force Protection
+
+- **REQUIRED**: Implement account lockout after multiple failed attempts
+- Use temporary lockouts with increasing duration
+- Alert users of suspicious login activity
+- Implement IP-based blocking for persistent attackers
+- Log all authentication attempts for security analysis
+- Consider implementing device fingerprinting for advanced protection
+
+<example>
+// GOOD: Account lockout implementation
+// lib/auth.ts
+export async function checkAccountLockout(userId: string): Promise<{
+  isLocked: boolean;
+  remainingTime?: number;
+}> {
+  const lockKey = `user:${userId}:lockout`;
+  const lockoutData = await redis.get(lockKey);
+  
+  if (!lockoutData) {
+    return { isLocked: false };
+  }
+  
+  const { expiresAt } = JSON.parse(lockoutData);
+  const now = Date.now();
+  
+  if (now < expiresAt) {
+    return {
+      isLocked: true,
+      remainingTime: Math.ceil((expiresAt - now) / 1000), // seconds remaining
+    };
+  }
+  
+  // Lockout expired
+  await redis.del(lockKey);
+  return { isLocked: false };
+}
+
+export async function lockAccount(userId: string, attempts: number): Promise<void> {
+  // Calculate lockout duration based on attempts (exponential backoff)
+  // Starting with 5 minutes, doubling each time, up to 24 hours
+  const baseMinutes = 5;
+  const maxHours = 24;
+  const lockoutMinutes = Math.min(baseMinutes * Math.pow(2, attempts - 5), maxHours * 60);
+  
+  const expiresAt = Date.now() + lockoutMinutes * 60 * 1000;
+  
+  // Store lockout info
+  await redis.set(
+    `user:${userId}:lockout`,
+    JSON.stringify({ expiresAt, attempts }),
+    'EX',
+    lockoutMinutes * 60
+  );
+  
+  // Send notification email to user
+  await sendSecurityAlert(userId, {
+    type: 'account_locked',
+    reason: 'multiple_failed_attempts',
+    duration: `${lockoutMinutes} minutes`,
+  });
+  
+  // Log security event
+  await logSecurityEvent({
+    userId,
+    event: 'account_lockout',
+    details: `Account locked for ${lockoutMinutes} minutes after ${attempts} failed attempts`,
+    severity: 'medium',
+  });
+}
+</example>
+
+### Multi-Factor Authentication
+
+- Offer multi-factor authentication options to users
+- Enforce MFA for high-privilege accounts
+- Ensure MFA is implemented securely following best practices
+- Provide backup methods for account recovery
+- Log all MFA events for security auditing
+- Consider risk-based authentication to trigger MFA conditionally
+
+<example>
+// GOOD: Risk-based MFA implementation
+// lib/auth.ts
+export async function shouldRequireMFA(userId: string, loginContext: any): Promise<boolean> {
+  const user = await getUserById(userId);
+  
+  // Always require MFA if user has it enabled
+  if (user.mfaEnabled) {
+    return true;
+  }
+  
+  // Calculate risk score based on various factors
+  let riskScore = 0;
+  
+  // Unusual location
+  if (!await isKnownLocation(userId, loginContext.ipAddress, loginContext.geoLocation)) {
+    riskScore += 30;
+  }
+  
+  // Unusual device
+  if (!await isKnownDevice(userId, loginContext.deviceFingerprint)) {
+    riskScore += 25;
+  }
+  
+  // Unusual time
+  if (!isUsualLoginTime(user, loginContext.timestamp)) {
+    riskScore += 15;
+  }
+  
+  // Check if high-value account (admin, etc.)
+  if (user.roles.includes('admin') || user.highValueAccount) {
+    riskScore += 20;
+  }
+  
+  // High risk score requires MFA
+  return riskScore >= 40;
+}
+</example>
+
+## Testing Session Security
+
+To ensure proper session security, implement comprehensive tests covering:
+
+```typescript
+// Session validation testing
+describe('Session Validation', () => {
+  it('should redirect unauthenticated requests to login page', async () => {
+    // Create request without valid session
+    const response = await fetch('/protected-route', {
+      redirect: 'manual'
+    });
+    
+    expect(response.status).toBe(307); // Temporary redirect
+    expect(response.headers.get('Location')).toContain('/login');
+  });
+  
+  it('should validate session in protected API routes', async () => {
+    // Create request without valid session
+    const response = await fetch('/api/protected-data', {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    
+    expect(response.status).toBe(401); // Unauthorized
+  });
+  
+  it('should allow access with valid session', async () => {
+    // Create request with valid session token
+    const mockSession = await createMockSession();
+    
+    const response = await fetch('/protected-route', {
+      headers: { Cookie: `session_token=${mockSession.token}` }
+    });
+    
+    expect(response.status).toBe(200);
+  });
+  
+  it('should reject expired sessions', async () => {
+    // Create expired session token
+    const expiredToken = await createExpiredSessionToken();
+    
+    const response = await fetch('/protected-route', {
+      headers: { Cookie: `session_token=${expiredToken}` },
+      redirect: 'manual'
+    });
+    
+    expect(response.status).toBe(307); // Redirect to login
+  });
+});
+
+// Rate limiting tests
+describe('Rate Limiting', () => {
+  it('should apply rate limits on authentication endpoints', async () => {
+    // Make multiple requests in quick succession
+    for (let i = 0; i < 11; i++) {
+      await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: 'test@example.com', password: 'password123' })
+      });
+    }
+    
+    // Last request should be rate limited
+    const response = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'test@example.com', password: 'password123' })
+    });
+    
+    expect(response.status).toBe(429); // Too Many Requests
+  });
+});
+```
+
+## Best Practices
+
+1. **Defense in Depth**: Implement multiple layers of security for session management
+2. **Token Security**: Always use HTTP-only, secure cookies with proper expiration
+3. **CSRF Protection**: Include CSRF tokens in all state-changing operations
+4. **Minimal Privilege**: Store minimal information in session tokens and use JWTs judiciously
+5. **Rate Limiting**: Implement progressive rate limiting across different dimensions (IP, account, action)
+6. **User Notification**: Notify users of important security events like login from new devices
+7. **Security Logging**: Maintain comprehensive logs of authentication events for auditing
+8. **Session Transparency**: Allow users to view and manage their active sessions
+
+## Implementation Checklist
+
+- [ ] Implement proper session validation for all authenticated routes
+- [ ] Configure appropriate session timeouts and renewal mechanisms
+- [ ] Implement CAPTCHA for login and registration
+- [ ] Set up rate limiting for authentication endpoints
+- [ ] Configure brute force protection with account lockouts
+- [ ] Offer or enforce multi-factor authentication
+- [ ] Implement proper error handling for authentication failures
+- [ ] Set up monitoring and alerting for suspicious authentication activity
+- [ ] Test authentication flows thoroughly, including edge cases
+
+## Related Rules
+- [departments/engineering/security/014-third-party-auth.mdc](mdc:departments/engineering/security/014-third-party-auth.mdc) - Third-party authentication
+- [departments/engineering/security/012-api-security.mdc](mdc:departments/engineering/security/012-api-security.mdc) - API security measures  
+- [technologies/frameworks/auth/018-clerk-authentication-standards.mdc](mdc:technologies/frameworks/auth/018-clerk-authentication-standards.mdc) - Clerk authentication implementation
+- [departments/engineering/frontend/045-browser-state-management.mdc](mdc:departments/engineering/frontend/045-browser-state-management.mdc) - Browser state management
+
+## Reference Implementations
+
+For comprehensive examples of session security implementation, refer to our documentation:
+
+- [SessionSecurityImplementation.md](mdc:examples/security/SessionSecurityImplementation.md) - Detailed implementation patterns for secure session management
+- [AuthBestPractices.md](mdc:examples/security/AuthBestPractices.md) - Guide to authentication and session security best practices
+
+**Important Note**: These reference implementations are provided as documentation examples only and are not meant to be imported or used directly in your codebase. They demonstrate the patterns and practices that should be followed when implementing session security.
+
+## Full Documentation Access
+
+To access the complete documentation including all examples, please refer to the original enterprise-cursor-rules repository. The examples directory in the repository contains detailed implementation guides that are referenced above.
+
+The flat structure of the Cursor rules deployment may not include these examples directly, but they remain available in the source repository.

@@ -1,0 +1,773 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+___
+description: IMPLEMENT secure multi-tenant isolation when DEVELOPING features for a multi-organization platform to ENSURE proper data separation, security, and scalability
+globs: "**/{models,database,api,context}/**/*.{ts,tsx,js,jsx}, **/{prisma,mongoose,sequelize}/**/*"
+___
+
+# Multi-Tenancy Architecture Standards
+
+## Context
+- Our platform is a multi-tenant SaaS solution serving multiple organizations
+- Each tenant's data must be strictly isolated from other tenants
+- UI, functionality, and features may vary by tenant configuration
+- Performance and security must be maintained across all tenants
+- Tenant-specific customization must be supported without code changes
+
+## Requirements
+
+### Data Isolation
+
+- **REQUIRED**: Every database query must include tenant context
+- **REQUIRED**: Implement tenant ID in all data models and schemas
+- **REQUIRED**: Create middleware to enforce tenant-based access control
+- **REQUIRED**: Prevent cross-tenant data access through query validation
+- **REQUIRED**: Implement proper error handling for tenant isolation failures
+- **REQUIRED**: Always use row-level security (RLS) for multi-tenant data access
+
+```typescript
+// Good: Database schema with tenant isolation
+import { Schema, model, models } from 'mongoose';
+
+const AgentSchema = new Schema({
+  name: {
+    type: String,
+    required: [true, 'Name is required'],
+    trim: true,
+  },
+  description: {
+    type: String,
+    trim: true,
+  },
+  status: {
+    type: String,
+    enum: ['active', 'inactive', 'archived'],
+    default: 'active',
+  },
+  capabilities: [{
+    type: String,
+    enum: ['text', 'image', 'audio', 'video', 'function', 'tool'],
+  }],
+  configuration: {
+    type: Map,
+    of: Schema.Types.Mixed,
+    default: {},
+  },
+  // Tenant isolation field - required on all models
+  organizationId: {
+    type: Schema.Types.ObjectId,
+    ref: 'Organization',
+    required: [true, 'Organization ID is required'],
+    index: true, // Index for performance
+  },
+  // Standard audit fields
+  createdBy: {
+    type: Schema.Types.ObjectId,
+    ref: 'User',
+    required: true,
+  },
+  updatedBy: {
+    type: Schema.Types.ObjectId,
+    ref: 'User',
+  },
+}, {
+  timestamps: true,
+});
+
+// Enforce tenant isolation on all queries
+AgentSchema.pre('find', function() {
+  if (!this.getQuery().organizationId && !this._skipTenantIsolation) {
+    throw new Error('Organization ID must be specified for tenant isolation');
+  }
+});
+
+AgentSchema.pre('findOne', function() {
+  if (!this.getQuery().organizationId && !this._skipTenantIsolation) {
+    throw new Error('Organization ID must be specified for tenant isolation');
+  }
+});
+
+// Similar pre hooks for other query types: updateOne, deleteOne, etc.
+
+export default models.Agent || model('Agent', AgentSchema);
+```
+
+### Row-Level Security (RLS) Implementation
+
+- **REQUIRED**: Implement row-level security (RLS) at the database level whenever possible
+- **REQUIRED**: Every query must filter data based on tenant/organization ID
+- **REQUIRED**: Row-level policies must be applied to all tables containing multi-tenant data
+- **REQUIRED**: RLS must be enforced consistently across all data access paths
+- Application-level RLS must be implemented when database-level RLS is not available
+
+#### Database-Level RLS (PostgreSQL Example)
+
+```sql
+-- Good: PostgreSQL row-level security implementation
+-- Enable RLS on the table
+ALTER TABLE agents ENABLE ROW LEVEL SECURITY;
+
+-- Create a policy that restricts data access by organization_id
+CREATE POLICY tenant_isolation_policy ON agents
+    USING (organization_id = current_setting('app.current_organization_id')::uuid);
+
+-- Create a function to set the current organization context
+CREATE OR REPLACE FUNCTION set_tenant_context(org_id uuid)
+RETURNS void AS $$
+BEGIN
+    PERFORM set_config('app.current_organization_id', org_id::text, false);
+END;
+$$ LANGUAGE plpgsql;
+
+-- Usage in application code
+BEGIN;
+SELECT set_tenant_context('00000000-0000-0000-0000-000000000000');
+-- All queries now automatically filtered by organization_id
+SELECT * FROM agents; -- Only returns agents for the set organization
+COMMIT;
+```
+
+#### Application-Level RLS
+
+```typescript
+// Good: Application-level RLS middleware for Mongoose
+export function applyRLS(model, tenantIdField = 'organizationId') {
+  // Add pre-hooks for all query methods
+  const queryMethods = ['find', 'findOne', 'findOneAndUpdate', 'findOneAndDelete', 
+                        'updateOne', 'updateMany', 'deleteOne', 'deleteMany', 'count'];
+  
+  queryMethods.forEach(method => {
+    model.schema.pre(method, function() {
+      // Skip RLS for system operations if needed
+      if (this._skipRLS) return;
+      
+      // Get current tenant from context
+      const currentTenantId = getCurrentTenantId();
+      
+      if (!currentTenantId) {
+        throw new Error('Tenant context is required for data access');
+      }
+      
+      // Add tenant filter to query if not already present
+      if (!this.getQuery()[tenantIdField]) {
+        this.where({ [tenantIdField]: currentTenantId });
+      } else if (this.getQuery()[tenantIdField] !== currentTenantId) {
+        // Cross-tenant access attempt - log and prevent
+        logger.warn('Cross-tenant access attempt prevented', {
+          attemptedTenantId: this.getQuery()[tenantIdField],
+          currentTenantId,
+          operation: method,
+          model: model.modelName
+        });
+        
+        // Either force current tenant ID or block access
+        this.where({ [tenantIdField]: currentTenantId });
+      }
+    });
+  });
+  
+  // Add hooks for any model-specific operations that bypass standard queries
+  
+  return model;
+}
+
+// Apply RLS to all models
+export function enableRLSForAllModels() {
+  const models = mongoose.models;
+  Object.keys(models).forEach(modelName => {
+    applyRLS(models[modelName]);
+  });
+}
+```
+
+### API Tenant Middleware
+
+- **REQUIRED**: Create middleware to extract and validate tenant context
+- **REQUIRED**: Apply tenant context to all API requests
+- **REQUIRED**: Reject requests without valid tenant context
+- **REQUIRED**: Handle tenant switching securely
+- **REQUIRED**: Log all cross-tenant access attempts
+
+```typescript
+// Good: API middleware for tenant isolation
+import { NextApiRequest, NextApiResponse } from 'next';
+import { getSession } from 'next-auth/react';
+import { getUserOrganizations, validateUserAccess } from '@/lib/auth';
+
+export interface TenantContext {
+  organizationId: string;
+  organizationName: string;
+  userRole: string;
+  permissions: string[];
+}
+
+// API route handler with tenant context
+export function withTenantContext(
+  handler: (req: NextApiRequest & { tenantContext: TenantContext }, res: NextApiResponse) => Promise<void>
+) {
+  return async (req: NextApiRequest, res: NextApiResponse) => {
+    // Get user session
+    const session = await getSession({ req });
+    
+    if (!session?.user?.id) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+    
+    try {
+      // Get organization ID from request
+      const organizationId = req.headers['x-organization-id'] as string || 
+                             req.query.organizationId as string;
+      
+      if (!organizationId) {
+        return res.status(400).json({ error: 'Organization ID is required' });
+      }
+      
+      // Validate user has access to this organization
+      const userOrganizations = await getUserOrganizations(session.user.id);
+      const organization = userOrganizations.find(org => org.id === organizationId);
+      
+      if (!organization) {
+        logger.warn('Unauthorized tenant access attempt', {
+          userId: session.user.id,
+          organizationId,
+          path: req.url,
+        });
+        
+        return res.status(403).json({ error: 'You do not have access to this organization' });
+      }
+      
+      // Check permission for specific operation
+      const requiredPermission = getRequiredPermissionForEndpoint(req.url!, req.method!);
+      
+      if (requiredPermission) {
+        const hasPermission = await validateUserAccess(
+          session.user.id,
+          organizationId,
+          requiredPermission
+        );
+        
+        if (!hasPermission) {
+          logger.warn('Insufficient permissions for tenant operation', {
+            userId: session.user.id,
+            organizationId,
+            permission: requiredPermission,
+            path: req.url,
+          });
+          
+          return res.status(403).json({ error: 'Insufficient permissions' });
+        }
+      }
+      
+      // Add tenant context to request
+      (req as any).tenantContext = {
+        organizationId,
+        organizationName: organization.name,
+        userRole: organization.userRole,
+        permissions: organization.permissions,
+      };
+      
+      // Call the original handler with tenant context
+      return await handler(req as any, res);
+    } catch (error) {
+      logger.error('Error processing tenant context', { error, path: req.url });
+      return res.status(500).json({ error: 'Server error' });
+    }
+  };
+}
+
+// Usage in API route
+export default withTenantContext(async function handler(req, res) {
+  const { organizationId } = req.tenantContext;
+  
+  // All database queries now include the tenant context
+  const agents = await Agent.find({ organizationId });
+  
+  return res.status(200).json({ agents });
+});
+```
+
+### Client-Side Tenant Context
+
+- **REQUIRED**: Implement React context for tenant information
+- **REQUIRED**: Create hooks for accessing current tenant
+- **REQUIRED**: Handle tenant switching in the UI
+- **REQUIRED**: Store tenant selection in application state
+- Enforce tenant context in all data fetching
+
+```typescript
+// Good: Client-side tenant context
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { useSession } from 'next-auth/react';
+
+interface Organization {
+  id: string;
+  name: string;
+  role: string;
+  permissions: string[];
+}
+
+interface TenantContextType {
+  currentOrganization: Organization | null;
+  organizations: Organization[];
+  isLoading: boolean;
+  switchOrganization: (organizationId: string) => Promise<void>;
+  hasPermission: (permission: string) => boolean;
+}
+
+const TenantContext = createContext<TenantContextType>({
+  currentOrganization: null,
+  organizations: [],
+  isLoading: true,
+  switchOrganization: async () => {},
+  hasPermission: () => false,
+});
+
+export function TenantProvider({ children }: { children: React.ReactNode }) {
+  const { data: session, status } = useSession();
+  const [organizations, setOrganizations] = useState<Organization[]>([]);
+  const [currentOrganization, setCurrentOrganization] = useState<Organization | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  
+  // Load user organizations
+  useEffect(() => {
+    const loadOrganizations = async () => {
+      if (status === 'authenticated' && session?.user) {
+        try {
+          setIsLoading(true);
+          const response = await fetch('/api/organizations');
+          const data = await response.json();
+          
+          setOrganizations(data.organizations);
+          
+          // Set current organization from localStorage or use first organization
+          const savedOrgId = localStorage.getItem('currentOrganizationId');
+          const orgToSelect = savedOrgId
+            ? data.organizations.find((org: Organization) => org.id === savedOrgId)
+            : data.organizations[0];
+            
+          if (orgToSelect) {
+            setCurrentOrganization(orgToSelect);
+            localStorage.setItem('currentOrganizationId', orgToSelect.id);
+          }
+        } catch (error) {
+          console.error('Failed to load organizations', error);
+        } finally {
+          setIsLoading(false);
+        }
+      }
+    };
+    
+    loadOrganizations();
+  }, [session, status]);
+  
+  // Switch to a different organization
+  const switchOrganization = async (organizationId: string) => {
+    const organization = organizations.find(org => org.id === organizationId);
+    
+    if (organization) {
+      setCurrentOrganization(organization);
+      localStorage.setItem('currentOrganizationId', organizationId);
+      
+      // Notify server about tenant switch
+      await fetch('/api/organizations/switch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ organizationId }),
+      });
+    }
+  };
+  
+  // Check if user has a specific permission
+  const hasPermission = (permission: string): boolean => {
+    if (!currentOrganization) return false;
+    
+    return currentOrganization.permissions.includes(permission);
+  };
+  
+  return (
+    <TenantContext.Provider
+      value={{
+        currentOrganization,
+        organizations,
+        isLoading,
+        switchOrganization,
+        hasPermission,
+      }}
+    >
+      {children}
+    </TenantContext.Provider>
+  );
+}
+
+export const useTenant = () => useContext(TenantContext);
+```
+
+### Data Fetching with Tenant Context
+
+- **REQUIRED**: Create fetch utilities that automatically include tenant context
+- **REQUIRED**: Implement client cache strategies that respect tenant boundaries
+- **REQUIRED**: Ensure all API requests include the current tenant ID
+- Handle errors that may occur due to tenant switching
+- Support fetching resources across tenants for administrative purposes
+
+```typescript
+// Good: Tenant-aware data fetching hook
+export function useTenantData<T>(
+  endpoint: string,
+  options?: {
+    method?: string;
+    body?: any;
+    skipTenantContext?: boolean;
+  }
+) {
+  const { currentOrganization } = useTenant();
+  const [data, setData] = useState<T | null>(null);
+  const [error, setError] = useState<Error | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  
+  useEffect(() => {
+    // Don't fetch if we don't have a tenant selected
+    if (!currentOrganization && !options?.skipTenantContext) {
+      setIsLoading(false);
+      return;
+    }
+    
+    const fetchData = async () => {
+      try {
+        setIsLoading(true);
+        
+        const response = await fetch(endpoint, {
+          method: options?.method || 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            // Include tenant context in request headers
+            ...(currentOrganization && !options?.skipTenantContext
+              ? { 'x-organization-id': currentOrganization.id }
+              : {}),
+          },
+          ...(options?.body ? { body: JSON.stringify(options.body) } : {}),
+        });
+        
+        // Handle HTTP errors
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'An error occurred');
+        }
+        
+        const result = await response.json();
+        setData(result);
+        setError(null);
+      } catch (err) {
+        setError(err instanceof Error ? err : new Error(String(err)));
+        setData(null);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchData();
+  }, [endpoint, currentOrganization, options?.skipTenantContext, options?.method, options?.body]);
+  
+  return { data, error, isLoading, refetch: () => {} };
+}
+```
+
+### Tenant Lifecycle Management
+
+- **REQUIRED**: Implement tenant provisioning and deprovisioning flows
+- **REQUIRED**: Create tenant-specific configuration and customization
+- **REQUIRED**: Support tenant data migration and backup
+- **REQUIRED**: Implement tenant data isolation validation
+- Provide tenant status monitoring and management
+
+```typescript
+// Good: Tenant provisioning service
+export class TenantProvisioningService {
+  // Create a new tenant with initial setup
+  async createTenant(tenantData: {
+    name: string;
+    adminEmail: string;
+    plan: string;
+    industry?: string;
+  }): Promise<{ success: boolean; tenantId?: string; error?: string }> {
+    try {
+      // Start a database transaction
+      const session = await mongoose.startSession();
+      session.startTransaction();
+      
+      try {
+        // Create organization record
+        const organization = await Organization.create([{
+          name: tenantData.name,
+          plan: tenantData.plan,
+          status: 'active',
+          industry: tenantData.industry || 'other',
+          settings: getDefaultSettings(tenantData.plan),
+          features: getEnabledFeatures(tenantData.plan),
+        }], { session });
+        
+        const organizationId = organization[0]._id;
+        
+        // Create admin user (or invite if user already exists)
+        const existingUser = await User.findOne({ email: tenantData.adminEmail });
+        
+        if (existingUser) {
+          // Add organization to existing user
+          await UserOrganization.create([{
+            userId: existingUser._id,
+            organizationId,
+            role: 'admin',
+            status: 'active',
+          }], { session });
+          
+          // Send invite notification
+          await sendOrganizationInvite(existingUser.email, tenantData.name);
+        } else {
+          // Create new user and add to organization
+          const password = generateSecurePassword();
+          const user = await User.create([{
+            email: tenantData.adminEmail,
+            password: await hashPassword(password),
+            status: 'pending',
+          }], { session });
+          
+          await UserOrganization.create([{
+            userId: user[0]._id,
+            organizationId,
+            role: 'admin',
+            status: 'active',
+          }], { session });
+          
+          // Send welcome email with credentials
+          await sendWelcomeEmail(tenantData.adminEmail, tenantData.name, password);
+        }
+        
+        // Provision tenant resources
+        await provisionTenantResources(organizationId, tenantData.plan);
+        
+        // Create default workspace
+        await Workspace.create([{
+          name: 'Default Workspace',
+          organizationId,
+          isDefault: true,
+        }], { session });
+        
+        // Commit transaction
+        await session.commitTransaction();
+        
+        // Log tenant creation
+        logger.info('New tenant provisioned', {
+          organizationId,
+          name: tenantData.name,
+          plan: tenantData.plan,
+        });
+        
+        return { success: true, tenantId: organizationId.toString() };
+      } catch (error) {
+        // Rollback transaction on error
+        await session.abortTransaction();
+        throw error;
+      } finally {
+        session.endSession();
+      }
+    } catch (error) {
+      logger.error('Tenant provisioning failed', { error, tenantData });
+      return { success: false, error: 'Failed to provision tenant' };
+    }
+  }
+}
+```
+
+## Examples
+
+<example>
+// Good: Tenant-aware component
+import { useTenant } from '@/contexts/TenantContext';
+import { useTenantData } from '@/hooks/useTenantData';
+
+function Dashboard() {
+  const { currentOrganization, isLoading: tenantLoading } = useTenant();
+  const { data, error, isLoading: dataLoading } = useTenantData('/api/dashboard/stats');
+  
+  if (tenantLoading || dataLoading) {
+    return <LoadingSpinner />;
+  }
+  
+  if (error) {
+    return <ErrorDisplay message={error.message} />;
+  }
+  
+  return (
+    <div>
+      <h1>{currentOrganization?.name} Dashboard</h1>
+      
+      <div className="stats-container">
+        {data?.stats.map(stat => (
+          <StatCard 
+            key={stat.id} 
+            title={stat.title} 
+            value={stat.value} 
+            change={stat.change} 
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+</example>
+
+<example>
+// Good: Testing multi-tenant isolation
+describe('Tenant Isolation', () => {
+  // Create test tenants and users
+  beforeAll(async () => {
+    // Create tenant 1 with data
+    tenant1 = await createTestTenant({
+      name: 'Tenant 1',
+      plan: 'basic'
+    });
+    
+    tenant1User = await createTestUser({
+      email: 'user1@example.com',
+      organizationId: tenant1.id,
+      role: 'admin'
+    });
+    
+    // Create tenant 2 with data
+    tenant2 = await createTestTenant({
+      name: 'Tenant 2',
+      plan: 'pro'
+    });
+    
+    tenant2User = await createTestUser({
+      email: 'user2@example.com',
+      organizationId: tenant2.id,
+      role: 'admin'
+    });
+    
+    // Create shared data for both tenants
+    await createTestData(tenant1.id, 'tenant1-data');
+    await createTestData(tenant2.id, 'tenant2-data');
+  });
+  
+  // Verify tenant data isolation
+  test('each tenant can only access their own data', async () => {
+    // Set up session for tenant 1 user
+    const tenant1Session = mockSession(tenant1User.id);
+    
+    // Query data with tenant 1 context
+    const tenant1Response = await fetchWithTenantContext('/api/data', tenant1.id, tenant1Session);
+    expect(tenant1Response.status).toBe(200);
+    const tenant1Data = await tenant1Response.json();
+    
+    // Verify tenant 1 can only see their data
+    expect(tenant1Data.items.length).toBeGreaterThan(0);
+    expect(tenant1Data.items.every(item => item.name.includes('tenant1-data'))).toBe(true);
+    
+    // Set up session for tenant 2 user
+    const tenant2Session = mockSession(tenant2User.id);
+    
+    // Query data with tenant 2 context
+    const tenant2Response = await fetchWithTenantContext('/api/data', tenant2.id, tenant2Session);
+    expect(tenant2Response.status).toBe(200);
+    const tenant2Data = await tenant2Response.json();
+    
+    // Verify tenant 2 can only see their data
+    expect(tenant2Data.items.length).toBeGreaterThan(0);
+    expect(tenant2Data.items.every(item => item.name.includes('tenant2-data'))).toBe(true);
+  });
+  
+  // Test cross-tenant access attempts
+  test('prevents cross-tenant access attempts', async () => {
+    // Set up session for tenant 1 user
+    const tenant1Session = mockSession(tenant1User.id);
+    
+    // Attempt to access tenant 2 data with tenant 1 user session
+    const crossTenantResponse = await fetchWithTenantContext('/api/data', tenant2.id, tenant1Session);
+    
+    // Verify access is denied
+    expect(crossTenantResponse.status).toBe(403);
+    const errorData = await crossTenantResponse.json();
+    expect(errorData.error).toContain('access to this organization');
+  });
+});
+</example>
+
+<example type="invalid">
+// Bad: Missing tenant context in queries
+async function getAgents() {
+  // ❌ No tenant context specified
+  const agents = await Agent.find({});
+  return agents;
+}
+</example>
+
+<example type="invalid">
+// Bad: Hardcoded tenant ID
+function UserDashboard() {
+  const { data } = useSWR('/api/dashboard', fetcher);
+  
+  // ❌ Hardcoded organization ID
+  const organizationName = getOrganizationName('org_12345');
+  
+  return (
+    <div>
+      <h1>{organizationName} Dashboard</h1>
+      {/* Dashboard content */}
+    </div>
+  );
+}
+</example>
+
+<example type="invalid">
+// Bad: Insecure tenant switching
+function OrganizationSwitcher() {
+  const [organizations, setOrganizations] = useState([]);
+  
+  // Fetch organizations user has access to
+  useEffect(() => {
+    fetch('/api/organizations').then(r => r.json()).then(data => {
+      setOrganizations(data.organizations);
+    });
+  }, []);
+  
+  // ❌ No validation that user has access to selected organization
+  const switchOrganization = (orgId) => {
+    localStorage.setItem('currentOrganizationId', orgId);
+    window.location.reload();
+  };
+  
+  return (
+    <div>
+      <h3>Switch Organization</h3>
+      <ul>
+        {organizations.map(org => (
+          <li key={org.id} onClick={() => switchOrganization(org.id)}>
+            {org.name}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+</example>
+
+## Common Pitfalls to Avoid
+
+1. **Missing tenant context** in any database query
+2. **Hardcoded tenant IDs** anywhere in the application
+3. **Cross-tenant data leakage** through APIs or UI
+4. **Tenant data conflicts** due to shared resources
+5. **Performance issues** from insufficient tenant-based indexing
+6. **Insecure tenant switching** without proper validation
+7. **Lack of tenant awareness** in caching mechanisms
+8. **Insufficient testing** of tenant isolation
+
+## Related Rules
+- [016-platform-hierarchy.mdc](mdc:departments/engineering/architecture/016-platform-hierarchy.mdc) - Platform data hierarchy
+- [012-api-security.mdc](mdc:departments/engineering/security/012-api-security.mdc) - API security measures
+- [054-accessibility-requirements.mdc](mdc:technologies/languages/javascript/054-accessibility-requirements.mdc) - Accessibility for all tenants
+- [046-session-validation.mdc](mdc:departments/engineering/security/046-session-validation.mdc) - Session security for tenant context

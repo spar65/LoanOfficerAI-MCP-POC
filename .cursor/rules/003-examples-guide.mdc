@@ -1,0 +1,91 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+___
+description: Reference guide to all implementation examples for Enterprise Cursor Rules
+globs: "**/*"
+___
+
+# Enterprise Cursor Rules - Example Documentation
+
+This guide provides a reference to all implementation examples that support the Enterprise Cursor Rules framework. Use these examples as guidance when implementing features that should comply with the rules.
+
+## Important Notes
+
+- These examples are **reference implementations only** and are not meant to be imported or used directly
+- The code snippets demonstrate patterns and practices described in the rules
+- No actual dependencies are required to view these examples
+- In order to access these examples, you'll need to refer to the original repository structure
+
+## Available Examples
+
+### CSS Architecture Examples
+
+The following examples demonstrate proper CSS architecture according to our standards:
+
+- [CSS Architecture - Component Example](mdc:examples/frontend/CSSComponentExample.md)
+- [CSS Architecture - Global Styles](mdc:examples/frontend/CSSGlobalStyles.md)
+- [CSS Architecture - Theme Implementation](mdc:examples/frontend/CSSThemeImplementation.md)
+
+### Frontend Components Examples
+
+These examples showcase properly built components and other frontend resources:
+
+- [Frontend Component - Button Component](mdc:examples/frontend/ButtonComponent.md)
+- [Frontend Component - Form Validation](mdc:examples/frontend/FormValidation.md)
+- [Frontend Component - Data Grid](mdc:examples/frontend/DataGrid.md)
+
+### API Design Examples
+
+Reference implementations for API design:
+
+- [API Design - REST Endpoints](mdc:examples/backend/RESTEndpoints.md)
+- [API Design - GraphQL Schema](mdc:examples/backend/GraphQLSchema.md)
+- [API Design - API Documentation](mdc:examples/backend/APIDocumentation.md)
+
+### Backend Architecture Examples
+
+Examples of backend architecture implementations:
+
+- [Backend Architecture - Service Layer](mdc:examples/backend/ServiceLayer.md)
+- [Backend Architecture - Repository Pattern](mdc:examples/backend/RepositoryPattern.md)
+- [Backend Architecture - Error Handling](mdc:examples/backend/ErrorHandling.md)
+
+### Technical Debt Management Examples
+
+Templates and guides for managing technical debt:
+
+- [Technical Debt Inventory Template](mdc:examples/architecture/TechnicalDebtInventoryTemplate.md)
+- [Technical Debt Impact Matrix](mdc:examples/architecture/TechnicalDebtImpactMatrix.md)
+- [Technical Debt Remediation Guide](mdc:examples/architecture/TechnicalDebtRemediationGuide.md)
+
+### Deployment Infrastructure Examples
+
+Templates and guides for deployment infrastructure:
+
+- [Deployment Pipeline Template](mdc:examples/operations/DeploymentPipelineTemplate.md)
+- [Environment Configuration Guide](mdc:examples/operations/EnvironmentConfigurationStrategy.md)
+- [Rollback Procedure Template](mdc:examples/operations/RollbackProcedureTemplate.md)
+- [GitHub Workflow Examples](mdc:examples/operations/GitHubWorkflowExamples.md)
+
+## How To Use These Examples
+
+1. Find the example that corresponds to the rule you're implementing
+2. Review the example to understand the expected patterns and practices
+3. Adapt the example to fit your specific use case
+4. Ensure your implementation adheres to all requirements in the associated rule
+
+## Contributing New Examples
+
+If you would like to contribute new examples:
+
+1. Follow the existing format and structure
+2. Place the example in the appropriate subdirectory
+3. Update this guide to reference your new example
+4. Submit a pull request for review
+
+## Path Resolution Notes
+
+The paths in this document are relative to the root of the enterprise-cursor-rules repository. When accessing these examples, make sure to adjust the paths according to your local setup.

@@ -1,0 +1,87 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+description: Apply ALWAYS when implementing any security-related features or handling sensitive data
+globs: "**/*"
+
+# Core Security Principles
+
+This document outlines the fundamental security principles to be followed across all projects within the organization. Security is a non-negotiable aspect of our development process and must be considered at every stage.
+
+## General Security Requirements
+
+- **Defense in Depth**: Implement multiple layers of security controls throughout the application
+- **Least Privilege**: Grant minimal access required for functionality to operate
+- **Secure by Default**: All features must be secure by default, requiring explicit opt-out rather than opt-in
+- **Security by Design**: Security must be considered from the earliest design stages
+- **Regular Auditing**: All security components must support logging and auditing
+
+## Authentication & Authorization
+
+- **Multi-factor Authentication**: MFA must be available for all user authentication flows
+- **Strong Password Policies**: Enforce minimum complexity requirements and periodic rotation
+- **Secure Session Management**: Sessions must timeout after inactivity and refresh securely
+- **Role-based Access Control**: Use RBAC for all access management and permission grants
+- **JWT Best Practices**: Follow industry best practices for JWT implementation including proper signing
+
+## Data Security
+
+- **Sensitive Data Encryption**: All PII and sensitive data must be encrypted at rest and in transit
+- **Proper Data Classification**: All data must be classified according to sensitivity level
+- **Data Minimization**: Only collect and retain the minimum necessary data
+- **Secure Data Deletion**: Implement proper mechanisms for data deletion when requested
+- **Secure Backup Strategies**: Ensure backups are encrypted and protected
+
+## API Security
+
+- **Input Validation**: Validate all input against strict schemas before processing
+- **Rate Limiting**: Implement rate limiting on all public-facing endpoints
+- **CORS Configuration**: Configure CORS to limit access to trusted domains only
+- **API Authentication**: All APIs must require proper authentication
+- **Request Validation**: Validate all requests for replay attacks and tampering
+
+## Infrastructure Security
+
+- **WAF Implementation**: Deploy Web Application Firewall for all production environments
+- **Network Segmentation**: Properly segment networks based on security zones
+- **Regular Vulnerability Scanning**: Conduct periodic vulnerability assessments
+- **Secure Configuration**: Follow hardening guidelines for all infrastructure components
+- **Intrusion Detection**: Implement monitoring for suspicious activities
+
+## Third-Party Integration Security
+
+- **Vendor Security Assessment**: Evaluate security posture of all third-party vendors
+- **Secure API Keys**: Store and transmit API keys and secrets securely
+- **Limited Access Scopes**: Request only necessary permissions from third-party APIs
+- **Regular Audit of Integrations**: Periodically review all active integrations
+
+## Incident Response
+
+- **Security Incident Process**: Follow established incident response procedures
+- **Communication Protocol**: Clear guidelines for communicating about security incidents
+- **Root Cause Analysis**: Perform detailed analysis after security incidents
+- **Remediation Plans**: Develop and implement remediation for identified issues
+- **Post-Incident Review**: Conduct reviews to improve security posture
+
+## Application Security Testing
+
+- **SAST Integration**: Static Application Security Testing in CI/CD pipeline
+- **DAST Requirements**: Dynamic Application Security Testing for critical components
+- **Dependency Scanning**: Regular scanning for vulnerabilities in dependencies
+- **Security Code Reviews**: All security-related code must undergo security-focused code review
+
+## Compliance Considerations
+
+- **Regulatory Mapping**: Map security controls to relevant regulatory requirements
+- **Privacy by Design**: Incorporate privacy principles into all features handling user data
+- **Audit Trails**: Maintain comprehensive audit trails for all security-relevant actions
+- **Compliance Validation**: Regular validation of compliance with required standards
+
+## References
+
+- OWASP Top 10
+- NIST Cybersecurity Framework
+- CIS Benchmarks
+- SANS Security Controls

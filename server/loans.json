@@ -1,0 +1,34 @@
+[
+  {
+    "id": "12345",
+    "borrower": "John Doe",
+    "amount": 50000,
+    "status": "Active",
+    "interestRate": 3.5,
+    "paymentHistory": ["On time", "On time", "Late"]
+  },
+  {
+    "id": "67890",
+    "borrower": "Jane Smith",
+    "amount": 30000,
+    "status": "Pending",
+    "interestRate": 4.0,
+    "paymentHistory": []
+  },
+  {
+    "id": "23456",
+    "borrower": "John Doe",
+    "amount": 20000,
+    "status": "Active",
+    "interestRate": 3.0,
+    "paymentHistory": ["On time"]
+  },
+  {
+    "id": "34567",
+    "borrower": "Alice Johnson",
+    "amount": 40000,
+    "status": "Closed",
+    "interestRate": 3.8,
+    "paymentHistory": ["On time", "On time"]
+  }
+] 

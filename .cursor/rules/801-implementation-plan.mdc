@@ -1,0 +1,401 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Implementation Planning Guidelines
+
+These guidelines instruct Cursor on how to plan and structure feature implementations in a way that ensures consistency, completeness, and alignment with business requirements. By following a structured approach to implementation planning, Cursor can assist developers in breaking down complex business requirements into detailed, actionable steps that are well-suited for AI-assisted development.
+
+---
+
+## 1. Business Requirements Analysis
+
+### Requirement Parsing
+- Automatically identify and parse business requirements from provided documentation, tickets, or user descriptions.
+- Extract key functional and non-functional requirements.
+- Flag ambiguous or incomplete requirements for clarification.
+- **Example**:
+  ```
+  Original requirement: "Users should be able to filter the dashboard by date"
+  Parsed requirements:
+  - Add date filter UI component to dashboard
+  - Implement date range selection
+  - Update backend API to accept date parameters
+  - Modify data retrieval logic to filter by selected dates
+  ```
+
+### Requirement Categorization
+- Categorize requirements by type:
+  - User Interface changes
+  - Business logic implementation
+  - Data model changes
+  - API modifications
+  - Infrastructure updates
+  - Security considerations
+  - Performance requirements
+- Group related requirements to identify dependencies and cohesive implementation units.
+
+### Requirement Validation
+- Check for completeness against standard feature concerns:
+  - User experience and accessibility
+  - Error handling and edge cases
+  - Security implications
+  - Performance considerations
+  - Testability and observability
+  - Backwards compatibility
+- **Example**: "The date filter requires proper validation to handle invalid date ranges."
+
+---
+
+## 2. Technical Design Breakdown
+
+### Architecture Alignment
+- Ensure implementation approach aligns with existing architectural patterns and system design.
+- Check if feature fits into existing modules/services or requires new ones.
+- Identify interfaces that need modification.
+- **Example**: "The date filter should use the existing FilterComponent pattern with the DateRangePicker component."
+
+### Component Mapping
+- Map business requirements to specific technical components:
+  - Frontend components and state management
+  - Backend services and APIs
+  - Database changes
+  - External services integration
+- Identify reusable components vs. new implementations needed.
+- **Example**:
+  ```
+  Component breakdown:
+  - Extend FilterBar component to include DateRangePicker
+  - Update DashboardController API to accept dateFrom/dateTo parameters
+  - Modify DashboardRepository to include date filtering in queries
+  ```
+
+### Dependency Analysis
+- Identify:
+  - External libraries/services needed
+  - Internal dependencies between components
+  - Potential version conflicts
+  - Required updates to shared components
+- Determine if new dependencies need to be introduced and evaluate their impact.
+
+### Technical Constraints Identification
+- Document:
+  - Performance constraints
+  - Security requirements
+  - Compatibility needs
+  - Scalability considerations
+- **Example**: "The date filtering must perform efficiently with large datasets by applying filters at the database level rather than in-memory."
+
+---
+
+## 3. Implementation Sequence Planning
+
+### Task Sequencing
+- Break implementation into sequenced tasks, considering:
+  - Logical development order
+  - Dependencies between components
+  - Risk mitigation (tackling high-risk items early)
+  - Testing requirements
+- Identify critical path items that might block progress.
+- **Example**:
+  ```
+  Sequence:
+  1. Update data models and repositories with date filtering capability
+  2. Extend API controllers to accept date parameters
+  3. Implement frontend date picker component
+  4. Connect frontend with API
+  5. Add comprehensive tests for all components
+  ```
+
+### Dependency Resolution Path
+- Determine order for resolving dependencies:
+  - External library integration first
+  - Shared component updates before dependent components
+  - Backend before frontend when there are API changes
+- **Plan Format**:
+  ```
+  Dependency resolution order:
+  1. Update shared FilterTypes definition
+  2. Modify API endpoints
+  3. Update service layer
+  4. Implement UI components
+  ```
+
+### Parallel Work Identification
+- Identify components that can be developed in parallel.
+- Suggest how to minimize blocking dependencies.
+- Recommend strategies for integrating parallel work streams.
+- **Example**: "The frontend DateRangePicker component can be developed in parallel with the backend date filtering logic using an agreed-upon API contract."
+
+---
+
+## 4. Implementation Details
+
+### Code Structure Planning
+- Define specific files and code locations that need changes.
+- Suggest method signatures, interfaces, and data structures.
+- Provide class/component structure outlines.
+- Include appropriate design patterns.
+- **Example**:
+  ```typescript
+  // DateFilterService.ts
+  interface DateFilterParams {
+    startDate?: Date;
+    endDate?: Date;
+  }
+  
+  class DateFilterService {
+    applyDateFilter(baseQuery: Query, params: DateFilterParams): Query {
+      // Implementation details...
+    }
+  }
+  ```
+
+### Edge Case Handling
+- Identify and document potential edge cases:
+  - Null/undefined values
+  - Invalid inputs
+  - Extreme conditions
+  - Rare user scenarios
+- Provide specific handling strategies for each.
+- **Example**: "Handle cases where users select an end date earlier than the start date by showing a validation message and disabling the apply button."
+
+### Error Management Strategy
+- Define error handling approach:
+  - Expected exception types
+  - Error messages and codes
+  - Fallback behaviors
+  - Logging requirements
+- **Example**: "API should return 400 Bad Request with errorCode: 'INVALID_DATE_RANGE' and appropriate message when date validation fails."
+
+### Performance Optimization Approach
+- Identify potential performance bottlenecks.
+- Suggest optimization strategies:
+  - Caching approaches
+  - Lazy loading
+  - Database query optimization
+  - Frontend rendering improvements
+- **Example**: "Implement date-based result caching with a 15-minute expiration to reduce database load for commonly selected date ranges."
+
+---
+
+## 5. Testing Strategy
+
+### Test Coverage Planning
+- Define test coverage requirements:
+  - Unit test scope
+  - Integration test boundaries
+  - End-to-end test scenarios
+  - Performance test thresholds
+- **Example**:
+  ```
+  Test coverage plan:
+  - Unit tests for date validation logic
+  - Integration tests for API with various date parameters
+  - E2E tests for complete filter workflow
+  - Performance test with 100,000 records
+  ```
+
+### Test Data Requirements
+- Specify:
+  - Test data needed
+  - Data generation approaches
+  - Mock service requirements
+  - Test environment needs
+- **Example**: "Create test dataset with records spanning multiple years to validate date filtering across different time ranges."
+
+### Validation Criteria
+- Define clear acceptance criteria for each implementation component.
+- Include both functional and non-functional validation criteria.
+- **Example**: "Date filter should return results in under 500ms for datasets up to 1 million records."
+
+---
+
+## 6. Implementation Execution Guidelines
+
+### Incremental Delivery Approach
+- Break implementation into deployable increments.
+- Define minimum viable product (MVP) for each feature.
+- Suggest feature flag strategy for staged rollout.
+- **Example**: "Implement date filtering behind feature flag 'ENABLE_ADVANCED_FILTERS' for controlled rollout."
+
+### Implementation Progress Tracking
+- Define clear milestones and checkpoints.
+- Recommend progress tracking approach.
+- Suggest review points during implementation.
+- **Example**:
+  ```
+  Implementation checkpoints:
+  1. Data model and repository changes completed
+  2. API endpoints implemented and tested
+  3. Frontend components integrated with API
+  4. End-to-end testing completed
+  5. Feature flag configuration ready for production
+  ```
+
+### Rollback Strategy
+- Define conditions that would trigger implementation rollback.
+- Provide specific rollback steps and verification methods.
+- **Example**: "If date filtering causes query performance to exceed 2 seconds, disable feature via configuration flag and log detailed performance metrics."
+
+---
+
+## 7. Documentation Requirements
+
+### Implementation Documentation
+- Specify documentation needs:
+  - Architecture decisions
+  - API changes
+  - New components/services
+  - Configuration changes
+- **Example**: "Document the date filter component API in the component library with examples of different configuration options."
+
+### User-Facing Documentation
+- Define required updates to:
+  - User manuals
+  - Help center content
+  - Tooltips and UI guidance
+- **Example**: "Update help center article 'Using Dashboard Filters' with new section on date range filtering."
+
+### Knowledge Transfer Plan
+- Identify key implementation details requiring specific knowledge transfer.
+- Suggest documentation formats and key audiences.
+- **Example**: "Create overview document of date filtering implementation for future maintainers, focusing on the caching strategy and performance optimization approaches."
+
+---
+
+## 8. Implementation Plan Adaptability
+
+### Plan Revision Triggers
+- Define conditions that should trigger implementation plan revision:
+  - Significant requirement changes
+  - Technical roadblocks
+  - Resource constraints
+  - Priority shifts
+- Provide guidance on managing plan adaption.
+- **Example**: "If requirement changes add more than 20% to the estimated implementation effort, rebuild the implementation plan."
+
+### Feedback Integration Process
+- Establish approach for incorporating feedback during implementation.
+- Define how to evaluate and integrate improvement suggestions.
+- **Example**: "Regular review points after completing each implementation phase to incorporate lessons learned."
+
+---
+
+## 9. Optimization for AI-Assisted Implementation
+
+### AI-Friendly Task Breakdown
+- Structure tasks to be well-suited for AI assistance:
+  - Clear boundaries and contexts
+  - Well-defined inputs and outputs
+  - Explicit constraints and requirements
+  - Appropriate level of detail
+- **Example**: "Break down complex components into self-contained functions with clear interfaces that can be implemented one at a time."
+
+### Context Preservation Strategy
+- Define how to maintain implementation context across multiple development sessions.
+- Recommend documentation approaches that provide necessary context for AI.
+- **Example**: "Document component relationships with diagrams and specify exact file locations for implementations to maintain consistency across sessions."
+
+### Edge Case Enumeration
+- Explicitly enumerate edge cases that might be missed by AI.
+- Provide specific guidance for complex business rules.
+- **Example**: "Implementation must account for these specific business rule exceptions: [detailed list]."
+
+---
+
+## 10. Implementation Plan Templates
+
+### Basic Feature Implementation Template
+```
+# Feature: [Feature Name]
+
+## Business Requirements
+- [Requirement 1]
+- [Requirement 2]
+
+## Technical Components
+- Frontend: [Component changes]
+- Backend: [Service/API changes]
+- Database: [Model/schema changes]
+
+## Implementation Sequence
+1. [Step 1]
+2. [Step 2]
+3. [Step 3]
+
+## Testing Requirements
+- [Test case 1]
+- [Test case 2]
+
+## Acceptance Criteria
+- [Criterion 1]
+- [Criterion 2]
+```
+
+### Complex System Change Template
+```
+# System Change: [Change Name]
+
+## Current System State
+[Description of current implementation]
+
+## Target System State
+[Description of target implementation]
+
+## Impact Analysis
+- Affected components: [List]
+- Risk assessment: [Details]
+- Performance implications: [Details]
+
+## Transition Strategy
+1. [Transition step 1]
+2. [Transition step 2]
+
+## Validation Plan
+- [Validation step 1]
+- [Validation step 2]
+
+## Rollback Plan
+- [Rollback step 1]
+- [Rollback step 2]
+```
+
+### Bug Fix Implementation Template
+```
+# Bug Fix: [Bug ID/Description]
+
+## Issue Description
+[Detailed bug description]
+
+## Root Cause Analysis
+[Identified cause]
+
+## Fix Approach
+[Technical approach to fix]
+
+## Implementation Steps
+1. [Step 1]
+2. [Step 2]
+
+## Verification Steps
+- [Verification step 1]
+- [Verification step 2]
+
+## Regression Testing
+- [Test case 1]
+- [Test case 2]
+```
+
+---
+
+## 11. Final Notes
+
+- Implementation plans should be living documents that evolve as development progresses.
+- Plans should be detailed enough to provide clear direction but flexible enough to accommodate discoveries made during implementation.
+- Always consider the ripple effects of changes across the entire system.
+- Prioritize user experience and system stability in implementation decisions.
+- Document key decisions and their rationale for future reference.
+
+By following these implementation planning guidelines, Cursor can help developers create structured, detailed plans that break down complex business requirements into manageable, AI-friendly implementation steps. This approach ensures consistency, completeness, and alignment with business goals throughout the development process.

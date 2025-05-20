@@ -1,0 +1,209 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Test-First Mandate
+
+**Cursor Rule**: 300-test-first-mandate
+**Priority**: P0 (Required)
+**Globs**: `**/test/**`, `**/*.test.*`, `**/*.spec.*`, `**/src/**`
+**Rule type**: Engineering Practice
+
+## Context
+
+Test-Driven Development (TDD) and test-first methodologies are proven to improve code quality, decrease defect rates, and provide living documentation of system behavior. This rule mandates a test-first approach for all significant development across the enterprise.
+
+## Requirements
+
+### REQUIRED:
+
+- Tests MUST be written before or alongside implementation for all new features and significant functionality changes
+- Test suites MUST be organized according to the standard test hierarchy:
+  - Unit tests for isolated functions, components, and modules
+  - Integration tests for interactions between components
+  - End-to-end tests for critical user flows
+- Each pull request MUST include appropriate tests for all new or modified code
+- All tests MUST be executed in the appropriate environments as defined in [116-testing-environments.mdc](mdc:departments/engineering/testing/116-testing-environments.mdc)
+- Tests MUST use standardized patterns for:
+  - Data setup and teardown
+  - Mocking and stubbing
+  - Assertions and expectations
+  - Error handling and edge cases
+- Tests MUST verify both positive (happy path) and negative (error handling) scenarios
+- Critical paths MUST have comprehensive test coverage, including:
+  - Authentication flows
+  - Payment processing
+  - Data persistence operations
+  - API endpoints with external visibility
+  - User-facing interfaces and workflows
+
+### RECOMMENDED:
+
+- Implement Behavior-Driven Development (BDD) style tests for high-level business requirements
+- Maintain a test coverage threshold of at least:
+  - 80% for line coverage
+  - 70% for branch coverage
+  - 90% for critical paths and components
+- Use property-based testing for algorithmic or data transformation functions
+- Implement contract tests for service boundaries and API interfaces
+- Practice red-green-refactor cycles: write a failing test, make it pass, then refactor
+- Perform mutation testing to validate test quality
+- Run tests continuously in development using watch mode
+
+## Examples
+
+**Good**:
+```typescript
+// user.test.ts - Written BEFORE implementation
+import { createUser, UserCreationError } from '../src/user';
+
+describe('User Creation', () => {
+  // Happy path test
+  it('should create a valid user with required fields', async () => {
+    // Arrange
+    const userData = {
+      email: 'test@example.com',
+      firstName: 'Test',
+      lastName: 'User',
+      password: 'SecurePass123!'
+    };
+    
+    // Act
+    const result = await createUser(userData);
+    
+    // Assert
+    expect(result).toHaveProperty('id');
+    expect(result.email).toBe(userData.email);
+    expect(result.firstName).toBe(userData.firstName);
+    expect(result.lastName).toBe(userData.lastName);
+    // Password should not be returned in plain text
+    expect(result).not.toHaveProperty('password');
+  });
+  
+  // Error handling test
+  it('should reject creation with invalid email', async () => {
+    // Arrange
+    const userData = {
+      email: 'invalid-email',
+      firstName: 'Test',
+      lastName: 'User',
+      password: 'SecurePass123!'
+    };
+    
+    // Act & Assert
+    await expect(createUser(userData)).rejects.toThrow(UserCreationError);
+    await expect(createUser(userData)).rejects.toMatchObject({
+      code: 'INVALID_EMAIL'
+    });
+  });
+  
+  // Edge case test
+  it('should trim whitespace from name fields', async () => {
+    // Arrange
+    const userData = {
+      email: 'test@example.com',
+      firstName: '  Test  ',
+      lastName: '  User  ',
+      password: 'SecurePass123!'
+    };
+    
+    // Act
+    const result = await createUser(userData);
+    
+    // Assert
+    expect(result.firstName).toBe('Test');
+    expect(result.lastName).toBe('User');
+  });
+});
+```
+
+**Bad**:
+```typescript
+// Implementation without tests
+// user.ts
+export function createUser(userData) {
+  // No tests written, jumping straight to implementation
+  const { email, firstName, lastName, password } = userData;
+  
+  // Missing validation that would have been caught by tests
+  // Missing error handling
+  // Missing edge case handling
+  
+  const newUser = {
+    id: generateId(),
+    email,
+    firstName,
+    lastName,
+    passwordHash: hashPassword(password)
+  };
+  
+  return saveUserToDatabase(newUser);
+}
+
+// Later adding tests after implementation is complete
+// user.test.ts - Written AFTER implementation (too late)
+test('createUser works', () => {
+  // Shallow test that only verifies the happy path
+  // No error cases or edge cases tested
+  const result = createUser({
+    email: 'test@example.com',
+    firstName: 'Test',
+    lastName: 'User',
+    password: 'password'
+  });
+  
+  expect(result).toBeDefined();
+});
+```
+
+## Implementation
+
+### Test-First Workflow
+
+All development should follow this workflow:
+
+1. **Understand Requirements**: Clearly understand what needs to be built
+2. **Write Tests**: Create tests that define the expected behavior
+3. **Implement Function**: Write code that passes the tests
+4. **Refactor**: Improve the implementation while keeping tests passing
+5. **Review**: Ensure tests and implementation meet standards
+6. **Integrate**: Merge changes with confidence that functionality works
+
+### Test Organization
+
+Organize tests according to this standard structure:
+
+```
+project/
+├── src/                    # Source code
+│   └── features/
+│       └── user/
+│           ├── user.ts     # Implementation
+│           └── types.ts    # Type definitions
+└── test/                   # Test code
+    ├── unit/
+    │   └── user/
+    │       └── user.test.ts  # Unit tests
+    ├── integration/
+    │   └── user/
+    │       └── user-db.test.ts  # Integration tests
+    └── e2e/
+        └── user-flows/
+            └── registration.test.ts  # End-to-end tests
+```
+
+### CI/CD Integration
+
+Configure CI/CD pipelines to enforce the test-first mandate:
+
+- Block PRs that decrease test coverage
+- Run tests in all appropriate environments
+- Include test quality metrics in code review process
+- Generate test coverage reports for visibility
+
+## Full Documentation Access
+
+- Test-First Implementation Guide: mdc:examples/testing/TestFirstImplementationGuide.md
+- Enterprise Test Strategy: mdc:examples/testing/EnterpriseTestStrategy.md
+- Testing Patterns and Anti-patterns: mdc:examples/testing/TestingPatternsGuide.md

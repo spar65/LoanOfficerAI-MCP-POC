@@ -1,0 +1,142 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Context
+
+Technical debt represents the cumulative cost of choosing expedient solutions over optimal ones. With VIBE (Velocity, Innovation, Business value, Engineering excellence) coding, we strive to minimize technical debt accumulation. However, technical debt is sometimes inevitable due to business constraints, time pressure, or evolving requirements. When technical debt does occur, it must be managed systematically rather than addressed with immediate refactoring, which can introduce additional risks.
+
+# Requirements
+
+## PLANNED vs. Unplanned Technical Debt
+
+1. **[REQUIRED]** Distinguish between planned and unplanned technical debt:
+   - Planned technical debt: Deliberate decisions to defer optimal implementation with clear documentation and remediation plans
+   - Unplanned technical debt: Discovered issues resulting from previous implementation decisions
+
+2. **[REQUIRED]** For planned technical debt:
+   - Document the decision, including business justification
+   - Create a remediation plan with a target timeline
+   - Add a `@TECH-DEBT` comment in code with issue tracker reference
+   - Register in the technical debt inventory
+
+3. **[REQUIRED]** For unplanned technical debt discovery:
+   - Document the issue and impact
+   - Assess severity using the Technical Debt Impact Matrix
+   - Add to the technical debt inventory with appropriate prioritization
+   - Do not attempt immediate fixes unless the debt is causing critical production issues
+
+## Technical Debt Inventory
+
+1. **[REQUIRED]** Maintain a technical debt inventory that includes:
+   - Description of the debt
+   - Location in code (file paths, modules)
+   - Creation date and author
+   - Business justification (for planned debt)
+   - Impact assessment (severity, affected components)
+   - Remediation plan and target timeline
+   - Associated ticket/issue number
+
+2. **[RECOMMENDED]** Review the technical debt inventory during:
+   - Sprint planning (for potential debt paydown allocation)
+   - Architecture reviews
+   - Release planning
+   - System performance evaluations
+
+## Remediation Planning
+
+1. **[REQUIRED]** Create specific remediation plans for each debt item:
+   - Break down large debt items into smaller, manageable tasks
+   - Establish clear acceptance criteria for debt resolution
+   - Identify dependencies and risks of remediation
+   - Allocate appropriate testing resources to validate debt resolution
+
+2. **[REQUIRED]** Prioritize technical debt using the formula:
+   ```
+   Priority = Impact × Effort⁻¹ × Strategic Alignment
+   ```
+   Where:
+   - Impact: Effect on system quality, performance, maintainability (1-10)
+   - Effort: Estimated work required for remediation (1-10)
+   - Strategic Alignment: Relevance to business objectives (0.5-2.0)
+
+3. **[RECOMMENDED]** Allocate a consistent percentage (15-20%) of each sprint to addressing technical debt.
+
+## Preventing New Technical Debt
+
+1. **[REQUIRED]** Implement guardrails to prevent new technical debt:
+   - Code quality gates in CI/CD pipeline
+   - Architecture decision records (ADRs) for design choices
+   - Regular code health metrics monitoring
+   - Knowledge sharing about debt triggers and prevention
+
+2. **[REQUIRED]** For all pull requests, include a "Technical Debt Impact" section that states:
+   - Any new technical debt being introduced
+   - Justification for the debt
+   - Remediation timeline and ownership
+
+## Documentation Standards
+
+1. **[REQUIRED]** Use standardized code annotations for technical debt:
+   ```
+   // @TECH-DEBT: [ISSUE-ID] Brief description of the debt
+   // @PLANNED: Yes/No
+   // @TIMELINE: Sprint XX / Q1 YYYY / etc.
+   // @OWNER: Team or individual responsible
+   ```
+
+2. **[RECOMMENDED]** Document architectural technical debt in Architecture Decision Records (ADRs) with:
+   - Context and problem statement
+   - Decision details and debt acknowledgment
+   - Consequences and remediation plan
+   - Timeline for revisiting the decision
+
+## Governance
+
+1. **[REQUIRED]** Include technical debt metrics in regular reporting:
+   - Total debt items by severity
+   - Debt remediation velocity
+   - Technical debt age distribution
+   - Trend analysis of debt accumulation vs. resolution
+
+2. **[REQUIRED]** Conduct quarterly technical debt reviews to:
+   - Reassess priorities based on current business objectives
+   - Evaluate the effectiveness of debt prevention measures
+   - Update remediation plans for existing debt
+   - Celebrate successful debt reduction
+
+# Implementation Guidance
+
+## Integration with Development Workflow
+
+- Incorporate technical debt assessment in design and code reviews
+- Include technical debt discussions in sprint retrospectives
+- Use automated tools to detect potential debt (complexity, duplication, etc.)
+- Create debt dashboards for visibility across teams
+
+## AI-Assisted Development Considerations
+
+When using AI pair programming or code generation:
+
+1. **[REQUIRED]** Prevent AI from making immediate refactoring of identified technical debt without explicit approval
+2. **[REQUIRED]** Configure AI tools to flag potential technical debt but suggest a planned approach rather than immediate fixes
+3. **[RECOMMENDED]** Use AI to help draft technical debt documentation and remediation plans
+4. **[RECOMMENDED]** Train AI assistants to recognize your team's technical debt patterns and conventions
+
+## Examples
+
+- See [mdc:examples/architecture/TechnicalDebtInventoryTemplate.md] for a template to track technical debt
+- See [mdc:examples/architecture/TechnicalDebtImpactMatrix.md] for evaluating debt severity
+- See [mdc:examples/architecture/TechnicalDebtRemediationGuide.md] for implementation guidance
+
+# Related Rules
+
+- [mdc:120-technical-stack.mdc] for technology selection that minimizes future debt
+- [mdc:135-code-documentation-standards.mdc] for documentation requirements
+- [mdc:140-troubleshooting-standards.mdc] for distinguishing between troubleshooting and debt remediation
+
+# Resources
+
+- [Technical Debt Quadrant](mdc:https:/martinfowler.com/bliki/TechnicalDebtQuadrant.html) - Martin Fowler
+- [Managing Technical Debt](mdc:https:/www.sei.cmu.edu/our-work/projects/display.cfm?customel_datapageid_4050=4050&customel_datapageid_4050_item_id=6226) - SEI Carnegie Mellon

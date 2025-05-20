@@ -1,0 +1,42 @@
+[
+  {
+    "equipment_id": "E001",
+    "borrower_id": "B001",
+    "description": "Tractor - John Deere 6155M",
+    "purchase_date": "2022-03-15",
+    "purchase_price": 120000,
+    "current_value": 95000
+  },
+  {
+    "equipment_id": "E002",
+    "borrower_id": "B001",
+    "description": "Combine Harvester - Case IH 5150",
+    "purchase_date": "2021-09-10",
+    "purchase_price": 250000,
+    "current_value": 185000
+  },
+  {
+    "equipment_id": "E003",
+    "borrower_id": "B002",
+    "description": "Irrigation System - Valley 8000 Series",
+    "purchase_date": "2023-05-20",
+    "purchase_price": 85000,
+    "current_value": 78000
+  },
+  {
+    "equipment_id": "E004",
+    "borrower_id": "B002",
+    "description": "Grain Auger - Westfield MKX 13\"x84'",
+    "purchase_date": "2023-02-18",
+    "purchase_price": 18000,
+    "current_value": 15000
+  },
+  {
+    "equipment_id": "E005",
+    "borrower_id": "B003",
+    "description": "Sprayer - John Deere R4045",
+    "purchase_date": "2022-06-25",
+    "purchase_price": 180000,
+    "current_value": 150000
+  }
+] 

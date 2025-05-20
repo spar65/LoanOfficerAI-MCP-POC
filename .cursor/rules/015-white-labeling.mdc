@@ -1,0 +1,360 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+description: Apply WHEN implementing multi-tenant applications that require organization-specific branding while maintaining platform identity
+globs: "**/*.{tsx,jsx,css,scss,html}"
+
+# White-Labeling Standards
+
+This document outlines the requirements and best practices for implementing white-labeling capabilities in multi-tenant platforms, ensuring consistent branding across the application while respecting organization customization.
+
+## Core Requirements
+
+- **REQUIRED**: Organization branding must include logo, primary color, and secondary color
+- **REQUIRED**: Organization branding settings must be fetched from the appropriate API
+- **REQUIRED**: CSS variables should be used for dynamic color application
+- **REQUIRED**: All UI components must use dynamic organization branding
+- **REQUIRED**: Platform-level interfaces must maintain platform branding
+
+## Branding Hierarchy
+
+### Platform vs. Organization Branding
+
+- Platform-level UI is the default when no organization context exists
+- Organization branding overrides platform branding when in organization context
+- Client context should determine which branding to apply
+- Maintain clear delineation between platform and organization interfaces
+- Platform-level branding should never be completely overridden
+
+### Dynamic Organization Branding
+
+Organization branding typically consists of:
+- Logo (logoUrl)
+- Primary Color (primaryColor)
+- Secondary Color (secondaryColor)
+- Accent Color (accentColor) - optional
+
+All color schemes must maintain accessibility standards (WCAG 2.1 AA compliance) regardless of organization customization.
+
+## Implementation Guidelines
+
+### CSS Variables Implementation
+
+```css
+/* Default platform branding */
+:root {
+  /* Platform colors (not customizable) */
+  --platform-primary: #0070f3;
+  --platform-secondary: #f5f5f5;
+  --platform-accent: #0070f3;
+  
+  /* Default organization colors */
+  --org-primary: var(--platform-primary);
+  --org-secondary: var(--platform-secondary);
+  --org-accent: var(--platform-accent);
+}
+
+/* Applied dynamically when organization context is active */
+.org-branded {
+  --org-primary: attr(data-primary);
+  --org-secondary: attr(data-secondary);
+  --org-accent: attr(data-accent);
+}
+```
+
+### Tailwind Configuration
+
+```javascript
+// tailwind.config.js
+module.exports = {
+  theme: {
+    extend: {
+      colors: {
+        // Platform colors (default)
+        platform: {
+          primary: '#0070f3',
+          secondary: '#f5f5f5',
+          accent: '#0070f3',
+        },
+        
+        // Dynamic organization colors via CSS variables
+        org: {
+          primary: 'var(--org-primary)',
+          secondary: 'var(--org-secondary)',
+          accent: 'var(--org-accent)',
+        }
+      }
+    }
+  }
+}
+```
+
+## Component Implementation
+
+### White-Label Aware Components
+
+```typescript
+// Component respecting white-labeling
+import { useOrganization } from '@/hooks/useOrganization';
+import { cn } from '@/lib/utils';
+
+interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  variant?: 'primary' | 'secondary' | 'platform' | 'default';
+}
+
+export function Button({ 
+  variant = 'default', 
+  className, 
+  children, 
+  ...props 
+}: ButtonProps) {
+  // Base classes
+  const baseClasses = "px-4 py-2 rounded-md font-medium transition-colors";
+  
+  // Variant-specific classes
+  const variantClasses = {
+    // Use organization branding
+    primary: "bg-org-primary text-white hover:bg-org-primary/90",
+    secondary: "bg-org-secondary text-gray-900 hover:bg-org-secondary/90",
+    // Always use platform branding regardless of org context
+    platform: "bg-platform-primary text-white hover:bg-platform-primary/90",
+    // Default styling
+    default: "bg-gray-100 text-gray-900 hover:bg-gray-200",
+  };
+  
+  return (
+    <button 
+      className={cn(
+        baseClasses,
+        variantClasses[variant],
+        className
+      )}
+      {...props}
+    >
+      {children}
+    </button>
+  );
+}
+```
+
+### Organization Theme Provider
+
+```typescript
+// Organization Theme Provider with branding application
+import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+
+interface Organization {
+  id: string;
+  name: string;
+  logoUrl: string;
+  primaryColor: string;
+  secondaryColor: string;
+  accentColor?: string;
+}
+
+interface OrganizationThemeContextType {
+  organization: Organization | null;
+  loading: boolean;
+  primaryColor: string;
+  secondaryColor: string;
+  accentColor: string;
+  logoUrl: string;
+  isWhiteLabeled: boolean;
+}
+
+const defaultTheme = {
+  primaryColor: '#0070f3', // Platform default
+  secondaryColor: '#f5f5f5',
+  accentColor: '#0070f3',
+  logoUrl: '/images/platform-logo.svg',
+  isWhiteLabeled: false
+};
+
+const OrganizationThemeContext = createContext<OrganizationThemeContextType>({
+  organization: null,
+  loading: true,
+  ...defaultTheme
+});
+
+export function OrganizationThemeProvider({ 
+  children 
+}: { 
+  children: ReactNode 
+}) {
+  const [organization, setOrganization] = useState<Organization | null>(null);
+  const [loading, setLoading] = useState(true);
+  
+  useEffect(() => {
+    async function fetchOrganization() {
+      try {
+        // Fetch organization data from API
+        const response = await fetch(`/api/v1/orgs/current`);
+        const data = await response.json();
+        
+        setOrganization(data);
+        
+        // Apply organization branding to CSS variables
+        if (data) {
+          document.documentElement.style.setProperty('--org-primary', data.primaryColor);
+          document.documentElement.style.setProperty('--org-secondary', data.secondaryColor);
+          document.documentElement.style.setProperty('--org-accent', data.accentColor || data.primaryColor);
+          // Add organization context class to body
+          document.body.classList.add('org-branded');
+        } else {
+          // Revert to platform branding if no organization
+          document.documentElement.style.removeProperty('--org-primary');
+          document.documentElement.style.removeProperty('--org-secondary');
+          document.documentElement.style.removeProperty('--org-accent');
+          document.body.classList.remove('org-branded');
+        }
+      } catch (error) {
+        console.error('Error fetching organization:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    
+    fetchOrganization();
+    
+    // Cleanup
+    return () => {
+      document.documentElement.style.removeProperty('--org-primary');
+      document.documentElement.style.removeProperty('--org-secondary');
+      document.documentElement.style.removeProperty('--org-accent');
+      document.body.classList.remove('org-branded');
+    };
+  }, []);
+  
+  // Compute theme values based on organization data
+  const theme = {
+    primaryColor: organization?.primaryColor || defaultTheme.primaryColor,
+    secondaryColor: organization?.secondaryColor || defaultTheme.secondaryColor,
+    accentColor: organization?.accentColor || organization?.primaryColor || defaultTheme.accentColor,
+    logoUrl: organization?.logoUrl || defaultTheme.logoUrl,
+    isWhiteLabeled: !!organization?.primaryColor
+  };
+  
+  return (
+    <OrganizationThemeContext.Provider value={{ 
+      organization, 
+      loading,
+      ...theme
+    }}>
+      {children}
+    </OrganizationThemeContext.Provider>
+  );
+}
+
+export const useOrganizationTheme = () => useContext(OrganizationThemeContext);
+```
+
+### Platform vs. Organization Context
+
+```typescript
+// Clear indication of platform vs. organization context
+function AppHeader() {
+  const { organization, isWhiteLabeled, logoUrl } = useOrganizationTheme();
+  const isPlatformView = useIsPlatformView(); // Custom hook to determine context
+  
+  return (
+    <header className="border-b border-gray-200 p-4">
+      {isPlatformView ? (
+        // Platform context header
+        <div className="flex items-center">
+          <img 
+            src="/images/platform-logo.svg" 
+            alt="Platform" 
+            className="h-8 w-auto" 
+          />
+          <div className="ml-2 px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded">
+            Platform View
+          </div>
+        </div>
+      ) : (
+        // Organization context header
+        <div className="flex items-center">
+          {logoUrl ? (
+            <img 
+              src={logoUrl} 
+              alt={organization?.name || 'Organization'} 
+              className="h-8 w-auto" 
+            />
+          ) : (
+            <div className="h-8 w-8 bg-gray-200 rounded flex items-center justify-center">
+              {organization?.name?.charAt(0) || '?'}
+            </div>
+          )}
+          <span className="ml-2 font-medium">{organization?.name}</span>
+          {isWhiteLabeled && (
+            <div className="ml-2 px-2 py-1 bg-org-primary/10 text-org-primary text-xs font-medium rounded">
+              Custom Branded
+            </div>
+          )}
+        </div>
+      )}
+    </header>
+  );
+}
+```
+
+## Testing Guidelines
+
+### White-Label Testing
+
+When testing white-labeled components:
+- Test with multiple organization color schemes
+- Verify correct branding in platform vs. organization context
+- Test color contrast meets accessibility requirements
+- Verify visual separation between platform and organization views
+- Test organization switching maintains correct branding
+- Verify logo fallback behavior when organization logo is unavailable
+
+```typescript
+// Example test for white-labeled components
+describe('White Label Support', () => {
+  it('renders with organization branding', () => {
+    const mockOrg = {
+      id: 'org-123',
+      name: 'Test Organization',
+      logoUrl: '/test-logo.svg',
+      primaryColor: '#FF0000',
+      secondaryColor: '#00FF00'
+    };
+    
+    // Mock the organization context
+    jest.spyOn(OrganizationHooks, 'useOrganization').mockReturnValue({
+      organization: mockOrg,
+      loading: false
+    });
+    
+    const { container } = render(<Button variant="primary">Test Button</Button>);
+    
+    // Check that the button uses the organization's primary color
+    const button = container.querySelector('button');
+    expect(button).toHaveClass('bg-org-primary');
+    
+    // Verify CSS variables are applied
+    expect(document.documentElement.style.getPropertyValue('--org-primary')).toBe('#FF0000');
+  });
+});
+```
+
+## Accessibility Considerations
+
+- Ensure all color combinations (text and background) meet WCAG 2.1 AA contrast requirements
+- Test organization colors for accessibility and provide feedback if they don't meet standards
+- Consider implementing color adjustments that maintain brand identity while improving accessibility
+- Provide documentation on color contrast requirements for organizations
+
+## Implementation Checklist
+
+- [ ] CSS Variables: Implement CSS variables for dynamic branding colors
+- [ ] Tailwind Config: Extend Tailwind theme with platform and organization colors
+- [ ] Context Provider: Create organization theme provider to manage dynamic branding
+- [ ] Component Testing: Test all components with multiple organization brand schemes
+- [ ] Visual Distinction: Maintain clear visual separation between platform and org interfaces
+- [ ] Accessibility: Verify all color combinations meet WCAG 2.1 AA contrast requirements
+- [ ] Logo Handling: Implement proper logo handling with appropriate fallbacks
+- [ ] Dynamic Updates: Ensure theme updates when organization context changes

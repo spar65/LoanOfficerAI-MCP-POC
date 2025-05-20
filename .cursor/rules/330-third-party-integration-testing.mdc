@@ -1,0 +1,784 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Third-Party Integration Testing
+
+**Cursor Rule**: 330-third-party-integration-testing
+**Priority**: P1 (Important)
+**Globs**: `**/integrations/**`, `**/*.integration.test.*`, `**/third-party/**`
+**Rule type**: Engineering Practice
+
+## Context
+
+Third-party integrations represent critical dependencies that can significantly impact application stability, security, and performance. However, these integrations also introduce unique testing challenges due to external control, versioning changes, rate limiting, and authentication constraints. This rule establishes standards for effectively testing, validating, and monitoring third-party integrations to ensure reliability and maintainability.
+
+## Requirements
+
+### REQUIRED:
+
+- All third-party integrations MUST have dedicated integration tests covering the full interaction flow
+- Integration tests MUST validate both success paths and all potential error paths/response codes
+- Tests MUST use consistent mocking/stubbing patterns for CI/CD environments
+- Tests MUST include contract validation against the third-party API schema/interface
+- Authentication and authorization flows MUST be tested with appropriate test credentials
+- Versioning changes in third-party APIs MUST be accounted for in tests
+- Integration tests MUST verify proper error handling and fallback behavior
+- Rate limiting and throttling behavior MUST be tested
+- Third-party webhooks or callback functionality MUST be tested with request validation
+- Service isolation patterns MUST be implemented to prevent third-party issues from cascading
+
+### RECOMMENDED:
+
+- Implement synthetic monitoring for critical third-party dependencies
+- Create sandbox environments for testing third-party integrations
+- Establish test data management strategies for third-party systems
+- Document known failure modes and observed error patterns
+- Implement circuit breaker patterns in third-party clients
+- Create response time benchmarks and alerts for performance degradation
+- Test with degraded network conditions to validate graceful degradation
+- Implement cross-version testing for APIs with multiple version support
+- Create fallback mechanisms for critical integrations
+- Develop chaos testing scenarios for third-party dependencies
+
+## Examples
+
+**Good**:
+```typescript
+// Good: Comprehensive third-party API client test
+import { PaymentProcessor } from '../services/payment';
+import { mockPaymentAPI } from '../mocks/payment-api';
+
+// Mock the HTTP client used by the payment processor
+jest.mock('../lib/http-client');
+
+describe('Payment Processor Integration', () => {
+  let paymentProcessor: PaymentProcessor;
+  
+  beforeEach(() => {
+    // Reset mocks before each test
+    jest.resetAllMocks();
+    mockPaymentAPI.reset();
+    
+    // Create new instance with test configuration
+    paymentProcessor = new PaymentProcessor({
+      apiKey: 'test-api-key',
+      environment: 'sandbox',
+      timeout: 3000,
+    });
+  });
+  
+  // Success path test
+  test('successfully processes a payment', async () => {
+    // Setup mock response
+    mockPaymentAPI.mockCreateCharge({
+      success: true,
+      id: 'charge_123',
+      amount: 1000,
+      currency: 'USD',
+      status: 'succeeded'
+    });
+    
+    const result = await paymentProcessor.createCharge({
+      amount: 1000,
+      currency: 'USD',
+      paymentMethodId: 'pm_123',
+      description: 'Test charge'
+    });
+    
+    expect(result.success).toBe(true);
+    expect(result.chargeId).toBe('charge_123');
+    expect(result.status).toBe('succeeded');
+    
+    // Verify correct API parameters were sent
+    expect(mockPaymentAPI.createCharge).toHaveBeenCalledWith({
+      amount: 1000,
+      currency: 'USD',
+      payment_method: 'pm_123',
+      description: 'Test charge'
+    });
+  });
+  
+  // Error path test
+  test('handles payment declined error', async () => {
+    // Setup error response
+    mockPaymentAPI.mockCreateChargeError({
+      type: 'card_error',
+      code: 'card_declined',
+      message: 'Your card was declined',
+      param: 'payment_method',
+      statusCode: 402
+    });
+    
+    await expect(paymentProcessor.createCharge({
+      amount: 1000,
+      currency: 'USD',
+      paymentMethodId: 'pm_123',
+      description: 'Test charge'
+    })).rejects.toMatchObject({
+      type: 'PaymentDeclinedError',
+      message: 'Payment was declined: Your card was declined',
+      code: 'card_declined',
+      retryable: true
+    });
+  });
+  
+  // Rate limiting test
+  test('handles rate limiting', async () => {
+    // Setup rate limit response
+    mockPaymentAPI.mockCreateChargeError({
+      type: 'rate_limit_error',
+      message: 'Too many requests',
+      statusCode: 429,
+      headers: {
+        'retry-after': '30'
+      }
+    });
+    
+    // Configure retry behavior for test
+    paymentProcessor.enableRetries({
+      maxRetries: 3,
+      initialDelay: 10
+    });
+    
+    // Mock Date.now for retry timing testing
+    const dateSpy = jest.spyOn(Date, 'now');
+    const startTime = 1000;
+    dateSpy.mockImplementation(() => startTime);
+    
+    // Execute with automatic retries
+    const chargePromise = paymentProcessor.createCharge({
+      amount: 1000,
+      currency: 'USD',
+      paymentMethodId: 'pm_123'
+    });
+    
+    // Advance time past retry interval
+    dateSpy.mockImplementation(() => startTime + 50);
+    
+    // Mock successful response on retry
+    mockPaymentAPI.mockCreateCharge({
+      success: true,
+      id: 'charge_123',
+      status: 'succeeded'
+    });
+    
+    // Verify successful retry
+    const result = await chargePromise;
+    expect(result.success).toBe(true);
+    expect(mockPaymentAPI.createCharge).toHaveBeenCalledTimes(2);
+    
+    dateSpy.mockRestore();
+  });
+  
+  // Timeout test
+  test('handles API timeout', async () => {
+    // Setup timeout behavior
+    mockPaymentAPI.mockTimeout();
+    
+    await expect(paymentProcessor.createCharge({
+      amount: 1000,
+      currency: 'USD',
+      paymentMethodId: 'pm_123'
+    })).rejects.toMatchObject({
+      type: 'TimeoutError',
+      message: 'Request timed out after 3000ms',
+      retryable: true
+    });
+  });
+  
+  // Webhook validation test
+  test('validates webhook signatures', () => {
+    const webhookPayload = {
+      id: 'evt_123',
+      type: 'charge.succeeded',
+      data: {
+        object: {
+          id: 'charge_123',
+          status: 'succeeded'
+        }
+      }
+    };
+    
+    const timestamp = Math.floor(Date.now() / 1000);
+    const signature = paymentProcessor.generateTestSignature(
+      JSON.stringify(webhookPayload),
+      timestamp,
+      'webhook_secret'
+    );
+    
+    // Valid signature test
+    expect(paymentProcessor.validateWebhook(
+      JSON.stringify(webhookPayload),
+      `t=${timestamp},v1=${signature}`,
+      'webhook_secret'
+    )).toBe(true);
+    
+    // Invalid signature test
+    expect(paymentProcessor.validateWebhook(
+      JSON.stringify(webhookPayload),
+      `t=${timestamp},v1=invalid_signature`,
+      'webhook_secret'
+    )).toBe(false);
+  });
+});
+
+// Integration test with contract validation
+test('API response matches expected schema', async () => {
+  // Setup mock response
+  mockPaymentAPI.mockCreateCharge({
+    id: 'charge_123',
+    object: 'charge',
+    amount: 1000,
+    currency: 'usd',
+    status: 'succeeded',
+    created: 1614556000
+  });
+  
+  // Perform API call
+  const result = await paymentProcessor.createCharge({
+    amount: 1000,
+    currency: 'USD',
+    paymentMethodId: 'pm_123'
+  });
+  
+  // Validate against schema
+  expect(result).toMatchSchema(paymentProcessor.getResponseSchema('charge'));
+});
+```
+
+**Bad**:
+```typescript
+// Bad: Insufficient third-party integration testing
+import { PaymentService } from './payment-service';
+
+describe('Payment Service', () => {
+  const paymentService = new PaymentService('fake-api-key');
+  
+  // Missing proper setup/teardown
+  
+  // Too simplistic, no error handling testing
+  test('processes payment', async () => {
+    const result = await paymentService.processPayment(100, 'usd', '4242424242424242');
+    expect(result.success).toBe(true);
+  });
+  
+  // Uses actual API in tests - will fail in CI, inconsistent results
+  test('gets transaction history', async () => {
+    const history = await paymentService.getTransactionHistory();
+    expect(history.length).toBeGreaterThan(0);
+  });
+  
+  // No validation of request parameters
+  test('refunds payment', async () => {
+    const refund = await paymentService.refundPayment('tx_123');
+    expect(refund.success).toBe(true);
+  });
+  
+  // Hardcoded expectations that will break when API changes
+  test('webhook processing', () => {
+    const result = paymentService.processWebhook({
+      type: 'payment_intent.succeeded',
+      data: {
+        object: {
+          id: 'pi_123',
+          status: 'succeeded'
+        }
+      }
+    });
+    
+    expect(result).toBe(true);
+  });
+});
+```
+
+## Implementation
+
+### Third-Party Integration Testing Patterns
+
+#### 1. Isolation Layer Pattern
+
+Create an abstraction layer that isolates third-party interactions:
+
+```typescript
+// src/integrations/payment/payment-provider.ts
+export interface PaymentProvider {
+  createCharge(params: CreateChargeParams): Promise<ChargeResult>;
+  refundCharge(chargeId: string): Promise<RefundResult>;
+  getCharge(chargeId: string): Promise<Charge>;
+  listCharges(params?: ListParams): Promise<PaginatedResult<Charge>>;
+}
+
+// Implementation for a specific provider (e.g., Stripe)
+export class StripePaymentProvider implements PaymentProvider {
+  private readonly client: Stripe;
+  
+  constructor(config: StripeConfig) {
+    this.client = new Stripe(config.apiKey, {
+      apiVersion: config.apiVersion,
+      maxNetworkRetries: config.retries || 0,
+      timeout: config.timeout || 30000,
+    });
+  }
+  
+  // Implement interface methods...
+}
+
+// Mock provider for testing
+export class MockPaymentProvider implements PaymentProvider {
+  // Test implementation...
+}
+```
+
+#### 2. API Contract Testing Pattern
+
+Implement contract tests to ensure your application correctly integrates with the third-party API:
+
+```typescript
+// test/contracts/payment-api.contract.ts
+import { schema as paymentSchema } from './schemas/payment-api.schema.json';
+import { PaymentService } from '../../src/services/payment-service';
+import { MockPaymentProvider } from '../../src/integrations/payment/mock-payment-provider';
+import { ApiValidator } from '../../src/utils/api-validator';
+
+describe('Payment API Contract Tests', () => {
+  let paymentService: PaymentService;
+  let mockProvider: MockPaymentProvider;
+  let validator: ApiValidator;
+  
+  beforeEach(() => {
+    mockProvider = new MockPaymentProvider();
+    paymentService = new PaymentService(mockProvider);
+    validator = new ApiValidator(paymentSchema);
+  });
+  
+  test('create charge request matches API contract', async () => {
+    // Capture request
+    mockProvider.captureNextRequest();
+    
+    await paymentService.createCharge({
+      amount: 1000,
+      currency: 'USD',
+      paymentMethodId: 'pm_123',
+      description: 'Test charge'
+    });
+    
+    const capturedRequest = mockProvider.getLastCapturedRequest();
+    const validationResult = validator.validateRequest(
+      'POST', 
+      '/v1/charges', 
+      capturedRequest
+    );
+    
+    expect(validationResult.valid).toBe(true);
+    if (!validationResult.valid) {
+      console.error('Validation errors:', validationResult.errors);
+    }
+  });
+  
+  test('charge response parsing matches API contract', async () => {
+    // Setup mock to return response matching schema
+    mockProvider.mockResponse('createCharge', {
+      id: 'ch_123',
+      object: 'charge',
+      amount: 1000,
+      currency: 'usd',
+      status: 'succeeded',
+      created: Math.floor(Date.now() / 1000)
+    });
+    
+    const result = await paymentService.createCharge({
+      amount: 1000,
+      currency: 'USD',
+      paymentMethodId: 'pm_123'
+    });
+    
+    const validationResult = validator.validateResponse(
+      'POST',
+      '/v1/charges',
+      mockProvider.getLastResponseSent()
+    );
+    
+    expect(validationResult.valid).toBe(true);
+    expect(result.id).toBe('ch_123');
+    expect(result.status).toBe('succeeded');
+  });
+});
+```
+
+#### 3. Webhook Testing Pattern
+
+Set up systems to test incoming webhooks from third-party systems:
+
+```typescript
+// test/integrations/webhook-handler.test.ts
+import { WebhookHandler } from '../../src/integrations/webhook-handler';
+import { mockWebhookEvent } from '../mocks/webhook-events';
+
+describe('Webhook Handler', () => {
+  let webhookHandler: WebhookHandler;
+  
+  beforeEach(() => {
+    webhookHandler = new WebhookHandler({
+      secretKey: 'webhook_signing_secret',
+      tolerance: 300 // 5 minutes
+    });
+  });
+  
+  test('validates authentic webhook signature', () => {
+    const payload = JSON.stringify(mockWebhookEvent('payment_intent.succeeded'));
+    const timestamp = Math.floor(Date.now() / 1000).toString();
+    
+    // Generate a real signature using the test secret
+    const signature = webhookHandler.generateTestSignature(
+      payload, 
+      timestamp, 
+      'webhook_signing_secret'
+    );
+    
+    const isValid = webhookHandler.verifySignature(
+      payload,
+      `t=${timestamp},v1=${signature}`,
+      'webhook_signing_secret'
+    );
+    
+    expect(isValid).toBe(true);
+  });
+  
+  test('rejects tampered webhook payload', () => {
+    const originalPayload = JSON.stringify(mockWebhookEvent('payment_intent.succeeded'));
+    const timestamp = Math.floor(Date.now() / 1000).toString();
+    
+    // Generate signature for original payload
+    const signature = webhookHandler.generateTestSignature(
+      originalPayload, 
+      timestamp, 
+      'webhook_signing_secret'
+    );
+    
+    // Tamper with the payload
+    const tamperedPayload = JSON.stringify({
+      ...JSON.parse(originalPayload),
+      data: {
+        object: {
+          id: 'pi_fraudulent',
+          amount: 999999
+        }
+      }
+    });
+    
+    const isValid = webhookHandler.verifySignature(
+      tamperedPayload,
+      `t=${timestamp},v1=${signature}`,
+      'webhook_signing_secret'
+    );
+    
+    expect(isValid).toBe(false);
+  });
+  
+  test('handles webhook event processing', async () => {
+    const mockEvent = mockWebhookEvent('payment_intent.succeeded');
+    const eventProcessor = jest.fn().mockResolvedValue(true);
+    
+    webhookHandler.registerEventHandler('payment_intent.succeeded', eventProcessor);
+    
+    await webhookHandler.processEvent(mockEvent);
+    
+    expect(eventProcessor).toHaveBeenCalledWith(mockEvent.data.object);
+  });
+});
+```
+
+#### 4. API Versioning Test Pattern
+
+Test compatibility with multiple API versions:
+
+```typescript
+// test/integrations/version-compatibility.test.ts
+import { PaymentService } from '../../src/services/payment-service';
+import { StripePaymentProvider } from '../../src/integrations/payment/stripe-payment-provider';
+
+describe('API Version Compatibility Tests', () => {
+  const supportedVersions = ['2020-08-27', '2022-11-15'];
+  
+  test.each(supportedVersions)('works with Stripe API version %s', async (apiVersion) => {
+    const provider = new StripePaymentProvider({
+      apiKey: 'test_key',
+      apiVersion
+    });
+    
+    const paymentService = new PaymentService(provider);
+    
+    // Mock API responses for this version
+    mockStripeResponses(apiVersion);
+    
+    // Test core functionality with this version
+    const charge = await paymentService.createCharge({
+      amount: 1000,
+      currency: 'USD',
+      paymentMethodId: 'pm_123'
+    });
+    
+    expect(charge.id).toBeDefined();
+    expect(charge.status).toBe('succeeded');
+  });
+});
+```
+
+### Advanced Third-Party Testing Strategies
+
+#### 1. Synthetic Monitoring
+
+Implement ongoing monitoring of third-party dependencies:
+
+```typescript
+// monitors/payment-provider.monitor.ts
+import { Monitor } from '../lib/monitoring';
+import { PaymentService } from '../services/payment-service';
+import { logger } from '../utils/logger';
+
+export class PaymentProviderMonitor extends Monitor {
+  private paymentService: PaymentService;
+  
+  constructor(config) {
+    super({
+      name: 'payment-provider',
+      interval: config.interval || 60000, // 1 minute
+      timeout: config.timeout || 10000,
+    });
+    
+    this.paymentService = new PaymentService({
+      apiKey: config.apiKey,
+      environment: 'sandbox'
+    });
+  }
+  
+  async check() {
+    const startTime = Date.now();
+    
+    try {
+      // Test token creation
+      const token = await this.paymentService.createTestToken();
+      
+      // Test charge creation & refund - the full flow
+      const charge = await this.paymentService.createCharge({
+        amount: 100,
+        currency: 'USD',
+        tokenId: token.id,
+        description: 'Synthetic monitoring test'
+      });
+      
+      const refund = await this.paymentService.refundCharge(charge.id);
+      
+      const duration = Date.now() - startTime;
+      
+      return {
+        status: 'ok',
+        duration,
+        data: {
+          tokenCreated: !!token.id,
+          chargeCreated: !!charge.id,
+          refundCreated: !!refund.id
+        }
+      };
+    } catch (error) {
+      logger.error('Payment provider check failed', error);
+      
+      return {
+        status: 'error',
+        error: {
+          message: error.message,
+          code: error.code,
+          type: error.type
+        }
+      };
+    }
+  }
+}
+```
+
+#### 2. Chaos Testing for Third-Party Dependencies
+
+Test application resilience when third-party services fail:
+
+```typescript
+// test/chaos/third-party-resilience.test.ts
+import { setupTestApp } from '../helpers/app-setup';
+import { PaymentChaosProxy } from '../helpers/chaos-proxy';
+import { request } from 'supertest';
+
+describe('Third-Party Service Resilience', () => {
+  let app;
+  let chaosProxy;
+  
+  beforeAll(async () => {
+    // Start chaos proxy to intercept API calls
+    chaosProxy = new PaymentChaosProxy({
+      targetUrl: 'https://api.payment-provider.com',
+      port: 9099
+    });
+    await chaosProxy.start();
+    
+    // Configure app to use chaos proxy instead of real API
+    app = await setupTestApp({
+      paymentApiUrl: 'http://localhost:9099'
+    });
+  });
+  
+  afterAll(async () => {
+    await chaosProxy.stop();
+  });
+  
+  beforeEach(() => {
+    chaosProxy.reset();
+  });
+  
+  test('handles complete API outage', async () => {
+    // Simulate complete API outage
+    chaosProxy.simulateOutage();
+    
+    const response = await request(app)
+      .post('/api/orders')
+      .send({
+        items: [{ id: 'product-1', quantity: 1 }],
+        paymentMethodId: 'pm_123'
+      });
+    
+    // Should fail gracefully with clear error
+    expect(response.status).toBe(503);
+    expect(response.body).toMatchObject({
+      error: {
+        message: 'Payment service unavailable',
+        retryable: true
+      }
+    });
+  });
+  
+  test('handles intermittent failures with retry', async () => {
+    // Fail first attempt, succeed on retry
+    chaosProxy.simulateIntermittentFailure({
+      failureRate: 0.5,
+      statusCode: 500
+    });
+    
+    const response = await request(app)
+      .post('/api/orders')
+      .send({
+        items: [{ id: 'product-1', quantity: 1 }],
+        paymentMethodId: 'pm_123'
+      });
+    
+    // Should eventually succeed after retries
+    expect(response.status).toBe(201);
+    expect(response.body.order.id).toBeDefined();
+    expect(response.body.order.status).toBe('processing');
+    
+    // Verify retry was attempted
+    expect(chaosProxy.getRequestCount()).toBeGreaterThan(1);
+  });
+  
+  test('handles slow responses', async () => {
+    // Simulate high latency
+    chaosProxy.simulateLatency({
+      delay: 5000 // 5 seconds
+    });
+    
+    const response = await request(app)
+      .post('/api/orders')
+      .send({
+        items: [{ id: 'product-1', quantity: 1 }],
+        paymentMethodId: 'pm_123'
+      });
+    
+    // Should timeout and fail gracefully
+    expect(response.status).toBe(408);
+    expect(response.body).toMatchObject({
+      error: {
+        message: 'Payment processing timed out',
+        retryable: true
+      }
+    });
+  });
+});
+```
+
+### Implementing Third-Party Integration Testing in CI/CD
+
+Configure your CI system to properly handle third-party testing:
+
+```yaml
+# .github/workflows/integration-tests.yml
+name: Integration Tests
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  integration-tests:
+    runs-on: ubuntu-latest
+    
+    services:
+      # Local service containers for integration testing
+      localstack:
+        image: localstack/localstack
+        ports:
+          - 4566:4566
+        env:
+          SERVICES: s3,dynamodb,sqs
+          
+      wiremock:
+        image: wiremock/wiremock
+        ports:
+          - 8080:8080
+        volumes:
+          - ./test/wiremock:/home/wiremock
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: npm
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Setup test environment
+        run: |
+          # Configure test env vars
+          echo "PAYMENT_API_URL=http://localhost:8080/payment-api" >> $GITHUB_ENV
+          echo "PAYMENT_API_KEY=test-api-key" >> $GITHUB_ENV
+          
+          # Setup mock services
+          npm run setup:mocks
+      
+      - name: Run integration tests
+        run: npm run test:integration
+      
+      - name: Run third-party contract tests
+        run: npm run test:contracts
+      
+      - name: Run chaos tests
+        run: npm run test:chaos
+        
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: integration-test-results
+          path: |
+            reports/
+            test-results/
+```
+
+## Full Documentation Access
+
+- [Third-Party Integration Strategy Guide](mdc:examples/testing/ThirdPartyIntegrationStrategy.md)
+- [API Contract Testing Guide](mdc:examples/testing/APIContractTestingGuide.md)
+- [Resilient Integration Patterns](mdc:examples/testing/ResilientIntegrationPatterns.md)

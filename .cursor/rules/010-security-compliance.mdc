@@ -1,0 +1,391 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+description: Use when analyzing code for security vulnerabilities, implementing security features, or ensuring compliance with regulations
+globs: "**/*"
+
+# Security & Compliance Implementation Guide
+
+This document provides detailed guidance for implementing security features and ensuring compliance with regulations. It builds upon the core security principles defined in [core/001-security.mdc](mdc:core/001-security.mdc).
+
+## Security Review & Implementation
+
+### Automated Security Analysis
+
+**Code Analysis:**
+- Proactively scan code for common security vulnerabilities (e.g., SQL injection, XSS)
+- Identify OWASP Top 10 vulnerabilities in web applications
+- Flag insecure coding patterns and suggest secure alternatives
+- Detect hardcoded credentials and sensitive information
+- **Recommended Tools**: SonarQube, Semgrep, or similar static analysis tools
+
+**Security Documentation:**
+- Maintain security documentation (threat models, security checklists)
+- Document all security features (authentication methods, encryption)
+- Create threat models for sensitive components
+- Use checklists for manual security reviews
+
+**Review Prioritization:**
+- Prioritize high-risk areas (authentication, payment processing)
+- Categorize security issues by severity (Critical, High, Medium, Low)
+- Focus on components handling sensitive data (PII, financial data)
+- Direct security testing to critical areas (input validation, session management)
+
+## Dependency Management
+
+### Vulnerability Detection
+
+**Dependency Analysis:**
+- **REQUIRED**: Run `npm audit` or equivalent before deployments
+- Identify outdated or vulnerable dependencies
+- Flag dependencies with known security issues
+- Suggest secure alternatives for problematic libraries
+
+**Update Recommendations:**
+- Recommend specific version updates to address vulnerabilities
+- Test thoroughly after security-related dependency updates
+- Document security exceptions with clear justification
+- Generate updated dependency configuration files
+
+**Dependency Scanning Integration:**
+- Integrate tools like Dependabot or Snyk for automated updates
+- Configure dependency scanning in CI/CD pipelines
+- Implement automated security testing
+- Check license compatibility for dependencies
+
+## Authentication & Authorization
+
+### Access Control Implementation
+
+**Authentication Security:**
+- **REQUIRED**: Use established authentication providers instead of custom solutions
+- Implement multi-factor authentication (MFA) for sensitive operations
+- Use secure session management (short-lived tokens, HTTPS-only cookies)
+- Follow secure password policies and reset flows
+
+**Authorization Patterns:**
+- Implement proper authorization checks before accessing resources
+- Use role-based access control (RBAC) for permissions
+- Check permissions at both API and UI levels
+- Validate roles with middleware for consistent enforcement
+
+### Role-Based Access Control (RBAC)
+
+**Role Implementation:**
+```typescript
+// Good: Role check in API route handler
+import { NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { hasRole } from '@/utils/auth';
+
+export async function DELETE(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
+  try {
+    // Get authenticated session
+    const session = await getServerSession();
+    if (!session?.user) {
+      return new NextResponse(null, { status: 401 });
+    }
+    
+    // Check role permission - only org_admin can delete agents
+    if (!hasRole(session.user, 'org_admin')) {
+      return new NextResponse(null, { status: 403 });
+    }
+    
+    // Proceed with deletion since role check passed
+    await deleteAgent(params.id);
+    
+    return new NextResponse(null, { status: 204 });
+  } catch (error) {
+    console.error('Error deleting agent:', error);
+    return new NextResponse(null, { status: 500 });
+  }
+}
+
+// Bad: No role check
+export async function DELETE(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
+  try {
+    // Missing role verification - anyone can delete!
+    await deleteAgent(params.id);
+    
+    return new NextResponse(null, { status: 204 });
+  } catch (error) {
+    console.error('Error deleting agent:', error);
+    return new NextResponse(null, { status: 500 });
+  }
+}
+```
+
+**UI Integration:**
+```typescript
+// Good: Role-based UI rendering
+import { useSession } from 'next-auth/react';
+import { hasPermission } from '@/utils/auth';
+
+function AgentActions({ agent }) {
+  const { data: session } = useSession();
+  const canEditAgent = hasPermission(session?.user, 'agent:edit');
+  const canDeleteAgent = hasPermission(session?.user, 'agent:delete');
+  
+  return (
+    <div className="agent-actions">
+      {canEditAgent && (
+        <button onClick={() => editAgent(agent.id)}>Edit</button>
+      )}
+      
+      {canDeleteAgent && (
+        <button onClick={() => deleteAgent(agent.id)}>Delete</button>
+      )}
+    </div>
+  );
+}
+```
+
+### Platform-Level Access Control
+
+**Platform User Authentication:**
+- Implement separate authentication checks for platform-level access
+- Ensure proper session validation for platform operations
+- Log all platform-level access attempts for security auditing
+- Implement multi-tenant isolation at the platform level
+
+**Example Platform Access Control:**
+```typescript
+// Good
+async function getPlatformStats(user) {
+  // Check for platform-level access
+  if (!user.roles.includes('platform_user')) {
+    throw new Error('Unauthorized: Platform User role required');
+  }
+  
+  // Proceed with platform-level data access
+  return await db.platformStats.find();
+}
+
+// Bad
+async function getPlatformStats(user) {
+  // No platform-specific role check
+  return await db.platformStats.find();
+}
+```
+
+## Data Protection
+
+### Sensitive Data Handling
+
+**Data Encryption:**
+- Encrypt all sensitive data at rest and in transit
+- Use industry-standard encryption methods (e.g., AES-256)
+- Implement proper key management (e.g., AWS KMS, HashiCorp Vault)
+- Ensure proper data classification and handling
+
+**Data Validation:**
+- Validate all user-supplied data against strict schemas
+- Implement output encoding to prevent injection attacks
+- Sanitize all inputs to prevent various attack vectors
+- Use parameterized queries to prevent SQL injection
+
+**Example: SQL Injection Prevention (Python)**
+```python
+# Vulnerable code
+def get_user(username):
+    query = f"SELECT * FROM users WHERE username = '{username}'"
+    cursor.execute(query)
+    return cursor.fetchone()
+
+# Secure parameterized query
+def get_user(username):
+    """Retrieve user by username using parameterized query to prevent SQL injection."""
+    query = "SELECT * FROM users WHERE username = %s"
+    cursor.execute(query, (username,))
+    return cursor.fetchone()
+```
+
+**Example: Secure Password Storage (JavaScript)**
+```javascript
+// Insecure password storage
+function createUser(username, password) {
+  const user = {
+    username: username,
+    password: password  // Storing plaintext password
+  };
+  return db.users.insert(user);
+}
+
+// Secure password hashing
+const bcrypt = require('bcrypt');
+
+async function createUser(username, password) {
+  const saltRounds = 12;
+  const hashedPassword = await bcrypt.hash(password, saltRounds);
+
+  const user = {
+    username: username,
+    password: hashedPassword
+  };
+
+  return db.users.insert(user);
+}
+```
+
+## Environment Variable Protection
+
+### Protection of Sensitive Configuration
+- **REQUIRED**: Never expose sensitive environment variables in client-side code
+- **REQUIRED**: Never share screenshots or recordings showing environment variables
+- Use naming conventions to distinguish client-safe variables (e.g., `NEXT_PUBLIC_` prefix)
+- Use secret management services in production environments
+- Implement sanitization in logging to prevent accidental exposure of secrets
+
+```typescript
+// BAD: Exposing sensitive credentials in client-side code
+// In a client-side component
+const ApiComponent = () => {
+  const apiKey = process.env.API_SECRET_KEY; // This will be exposed in the client bundle!
+  
+  return <div>Using API: {apiKey}</div>;
+};
+
+// GOOD: Only using approved client-side variables
+// In a client-side component
+const ApiComponent = () => {
+  const publicApiEndpoint = process.env.NEXT_PUBLIC_API_ENDPOINT; // Safe to expose
+  
+  return <div>API Endpoint: {publicApiEndpoint}</div>;
+};
+
+// GOOD: Keeping sensitive variables server-side
+// In a server-side API route or Server Component
+export async function getServerSideProps() {
+  const apiKey = process.env.API_SECRET_KEY; // Safely used server-side only
+  const data = await fetchWithAuth(apiKey);
+  
+  return { props: { data } }; // Only the resulting data is sent to client
+}
+```
+
+## Compliance Support
+
+### Regulatory Guidance
+
+**Compliance Implementation:**
+- Identify relevant regulatory requirements (GDPR, CCPA, HIPAA, etc.)
+- Implement data privacy requirements (consent management, data deletion)
+- Maintain audit logs for compliance-relevant actions
+- Support data subject rights (access, deletion, portability)
+
+**GDPR Data Subject Rights Implementation (Python)**
+```python
+# GDPR-compliant user controller
+class UserController:
+    def create_user(self, user_data, consent=None):
+        if consent is None:
+            consent = {}
+
+        user_record = {
+            **user_data,
+            "consent": consent,
+            "consent_timestamp": datetime.now().isoformat(),
+            "data_collected_at": datetime.now().isoformat()
+        }
+
+        audit_logger.info("User consent recorded", extra={
+            "user_id": user_record.get("id"), "consent": consent
+        })
+
+        return db.users.insert(user_record)
+
+    def delete_user(self, user_id):
+        user = db.users.find_by_id(user_id)
+        if not user:
+            return {"error": "User not found"}
+
+        audit_logger.info("User data deleted per request", extra={"user_id": user_id})
+        return db.users.delete(user_id)
+
+    def export_user_data(self, user_id):
+        user = db.users.find_by_id(user_id)
+        if not user:
+            return {"error": "User not found"}
+
+        portable_data = {
+            k: v for k, v in user.items() if k not in ["internal_id", "tracking_data"]
+        }
+
+        audit_logger.info("User data exported", extra={"user_id": user_id})
+        return portable_data
+```
+
+## Additional Security Controls
+
+### Web Application Protection
+- **REQUIRED**: All applications must implement DDoS protection and WAF
+- **REQUIRED**: Implement rate limiting for all API endpoints
+- Use CAPTCHA for login attempts and sensitive operations
+- Set up monitoring and alerting for security events
+- Implement secure headers (CSP, HSTS, etc.)
+
+**Example: Security Headers Implementation (Express)**
+```javascript
+// Express app with security headers
+const express = require('express');
+const helmet = require('helmet');
+
+const app = express();
+
+app.use(helmet());
+
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", "data:"],
+      },
+    },
+    referrerPolicy: { policy: "same-origin" },
+    hsts: { maxAge: 63072000, includeSubDomains: true, preload: true }
+  })
+);
+
+app.get('/', (req, res) => {
+  res.send('Hello World!');
+});
+
+app.listen(3000);
+```
+
+## Context-Aware Implementation
+
+Adapt security measures based on the specific context:
+
+**Application Type:**
+- Web: Focus on OWASP Top 10, secure headers
+- Mobile: Secure storage (e.g., Keychain for iOS)
+- API: Rate limiting, API key management
+- Desktop: Secure update mechanisms
+
+**Data Sensitivity:**
+- Public: Minimal encryption, focus on availability
+- Internal: Encrypt sensitive internal data
+- Confidential: Strong encryption, access controls, audit logs
+
+**Framework Capabilities:**
+- Leverage built-in security features (e.g., Django's CSRF protection)
+- Use security plugins (e.g., helmet for Express)
+- Configure frameworks securely
+
+**Deployment Environment:**
+- Cloud: Use cloud-native security tools (e.g., AWS WAF)
+- On-Prem: Firewall rules, network segmentation
+- Containers: Image scanning, least-privilege execution
+- Serverless: Function permissions, secure environment variables

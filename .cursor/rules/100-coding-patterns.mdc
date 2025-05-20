@@ -1,0 +1,774 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+___
+description: ALWAYS APPLY these coding patterns when DEVELOPING and REVIEWING code to ENSURE maintainability, reliability, and consistency
+globs: "**/*.{js,ts,jsx,tsx,py,java,c,cpp,go,rb,php,swift,rs}"
+___
+
+# Coding Patterns & Standards
+
+## Context
+- Code quality directly impacts maintainability, reliability, and development velocity
+- Consistent patterns reduce cognitive load when navigating the codebase
+- The cost of maintaining poor code increases exponentially over time
+- Clean, well-structured code reduces bugs and simplifies future changes
+- These patterns apply across all languages and frameworks
+
+## Core Principles
+
+### Always prefer simple solutions
+- **REQUIRED**: Choose clarity and simplicity over cleverness
+- **REQUIRED**: Prioritize readability over minor optimizations
+- **REQUIRED**: Implement straightforward solutions before complex alternatives
+- **REQUIRED**: Break complex logic into smaller, more manageable functions
+- Document complex algorithms with clear explanations
+- Avoid premature optimization and over-engineering
+
+```typescript
+// Bad: Complex, clever solution
+function getActiveUsersByRole(users, roles) {
+  return users.reduce((acc, u) => (u.active && roles.includes(u.role) && acc.push({...u}), acc), []);
+}
+
+// Good: Clear, readable solution
+function getActiveUsersByRole(users, roles) {
+  return users
+    .filter(user => user.active && roles.includes(user.role))
+    .map(user => ({...user}));
+}
+```
+
+### Avoid duplication of code
+- **REQUIRED**: Extract duplicate logic into reusable functions, components, or utilities
+- **REQUIRED**: Check for existing functionality before implementing new code
+- **REQUIRED**: Create appropriate abstractions for repeated patterns
+- Use composition to reuse functionality across components
+- Apply DRY (Don't Repeat Yourself) principle judiciously
+
+```typescript
+// Bad: Duplicated validation logic
+function validateUserForm(userData) {
+  if (!userData.name || userData.name.length < 2) {
+    return { valid: false, error: 'Name must be at least 2 characters' };
+  }
+  if (!userData.email || !userData.email.includes('@')) {
+    return { valid: false, error: 'Valid email is required' };
+  }
+  return { valid: true };
+}
+
+function validateProductForm(productData) {
+  if (!productData.name || productData.name.length < 2) {
+    return { valid: false, error: 'Name must be at least 2 characters' };
+  }
+  if (!productData.price || productData.price <= 0) {
+    return { valid: false, error: 'Price must be greater than 0' };
+  }
+  return { valid: true };
+}
+
+// Good: Reusable validation utilities
+const validators = {
+  required: (value) => !!value || 'This field is required',
+  minLength: (length) => (value) => 
+    !value || value.length >= length || `Must be at least ${length} characters`,
+  email: (value) => 
+    !value || value.includes('@') || 'Valid email is required',
+  positiveNumber: (value) => 
+    !value || value > 0 || 'Must be greater than 0',
+};
+
+function validate(data, rules) {
+  for (const [field, fieldValidators] of Object.entries(rules)) {
+    for (const validator of fieldValidators) {
+      const error = validator(data[field]);
+      if (error !== true) {
+        return { valid: false, error, field };
+      }
+    }
+  }
+  return { valid: true };
+}
+
+// Usage
+const userRules = {
+  name: [validators.required, validators.minLength(2)],
+  email: [validators.required, validators.email],
+};
+
+const productRules = {
+  name: [validators.required, validators.minLength(2)],
+  price: [validators.required, validators.positiveNumber],
+};
+
+validate(userData, userRules);
+validate(productData, productRules);
+```
+
+### Make only requested or clearly understood changes
+- **REQUIRED**: Focus on specific area of responsibility
+- **REQUIRED**: Avoid touching unrelated code
+- **REQUIRED**: Make the minimal necessary change to solve the problem
+- Create separate PRs for unrelated improvements
+- Document assumptions and rationale for non-obvious changes
+
+### Use existing patterns before introducing new ones
+- **REQUIRED**: Analyze codebase for established patterns first
+- **REQUIRED**: Match coding style of the surrounding code
+- **REQUIRED**: Provide clear rationale if introducing a new pattern
+- **REQUIRED**: Avoid introducing new dependencies for minor features
+- Extend existing solutions rather than replacing them
+- Standardize on a single approach for common problems
+
+```typescript
+// Assuming the codebase uses a specific error handling pattern:
+
+// Bad: Introducing a different error handling pattern
+try {
+  const data = await fetchData();
+  return data;
+} catch (error) {
+  console.error('Failed to fetch data', error);
+  return null;
+}
+
+// Good: Using the established pattern in the codebase
+try {
+  const data = await fetchData();
+  return {
+    success: true,
+    data
+  };
+} catch (error) {
+  logger.error('api_error', { message: 'Failed to fetch data', error });
+  return {
+    success: false,
+    error: error.message
+  };
+}
+```
+
+### Keep the codebase clean and organized
+- **REQUIRED**: Use consistent naming conventions
+- **REQUIRED**: Organize code by feature or domain
+- **REQUIRED**: Remove unused code, imports, and comments
+- **REQUIRED**: Keep files focused on a single responsibility
+- **REQUIRED**: Follow language-specific style guides
+- Split large files into smaller, cohesive modules
+- Use appropriate design patterns for your problem domain
+
+### Avoid having files over 200-300 lines of code
+- **REQUIRED**: Refactor files exceeding 300 lines
+- **REQUIRED**: Identify logical boundaries for splitting
+- Extract reusable components, utilities, or classes
+- Use composition to manage complexity
+- Create smaller, focused modules with clear responsibilities
+
+## Function & Method Design
+
+### Function size and focus
+- **REQUIRED**: Functions should do one thing well
+- **REQUIRED**: Keep functions under 30 lines where possible
+- **REQUIRED**: Limit function parameters (max 3-4 direct parameters)
+- Use object parameters for functions with many options
+- Reduce function complexity (cyclomatic complexity < 10)
+- Use meaningful function names that convey intent
+
+```typescript
+// Bad: Large function with multiple responsibilities
+function processOrder(order, user, items, paymentInfo, shippingDetails) {
+  // 50+ lines of code handling validation, payment, inventory, shipping, etc.
+}
+
+// Good: Smaller functions with clear responsibilities
+function processOrder(orderData) {
+  const validatedOrder = validateOrder(orderData);
+  const payment = processPayment(validatedOrder.paymentInfo, validatedOrder.totalAmount);
+  
+  if (payment.success) {
+    updateInventory(validatedOrder.items);
+    const shipping = arrangeShipping(validatedOrder.items, validatedOrder.shippingDetails);
+    sendOrderConfirmation(validatedOrder, payment, shipping);
+    return { success: true, orderId: validatedOrder.id };
+  }
+  
+  return { success: false, error: payment.error };
+}
+```
+
+### Self-documenting code
+- **REQUIRED**: Use descriptive variable and function names
+- **REQUIRED**: Express intent in code rather than comments
+- **REQUIRED**: Make code readable for humans first
+- Use explanatory variables to clarify complex expressions
+- Add comments only when necessary to explain "why" not "what"
+- Write code that reveals its purpose through its structure
+
+```typescript
+// Bad: Unclear code with explanatory comment
+// Calculate the total price with tax
+const p = i * (1 + (t / 100));
+
+// Good: Self-documenting code
+const totalPriceWithTax = itemPrice * (1 + (taxPercentage / 100));
+
+// Bad: Complex conditional with unclear purpose
+if (user.lastLogin && (Date.now() - user.lastLogin) / (1000 * 60 * 60 * 24) > 90 && !user.isAdmin) {
+  // ...
+}
+
+// Good: Self-documenting with helper functions and constants
+const INACTIVE_DAYS_THRESHOLD = 90;
+
+function isInactiveUser(user) {
+  if (!user.lastLogin) return false;
+  const daysSinceLastLogin = getDaysSince(user.lastLogin);
+  return daysSinceLastLogin > INACTIVE_DAYS_THRESHOLD && !user.isAdmin;
+}
+
+if (isInactiveUser(user)) {
+  // ...
+}
+```
+
+### Error handling
+- **REQUIRED**: Handle errors at appropriate boundaries
+- **REQUIRED**: Use specific error types or codes
+- **REQUIRED**: Fail fast with clear error messages
+- **REQUIRED**: Always handle promises with proper error catching
+- Avoid swallowing errors without proper handling
+- Log errors with context for troubleshooting
+- Implement centralized error handling where appropriate
+
+```typescript
+// Bad: Poor error handling
+try {
+  const data = JSON.parse(rawData);
+  const result = processData(data);
+  return result;
+} catch (error) {
+  console.log('Error occurred');
+  return null;
+}
+
+// Good: Proper error handling with context
+try {
+  const data = JSON.parse(rawData);
+  const result = processData(data);
+  return result;
+} catch (error) {
+  if (error instanceof SyntaxError) {
+    logger.error('Invalid JSON format', { error, rawData: rawData.substring(0, 100) });
+    throw new InvalidInputError('Provided data is not valid JSON');
+  }
+  
+  logger.error('Failed to process data', { error });
+  throw new ProcessingError('Could not process the data', { cause: error });
+}
+```
+
+## Code Organization
+
+### Module structure
+- **REQUIRED**: Organize code by feature or domain, not by type
+- **REQUIRED**: Keep related code together
+- **REQUIRED**: Export public API from index files
+- **REQUIRED**: Use consistent file naming across the project
+- Design modules with clear input/output boundaries
+- Keep module dependencies transparent and minimal
+
+```
+// Good directory structure, organized by feature
+src/
+  features/
+    auth/
+      components/
+      hooks/
+      services/
+      utils/
+      index.ts
+    products/
+      components/
+      hooks/
+      services/
+      utils/
+      index.ts
+  shared/
+    components/
+    hooks/
+    utils/
+```
+
+### Separation of concerns
+- **REQUIRED**: Separate business logic from presentation
+- **REQUIRED**: Isolate side effects in dedicated modules
+- **REQUIRED**: Keep data transformation separate from data fetching
+- **REQUIRED**: Split configuration from implementation
+- Use dependency injection or composition to manage relationships
+- Follow SOLID principles where applicable
+
+```typescript
+// Bad: Mixed concerns
+function UserComponent({ userId }) {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  
+  useEffect(() => {
+    fetchUser(userId)
+      .then(data => {
+        // Transform the data
+        const transformed = {
+          name: `${data.firstName} ${data.lastName}`,
+          email: data.email,
+          role: data.userRole || 'user',
+          lastLogin: new Date(data.last_login).toLocaleDateString()
+        };
+        setUser(transformed);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error(err);
+        setError('Failed to load user');
+        setLoading(false);
+      });
+  }, [userId]);
+  
+  // Render logic with multiple responsibilities
+}
+
+// Good: Separated concerns
+// UserAPI.js
+export async function fetchUser(userId) {
+  const response = await fetch(`/api/users/${userId}`);
+  if (!response.ok) throw new Error('Failed to fetch user');
+  return await response.json();
+}
+
+// userTransforms.js
+export function transformUserData(userData) {
+  return {
+    name: `${userData.firstName} ${userData.lastName}`,
+    email: userData.email,
+    role: userData.userRole || 'user',
+    lastLogin: new Date(userData.last_login).toLocaleDateString()
+  };
+}
+
+// useUser.js
+export function useUser(userId) {
+  const [state, setState] = useState({
+    user: null,
+    loading: true,
+    error: null
+  });
+  
+  useEffect(() => {
+    let isMounted = true;
+    
+    async function loadUser() {
+      try {
+        const userData = await fetchUser(userId);
+        const transformedUser = transformUserData(userData);
+        
+        if (isMounted) {
+          setState({
+            user: transformedUser,
+            loading: false,
+            error: null
+          });
+        }
+      } catch (error) {
+        logger.error('Failed to load user', { userId, error });
+        
+        if (isMounted) {
+          setState({
+            user: null,
+            loading: false,
+            error: 'Failed to load user data'
+          });
+        }
+      }
+    }
+    
+    loadUser();
+    
+    return () => {
+      isMounted = false;
+    };
+  }, [userId]);
+  
+  return state;
+}
+
+// UserComponent.jsx
+function UserComponent({ userId }) {
+  const { user, loading, error } = useUser(userId);
+  
+  if (loading) return <LoadingSpinner />;
+  if (error) return <ErrorMessage message={error} />;
+  
+  return (
+    <div className="user-profile">
+      <h2>{user.name}</h2>
+      <div>{user.email}</div>
+      {/* Additional user interface */}
+    </div>
+  );
+}
+```
+
+## Performance & Optimization
+
+### Performance considerations
+- **REQUIRED**: Identify and optimize critical paths
+- **REQUIRED**: Avoid unnecessary computations in render paths
+- **REQUIRED**: Use pagination, virtualization for large data sets
+- **REQUIRED**: Minimize renders and reflows
+- Memoize expensive calculations
+- Avoid premature optimization
+- Measure performance before and after optimizations
+
+```typescript
+// Bad: Inefficient list rendering
+function UserList({ users }) {
+  return (
+    <div>
+      {users.map(user => (
+        <UserItem 
+          key={user.id} 
+          user={user}
+          isAdmin={user.role === 'admin'}
+          formattedDate={new Date(user.createdAt).toLocaleDateString()}
+          fullName={`${user.firstName} ${user.lastName}`}
+        />
+      ))}
+    </div>
+  );
+}
+
+// Good: Optimized list rendering
+const UserItem = React.memo(function UserItem({ user }) {
+  const formattedDate = useMemo(
+    () => new Date(user.createdAt).toLocaleDateString(),
+    [user.createdAt]
+  );
+  
+  const fullName = useMemo(
+    () => `${user.firstName} ${user.lastName}`,
+    [user.firstName, user.lastName]
+  );
+  
+  const isAdmin = user.role === 'admin';
+  
+  return (
+    <div className="user-item">
+      <h3>{fullName}</h3>
+      <div>Created: {formattedDate}</div>
+      {isAdmin && <AdminBadge />}
+    </div>
+  );
+});
+
+function UserList({ users }) {
+  return (
+    <div>
+      {users.map(user => (
+        <UserItem key={user.id} user={user} />
+      ))}
+    </div>
+  );
+}
+```
+
+### Resource management
+- **REQUIRED**: Properly dispose of resources (connections, listeners)
+- **REQUIRED**: Implement cancellation for long-running operations
+- **REQUIRED**: Avoid memory leaks in cleanup routines
+- **REQUIRED**: Use connection pooling for database and network resources
+- Batch operations when possible
+- Implement proper caching strategies
+
+```typescript
+// Bad: Resource leak
+function DataComponent() {
+  useEffect(() => {
+    const subscription = dataSource.subscribe(handleDataUpdate);
+    const interval = setInterval(fetchLatestData, 30000);
+    
+    // Missing cleanup - will cause memory leaks
+  }, []);
+  
+  // Rest of component
+}
+
+// Good: Proper resource cleanup
+function DataComponent() {
+  useEffect(() => {
+    const subscription = dataSource.subscribe(handleDataUpdate);
+    const interval = setInterval(fetchLatestData, 30000);
+    
+    return () => {
+      subscription.unsubscribe();
+      clearInterval(interval);
+    };
+  }, []);
+  
+  // Rest of component
+}
+```
+
+## Testing Practices
+
+### Test coverage requirements
+- **REQUIRED**: Write unit tests for all business logic
+- **REQUIRED**: Test both success and failure paths
+- **REQUIRED**: Test edge cases and boundary conditions
+- **REQUIRED**: Implement integration tests for critical flows
+- Use test-driven development for complex functionality
+- Maintain tests alongside code changes
+
+```typescript
+// Example test for a validation function
+describe('validateEmail', () => {
+  it('should accept valid email addresses', () => {
+    expect(validateEmail('user@example.com')).toBe(true);
+    expect(validateEmail('name.surname@domain.co.uk')).toBe(true);
+  });
+  
+  it('should reject invalid email addresses', () => {
+    expect(validateEmail('')).toBe(false);
+    expect(validateEmail('not-an-email')).toBe(false);
+    expect(validateEmail('missing@domain')).toBe(false);
+  });
+  
+  it('should handle edge cases', () => {
+    expect(validateEmail(null)).toBe(false);
+    expect(validateEmail(undefined)).toBe(false);
+    expect(validateEmail(' user@example.com ')).toBe(true); // Should trim
+  });
+});
+```
+
+### Testable code design
+- **REQUIRED**: Design code for testability
+- **REQUIRED**: Isolate side effects for easier testing
+- **REQUIRED**: Use dependency injection for external services
+- Create pure functions where possible
+- Write loosely coupled, modular code
+- Provide testing utilities for common scenarios
+
+```typescript
+// Bad: Hard to test
+function saveUser(userData) {
+  // Direct database call
+  const db = getDatabaseConnection();
+  const result = db.users.insert(userData);
+  
+  // Direct email sending
+  sendWelcomeEmail(userData.email);
+  
+  return result;
+}
+
+// Good: Testable with dependency injection
+function saveUser(userData, { database, emailService }) {
+  const result = database.users.insert(userData);
+  
+  if (result.success) {
+    emailService.sendWelcomeEmail(userData.email);
+  }
+  
+  return result;
+}
+
+// Usage in production
+saveUser(userData, { 
+  database: realDatabase,
+  emailService: realEmailService
+});
+
+// Usage in tests
+test('saveUser success path', async () => {
+  // Mock dependencies
+  const mockDb = {
+    users: {
+      insert: jest.fn().mockReturnValue({ success: true, id: '123' })
+    }
+  };
+  
+  const mockEmailService = {
+    sendWelcomeEmail: jest.fn()
+  };
+  
+  // Test the function
+  const result = await saveUser(testUserData, {
+    database: mockDb,
+    emailService: mockEmailService
+  });
+  
+  // Assertions
+  expect(result.success).toBe(true);
+  expect(result.id).toBe('123');
+  expect(mockDb.users.insert).toHaveBeenCalledWith(testUserData);
+  expect(mockEmailService.sendWelcomeEmail).toHaveBeenCalledWith(testUserData.email);
+});
+```
+
+## Security Best Practices
+
+### Input validation
+- **REQUIRED**: Validate all inputs, especially user-provided data
+- **REQUIRED**: Use strict type checking
+- **REQUIRED**: Reject invalid inputs early
+- **REQUIRED**: Apply appropriate sanitization for dangerous contexts
+- **REQUIRED**: Use parameterized queries for database operations
+- Implement server-side validation even if client-side exists
+- Use validation libraries or schema validation
+
+```typescript
+// Bad: Vulnerable code
+function searchUsers(query) {
+  const sql = `SELECT * FROM users WHERE name LIKE '%${query}%'`;
+  return database.execute(sql);
+}
+
+// Good: Safe, parameterized query
+function searchUsers(query) {
+  const sql = 'SELECT * FROM users WHERE name LIKE ?';
+  return database.execute(sql, [`%${query}%`]);
+}
+```
+
+### Authentication & authorization
+- **REQUIRED**: Implement proper authentication for all protected routes
+- **REQUIRED**: Check authorization for all sensitive operations
+- **REQUIRED**: Use secure token handling and validation
+- **REQUIRED**: Implement proper password handling (hashing, not storing plaintext)
+- Create fine-grained access control
+- Validate user roles and permissions in middleware
+- Audit authentication and authorization failures
+
+```typescript
+// Good: Proper authentication middleware
+function authenticate(req, res, next) {
+  const token = req.headers.authorization?.split(' ')[1];
+  
+  if (!token) {
+    return res.status(401).json({
+      error: 'Authentication required'
+    });
+  }
+  
+  try {
+    const decodedToken = verifyToken(token);
+    
+    // Check token expiration
+    if (decodedToken.exp < Date.now() / 1000) {
+      return res.status(401).json({
+        error: 'Token expired'
+      });
+    }
+    
+    // Attach user to request
+    req.user = {
+      id: decodedToken.sub,
+      roles: decodedToken.roles || [],
+      permissions: decodedToken.permissions || []
+    };
+    
+    next();
+  } catch (error) {
+    logger.error('Authentication error', { error, token: maskToken(token) });
+    return res.status(401).json({
+      error: 'Invalid authentication token'
+    });
+  }
+}
+
+// Good: Authorization middleware
+function authorize(requiredPermissions) {
+  return (req, res, next) => {
+    if (!req.user) {
+      return res.status(401).json({
+        error: 'Authentication required'
+      });
+    }
+    
+    // Check if user has all required permissions
+    const hasPermission = requiredPermissions.every(
+      permission => req.user.permissions.includes(permission)
+    );
+    
+    if (!hasPermission) {
+      logger.warn('Authorization failure', {
+        userId: req.user.id,
+        requiredPermissions,
+        userPermissions: req.user.permissions
+      });
+      
+      return res.status(403).json({
+        error: 'Insufficient permissions'
+      });
+    }
+    
+    next();
+  };
+}
+```
+
+## Documentation
+
+### Code documentation
+- **REQUIRED**: Document public APIs, functions, and complex components
+- **REQUIRED**: Include parameter descriptions, return values, and exceptions
+- **REQUIRED**: Document non-obvious design decisions
+- **REQUIRED**: Maintain up-to-date README files
+- Add examples for non-trivial usage
+- Document configuration options and environment variables
+- Update documentation when making code changes
+
+### Project documentation
+- **REQUIRED**: Include setup instructions in the README
+- **REQUIRED**: Document build, test, and deployment procedures
+- **REQUIRED**: Outline project architecture and key components
+- **REQUIRED**: Maintain a changelog of significant changes
+- Create architecture diagrams for complex systems
+- Document integration points with external systems
+- Include troubleshooting guides for common issues
+
+## Language-Specific Guidelines
+
+Each language in our stack has its own additional guidelines:
+
+- TypeScript/JavaScript: [105-typescript-linter-standards.mdc](mdc:departments/engineering/coding-standards/105-typescript-linter-standards.mdc)
+- Python: [110-python-standards.mdc](mdc:departments/engineering/coding-standards/110-python-standards.mdc)
+- Java: [115-java-standards.mdc](mdc:departments/engineering/coding-standards/115-java-standards.mdc)
+
+## Implementation Examples
+
+For detailed examples of coding patterns and best practices, refer to our example documentation:
+
+- [CodingPatternsExamples.md](mdc:examples/coding-standards/CodingPatternsExamples.md)
+
+**Important Note**: These reference implementations are provided as documentation examples only and are not meant to be imported or used directly in your codebase.
+
+## Full Documentation Access
+
+To access the complete documentation including all examples, please refer to the original enterprise-cursor-rules repository. The examples directory in the repository contains detailed implementation guides that are referenced above.
+
+## Implementation Checklist
+
+- [ ] Code follows project's style guide and established patterns
+- [ ] Complex logic is broken down into smaller, focused functions
+- [ ] Files are kept under 300 lines, with clear responsibilities
+- [ ] Duplicated code is extracted into reusable functions or components
+- [ ] Error handling is comprehensive and informative
+- [ ] Security best practices are implemented for all sensitive operations
+- [ ] Tests are comprehensive and cover edge cases
+- [ ] Documentation is clear and up-to-date
+- [ ] Performance considerations are addressed for critical paths
+- [ ] Code is reviewed for simplicity and maintainability

@@ -1,0 +1,209 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+___
+description: ALWAYS APPLY the "Do No Harm" principle when handling files, data, and critical business logic - never modify without explicit permission
+globs: "**/*.{js,ts,jsx,tsx,py,java,c,cpp,go,rb,php,swift,rs,sh,bash}"
+___
+
+# Do No Harm Principle
+
+## Context
+
+- AI assistants and automated scripts can easily modify critical files and business logic
+- Modified code can result in serious business impacts, compliance issues, and security vulnerabilities 
+- Some files contain carefully-tuned logic, audited algorithms, and regulatory-compliant implementations
+- Users might need to explicitly mark certain files as protected from modification
+- VIBE (Value-Informed, Behavioral-Embedded) coding provides a framework for human-AI collaboration
+
+## Core Requirements
+
+### File and Data Protection
+
+- **REQUIRED**: Scripts and AI assistants MUST NOT delete files without explicit user confirmation
+- **REQUIRED**: Before overwriting existing files, tools MUST check for user content and either:
+  - Skip the file and notify the user
+  - Make a backup copy before overwriting
+  - Merge new content with existing content when possible
+- **REQUIRED**: Critical operations MUST include a backup mechanism
+- **REQUIRED**: Never perform operations outside the project directory without explicit confirmation
+
+### Protected Code Identification
+
+- **REQUIRED**: Respect `@ai-preserve` annotations in code files
+- **REQUIRED**: Respect protection boundaries marked with `@ai-protected-region` and `@ai-end-protected-region`
+- **REQUIRED**: Check for protection indicators in file headers and configuration files
+- **REQUIRED**: Honor protection status communicated through VIBE coding patterns
+- When a file is marked as protected, respect the specific modification restrictions
+
+### Safe Implementation Patterns
+
+- **REQUIRED**: Use conditional checks before file operations: `if [ -f "$file" ] || [ -d "$directory" ]`
+- **REQUIRED**: Implement dry-run modes that show what would happen without making changes
+- **REQUIRED**: Use temporary files for intermediate operations
+- **REQUIRED**: Append `.bak` or timestamp to backup files
+- **REQUIRED**: Log all file operations for audit purposes
+
+### VIBE Coding Implementation
+
+- **REQUIRED**: Respect value markers and boundary demarcations in VIBE-annotated code
+- **REQUIRED**: Follow behavioral instructions embedded in code comments
+- **REQUIRED**: Check for configuration-based protection in project files
+- **RECOMMENDED**: Suggest VIBE coding patterns for critical business logic
+
+## Examples
+
+### Safe File Operations
+
+<example>
+// Correct: Check if file exists before overwriting
+```bash
+if [ -f "$target_file" ]; then
+  echo "Warning: $target_file already exists."
+  echo "Creating backup at $target_file.bak"
+  cp "$target_file" "$target_file.bak"
+fi
+```
+
+// Correct: Move files instead of deleting
+```bash
+if [ -d "$old_directory" ]; then
+  echo "Moving files to $backup_location instead of deleting"
+  mkdir -p "$backup_location"
+  mv "$old_directory"/* "$backup_location/"
+fi
+```
+
+// Correct: Ask for permission before destructive operations
+```bash
+read -p "This will delete $file. Are you sure? (y/N): " confirm
+if [ "$confirm" = "y" ] || [ "$confirm" = "Y" ]; then
+  rm "$file"
+else
+  echo "Operation cancelled."
+fi
+```
+
+// Correct: Non-destructive alternative to replacement
+```javascript
+// Instead of fs.writeFileSync(path, newContent);
+if (fs.existsSync(path)) {
+  console.log(`File ${path} already exists, creating ${path}.new instead`);
+  fs.writeFileSync(`${path}.new`, newContent);
+} else {
+  fs.writeFileSync(path, newContent);
+}
+```
+</example>
+
+### VIBE Coding Patterns
+
+<example>
+// Correct: VIBE-annotated file header
+```javascript
+/**
+ * @file Payment Processing Service
+ * @module finance/payments
+ * 
+ * @ai-vibe-version 1.0
+ * @ai-review-level HIGH
+ * @ai-owners finance-team@example.com
+ * 
+ * @ai-protection-reason This module implements critical financial 
+ * logic that has been audited and approved for regulatory compliance.
+ * 
+ * @ai-modification-guidelines
+ * - DO NOT modify core transaction processing logic
+ * - DO NOT change parameter types or return values
+ * - MAY improve error handling with equivalent security
+ * - MAY update comments and documentation
+ * - MAY add logging (but not for sensitive data)
+ * - MUST add tests for any changes
+ */
+```
+
+// Correct: Protected region with clear boundaries
+```javascript
+function processPayment(paymentDetails) {
+  // Regular code, AI can suggest improvements
+  validateInputFormat(paymentDetails);
+  logAttempt(paymentDetails);
+
+  /* @ai-protected-region
+   * Reason: This section implements the exact algorithm specified
+   * in the payment processor's compliance documentation v2.3.
+   * It has been audited for security and regulatory compliance.
+   */
+  const encryptedPayload = preparePayload(paymentDetails);
+  const transactionId = generateSecureTransactionId();
+  const result = submitToPaymentProcessor(encryptedPayload, transactionId);
+  validateResponse(result);
+  /* @ai-end-protected-region */
+
+  // Regular code, AI can suggest improvements
+  return formatResponse(result);
+}
+```
+</example>
+
+### Invalid Patterns
+
+<example type="invalid">
+// WRONG: Deleting without checking
+```bash
+rm -rf $directory  # Dangerous - no check or confirmation
+```
+
+// WRONG: Overwriting without checking
+```javascript
+fs.writeFileSync(path, newContent);  // Overwrites without checking
+```
+
+// WRONG: Permanently removing files
+```bash
+find . -name "*.tmp" -delete  # Deletes without backup or verification
+```
+
+// WRONG: Ignoring protection markers
+```javascript
+// In a file with @ai-preserve header
+function calculateRegulatoryFees() { 
+  // Modifying protected logic without permission
+  return amount * 0.05; // Changed from complex, audited calculation
+}
+```
+</example>
+
+## Security Considerations
+
+- Scripts should run with minimal privileges needed
+- File operations should be restricted to the project directory
+- Absolute paths should be validated carefully to prevent accidental operations on system files
+- Always check for special markers indicating regulatory, financial, or security-critical code
+- Consider the business impact of modifications, not just the technical correctness
+
+## Implementation Notes
+
+When implementing the Do No Harm principle:
+
+1. **Always check** for VIBE coding patterns and protection markers before suggesting changes
+2. **Create explicit backups** before modifying important files
+3. **Document all modifications** to protected files, including rationale
+4. **Suggest protective markers** for critical business logic and configurations
+5. **Use dry-run options** when executing potentially destructive operations
+
+## Related Rules
+
+- [002-rule-application.mdc](mdc:002-rule-application.mdc)
+- [060-api-standards.mdc](mdc:departments/engineering/api/060-api-standards.mdc)
+- [100-coding-patterns.mdc](mdc:departments/engineering/coding-standards/100-coding-patterns.mdc)
+- [150-technical-debt-prevention.mdc](mdc:150-technical-debt-prevention.mdc)
+
+## Full Documentation Access
+
+For detailed implementation examples and patterns, refer to:
+
+- [Do No Harm Examples](mdc:examples/file-operations/DoNoHarmExamples.md) - Comprehensive examples of safe file operations and protection patterns
+- [VIBE AI Coding Guide](mdc:examples/file-operations/VIBE-AI-Coding-Guide.md) - Guide to Value-Informed, Behavioral-Embedded coding for AI collaboration

@@ -1,0 +1,389 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+___
+description: IMPLEMENT consistent security-related UI components when DEVELOPING interfaces to ENSURE recognizable security patterns and user trust
+globs: "**/{components,ui}/**/*.{tsx,ts,jsx,js}, **/security/**/*.{tsx,ts,jsx,js}"
+___
+
+# Security Design System Standards
+
+## Context
+- Security-related UI elements must be consistent and recognizable
+- Users should develop a mental model of security in the application
+- Security indicators need clear visual hierarchy and meaning
+- Different security levels and states must be visually distinct
+- Security interfaces should balance alerting with usability
+- Consistent security patterns increase user trust and comprehension
+- Security UI must follow accessibility standards for all users
+
+## Requirements
+
+### Security Visual Language
+
+- **REQUIRED**: Use consistent iconography for security states across the application
+- **REQUIRED**: Maintain a dedicated color palette for security indicators
+- Apply consistent typography for security messages
+- Implement standardized animation patterns for security operations
+
+```typescript
+// Good: Security icon system
+export const SecurityIcons = {
+  locked: <LockIcon className="security-icon locked" />,
+  unlocked: <UnlockIcon className="security-icon unlocked" />,
+  verified: <ShieldCheckIcon className="security-icon verified" />,
+  warning: <AlertTriangleIcon className="security-icon warning" />,
+  error: <AlertOctagonIcon className="security-icon error" />,
+  info: <InfoIcon className="security-icon info" />
+};
+```
+
+<example>
+// Good: Security color tokens
+:root {
+  /* Security-specific color palette */
+  --security-secure: #00845c;
+  --security-warning: #f1a817;
+  --security-danger: #e12029;
+  --security-info: #2670e8;
+  --security-neutral: #6e7a8a;
+  
+  /* Security level indicators */
+  --security-level-1: #0070f3;
+  --security-level-2: #7928ca;
+  --security-level-3: #e12029;
+}
+</example>
+
+### Security Component Library
+
+- **REQUIRED**: Create reusable components for common security patterns
+- Standardize layout and placement of security elements
+- Ensure consistent spacing and sizing for security indicators
+- Support dark mode for all security components
+
+<example>
+// Good: Authentication status component
+export function AuthStatusIndicator({ status }: { status: AuthStatus }) {
+  return (
+    <div className="auth-status-indicator">
+      {status === 'authenticated' && (
+        <>
+          {SecurityIcons.verified}
+          <span className="auth-status-text">Verified Session</span>
+        </>
+      )}
+      {status === 'expiring-soon' && (
+        <>
+          {SecurityIcons.warning}
+          <span className="auth-status-text">Session Expiring Soon</span>
+        </>
+      )}
+      {status === 'expired' && (
+        <>
+          {SecurityIcons.error}
+          <span className="auth-status-text">Session Expired</span>
+        </>
+      )}
+    </div>
+  );
+}
+</example>
+
+<example>
+// Good: Secure field component
+export function SecureField({ 
+  label, 
+  sensitivity = 'standard',
+  ...props 
+}: SecureFieldProps) {
+  return (
+    <div className={`secure-field sensitivity-${sensitivity}`}>
+      <label>
+        {label}
+        {sensitivity === 'high' && SecurityIcons.locked}
+      </label>
+      <div className="secure-input-wrapper">
+        <input {...props} />
+        {sensitivity === 'high' && <BlurOverlay />}
+      </div>
+    </div>
+  );
+}
+</example>
+
+<example type="invalid">
+// Bad: Inconsistent security indicators
+function LoginForm() {
+  // Using different icons for similar security states
+  // across different components
+  return (
+    <form>
+      <h2>Login <LockOpenIcon /></h2>
+      {/* One component uses a shield icon for secure state */}
+      <SecureInput 
+        icon={<ShieldIcon />} 
+        type="password" 
+      />
+      {/* Another component uses a lock icon for secure state */}
+      <SensitiveField
+        icon={<LockClosedIcon />}
+        type="text"
+      />
+      {/* Inconsistent color usage - red for security
+          which could be confused with error states */}
+      <button className="security-button-red">
+        Secure Login
+      </button>
+    </form>
+  );
+}
+</example>
+
+### Security Messaging Framework
+
+- **REQUIRED**: Create consistent pattern for security notifications
+- Use appropriate urgency levels for different security events
+- Apply standardized styling to security messages
+- Include clear action steps in security notifications
+
+<example>
+// Good: Security notice component
+export function SecurityNotice({ 
+  title, 
+  message, 
+  severity = 'info',
+  actionText,
+  onAction
+}: SecurityNoticeProps) {
+  return (
+    <div className={`security-notice ${severity}`} role="alert">
+      {SecurityIcons[severity]}
+      <div className="security-notice-content">
+        <h3 className="security-notice-title">{title}</h3>
+        <p className="security-notice-message">{message}</p>
+        {actionText && (
+          <Button 
+            className="security-notice-action"
+            variant="security"
+            size="sm"
+            onClick={onAction}
+          >
+            {actionText}
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
+</example>
+
+<example>
+// Good: Security messaging context
+export const SecurityMessagingContext = createContext<SecurityMessagingContextType>({
+  addNotice: () => {},
+  removeNotice: () => {},
+  notices: []
+});
+
+export function SecurityMessagingProvider({ children }: { children: React.ReactNode }) {
+  const [notices, setNotices] = useState<SecurityNotice[]>([]);
+  
+  const addNotice = useCallback((notice: SecurityNotice) => {
+    // Log security event
+    if (notice.severity === 'warning' || notice.severity === 'error') {
+      logSecurityEvent(notice.type, notice.message);
+    }
+    
+    setNotices(prev => [...prev, { id: Date.now(), ...notice }]);
+  }, []);
+  
+  const removeNotice = useCallback((id: number) => {
+    setNotices(prev => prev.filter(notice => notice.id !== id));
+  }, []);
+  
+  return (
+    <SecurityMessagingContext.Provider value={{ notices, addNotice, removeNotice }}>
+      {children}
+      <SecurityNoticeContainer notices={notices} onDismiss={removeNotice} />
+    </SecurityMessagingContext.Provider>
+  );
+}
+</example>
+
+<example type="invalid">
+// Bad: Inconsistent security messaging
+function AccountPage() {
+  // Mixing security notifications with different styles
+  return (
+    <div>
+      {/* One style for password security */}
+      <div className="red-alert">
+        <span>⚠️</span> Your password was changed 2 days ago
+      </div>
+      
+      {/* Different style for login security */}
+      <p className="security-message">
+        <LockIcon /> Last login from new device
+      </p>
+      
+      {/* Incomplete security information */}
+      <div className="notification">
+        Security alert detected
+        {/* Missing details and actions */}
+      </div>
+    </div>
+  );
+}
+</example>
+
+### Progressive Security UX
+
+- Create a unified approach to progressive security challenges
+- **REQUIRED**: Use standardized visualizations for security levels
+- Maintain consistent UI patterns for step-up authentication
+- Support multiple authentication methods with consistent UI
+
+<example>
+// Good: Security level indicator
+export function SecurityLevelIndicator({ level }: { level: 1 | 2 | 3 }) {
+  return (
+    <div className="security-level-indicator" aria-label={`Security level ${level} of 3`}>
+      <div className={`level-marker ${level >= 1 ? 'active' : ''}`} />
+      <div className={`level-marker ${level >= 2 ? 'active' : ''}`} />
+      <div className={`level-marker ${level >= 3 ? 'active' : ''}`} />
+    </div>
+  );
+}
+</example>
+
+<example>
+// Good: Step-up authentication
+export function StepUpAuth({ 
+  requiredLevel, 
+  currentLevel,
+  onComplete
+}: StepUpAuthProps) {
+  return (
+    <SecurityDialogBase>
+      <SecurityLevelIndicator level={requiredLevel} />
+      <h2 className="security-dialog-title">Additional Verification Required</h2>
+      <p className="security-dialog-message">
+        This action requires security level {requiredLevel}.
+      </p>
+      <SecurityVerificationMethod level={requiredLevel} onComplete={onComplete} />
+    </SecurityDialogBase>
+  );
+}
+</example>
+
+## Testing Guidelines
+
+Security UI components need thorough testing to ensure they properly convey security status:
+
+```typescript
+// Example: Testing for security design system consistency
+describe('Security Design System', () => {
+  it('maintains consistent styling across security levels', () => {
+    const { getByTestId } = render(
+      <>
+        <SecurityLevelIndicator data-testid="level1" level={1} />
+        <SecurityLevelIndicator data-testid="level2" level={2} />
+        <SecurityLevelIndicator data-testid="level3" level={3} />
+      </>
+    );
+    
+    // Get computed styles for each level indicator
+    const level1Style = window.getComputedStyle(getByTestId('level1'));
+    const level2Style = window.getComputedStyle(getByTestId('level2'));
+    const level3Style = window.getComputedStyle(getByTestId('level3'));
+    
+    // Core structure should be identical
+    expect(level1Style.borderRadius).toEqual(level2Style.borderRadius);
+    expect(level2Style.borderRadius).toEqual(level3Style.borderRadius);
+    
+    // Security colors should follow the defined palette
+    const level1Color = level1Style.getPropertyValue('--security-level-1');
+    const level2Color = level2Style.getPropertyValue('--security-level-2');
+    const level3Color = level3Style.getPropertyValue('--security-level-3');
+    
+    expect(level1Color).toBe('#0070f3');
+    expect(level2Color).toBe('#7928ca');
+    expect(level3Color).toBe('#e12029');
+  });
+  
+  it('renders security notifications with appropriate accessibility attributes', () => {
+    const { getByRole } = render(
+      <SecurityNotice
+        title="Security Alert"
+        message="Your account password was changed recently."
+        severity="warning"
+        actionText="Review Activity"
+        onAction={() => {}}
+      />
+    );
+    
+    // Should use appropriate ARIA roles
+    const alert = getByRole('alert');
+    expect(alert).toBeInTheDocument();
+    
+    // Should have appropriate focus management
+    const actionButton = getByRole('button', { name: /review activity/i });
+    expect(actionButton).toHaveFocus();
+  });
+});
+```
+
+Additional testing considerations:
+- Test security components for accurate visual representation of security states
+- Verify accessibility across all security indicators
+- Ensure proper message handling for different security events
+- Test consistent styling in light and dark modes
+- Validate cross-browser rendering consistency
+- Verify screen reader compatibility for security notifications
+
+## Best Practices
+
+1. **Consistent Visual Language**: Use the same visual cues across the application for similar security states
+2. **Clear Communication**: Security messaging should be clear, concise, and actionable
+3. **Progressive Disclosure**: Use progressive disclosure for security information to avoid overwhelming users
+4. **Accessibility First**: Ensure all security indicators are accessible to all users
+5. **Color Semantics**: Use consistent color meanings (e.g., green for secure, red for danger)
+6. **Focus Management**: Properly manage focus for security-related modals and notifications
+7. **Animation Purpose**: Use animation to draw attention to security elements only when necessary
+8. **Dark Mode Support**: Ensure security components work well in both light and dark themes
+
+## Implementation Checklist
+
+- [ ] Security Icons: Implement a consistent set of security-related icons
+- [ ] Color System: Define and use a security-specific color palette with appropriate contrast
+- [ ] Component Library: Create reusable security UI components (notices, indicators, dialogs)
+- [ ] Messaging Framework: Implement standardized security notification patterns
+- [ ] Progressive Security: Design UI for different security levels and step-up authentication
+- [ ] Accessibility: Ensure all security components meet accessibility requirements
+- [ ] Dark Mode: Test security components in both light and dark modes
+- [ ] User Testing: Validate security UI with actual users to ensure comprehension
+
+## Related Rules
+
+- [core/001-security.mdc](mdc:core/001-security.mdc) - Core security principles
+- [departments/engineering/security/046-session-validation.mdc](mdc:departments/engineering/security/046-session-validation.mdc) - Session validation
+- [departments/product/030-visual-style-consolidated.mdc](mdc:departments/product/030-visual-style-consolidated.mdc) - Visual design system
+- [technologies/languages/javascript/054-accessibility-requirements.mdc](mdc:technologies/languages/javascript/054-accessibility-requirements.mdc) - Accessibility standards
+
+## Reference Implementations
+
+For detailed implementation examples, refer to our documentation:
+
+- [SecurityComponentExamples.md](mdc:examples/security/SecurityComponentExamples.md) - Shows implementation of various security UI components
+- [ProgressiveSecurityUX.md](mdc:examples/security/ProgressiveSecurityUX.md) - Patterns for implementing progressive security verification
+
+**Important Note**: These reference implementations are provided as documentation examples only and are not meant to be imported or used directly in your codebase. They demonstrate the patterns and practices that should be followed when implementing security UI components.
+
+## Full Documentation Access
+
+To access the complete documentation including all examples, please refer to the original enterprise-cursor-rules repository. The examples directory in the repository contains detailed implementation guides that are referenced above.
+
+The flat structure of the Cursor rules deployment may not include these examples directly, but they remain available in the source repository.

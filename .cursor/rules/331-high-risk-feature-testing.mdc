@@ -1,0 +1,157 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# High-Risk Feature Testing
+
+## Context and Purpose
+
+High-risk features are components and functionality that could pose significant business, operational, or security risks if they fail. These features require enhanced testing coverage and specialized testing strategies beyond standard approaches.
+
+This rule establishes requirements and best practices for testing high-risk features to ensure they meet the highest standards of reliability, security, and performance before deployment.
+
+## Requirements
+
+1. **Risk Assessment & Classification**
+   - All features must be classified by risk level during planning
+   - High-risk features must be identified using a standardized risk assessment matrix
+   - Risk classifications must be documented and reviewed by QA and security teams
+
+2. **Enhanced Coverage Requirements**
+   - High-risk features must achieve minimum 95% test coverage
+   - All edge cases and failure modes must be tested explicitly
+   - Boundary conditions must have dedicated test cases
+
+3. **Specialized Testing Approaches**
+   - Performance testing under extreme load conditions is required
+   - Chaos engineering principles must be applied to validate resilience
+   - Security penetration testing must be performed
+
+4. **Approval Gates**
+   - High-risk features require sign-off from security, operations, and QA
+   - Test results must be reviewed in dedicated risk assessment meetings
+   - Post-deployment monitoring plan must be established
+
+5. **Documentation**
+   - Test strategy for high-risk features must be documented in a dedicated test plan
+   - Discovered issues and their mitigations must be tracked in a risk register
+   - Test results must be preserved for compliance and audit purposes
+
+## Examples
+
+### Good Examples
+
+```typescript
+// Example: Comprehensive failure mode testing for a payment processor
+describe('Payment Processor High-Risk Tests', () => {
+  test('should handle network timeout during payment authorization', async () => {
+    // Arrange: Setup network failure simulation
+    mockNetworkFailure('timeout', 'authorization');
+    
+    // Act: Process payment during simulated network failure
+    const result = await paymentProcessor.processPayment(validPaymentDetails);
+    
+    // Assert: Verify system handles failure gracefully and provides proper user feedback
+    expect(result.status).toBe('pending-retry');
+    expect(result.userMessage).toContain('temporary issue');
+    expect(auditLog.entries).toContainEntry({
+      type: 'PAYMENT_NETWORK_FAILURE',
+      severity: 'HIGH',
+      recoveryAttempted: true
+    });
+  });
+
+  test('should prevent duplicate charges during retry scenarios', async () => {
+    // Multiple test scenarios for duplicate prevention...
+  });
+  
+  // Additional tests covering all failure modes...
+});
+```
+
+```java
+// Example: Chaos testing for a critical microservice
+@ChaosTesting
+public class HighAvailabilityServiceTests {
+    @Test
+    @SimulateFailure(type = FailureType.NODE_CRASH, count = 2)
+    public void shouldMaintainServiceWhenMultipleNodesFailSimultaneously() {
+        // Arrange: Setup service with resilience configuration
+        HighAvailabilityService service = new HighAvailabilityService(resilienceConfig);
+        
+        // Act: Perform operations during simulated node failures
+        ServiceResponse response = service.processCriticalRequest(validRequest);
+        
+        // Assert: Verify service remains operational with acceptable degradation
+        assertTrue(response.isSuccessful());
+        assertTrue(response.getLatency() < SLA_MAX_LATENCY);
+        assertEquals(ResilienceState.DEGRADED, service.getState());
+        assertTrue(service.getActiveNodeCount() >= MIN_REQUIRED_NODES);
+    }
+    
+    // Additional chaos tests...
+}
+```
+
+### Bad Examples
+
+```javascript
+// BAD EXAMPLE: Insufficient testing for high-risk financial feature
+test('payment should work', () => {
+  const result = paymentService.processPayment({
+    amount: 100,
+    cardNumber: '4111111111111111'
+  });
+  
+  expect(result.success).toBe(true);
+});
+// No testing of failure scenarios, security concerns, or edge cases
+```
+
+```python
+# BAD EXAMPLE: Missing load testing for critical authentication service
+def test_user_login():
+    response = auth_service.login("user@example.com", "password123")
+    assert response.status_code == 200
+    assert "token" in response.json()
+    
+# No tests for concurrent users, rate limiting, or security concerns
+```
+
+## Implementation
+
+1. **Risk Assessment Process**
+   - Implement a standardized risk assessment matrix in the planning phase
+   - Include scoring for business impact, security implications, and operational complexity
+   - Automate classification where possible in project management tools
+
+2. **Extended Test Coverage**
+   - Configure code coverage tools to flag high-risk components below 95% coverage
+   - Create specialized test templates for high-risk features with required test scenarios
+   - Implement metrics to track test coverage specifically for high-risk components
+
+3. **Specialized Test Infrastructure**
+   - Deploy dedicated test environments for high-risk feature testing
+   - Implement automated chaos engineering capabilities for resilience testing
+   - Establish security testing pipelines for penetration testing
+
+4. **CI/CD Integration**
+   - Add specific quality gates for high-risk features in CI/CD pipelines
+   - Configure longer test cycles and more thorough validation for high-risk components
+   - Implement staged rollout patterns with increased monitoring
+
+5. **Documentation & Compliance**
+   - Create templates for high-risk test plans
+   - Integrate risk documentation with existing test management tools
+   - Establish audit trails for test results of high-risk features
+
+## See Also
+
+- [mdc:300-test-first-mandate.mdc](mdc:Test-First Mandate)
+- [mdc:310-component-visual-testing.mdc](mdc:Component Visual Testing)
+- [mdc:320-test-resilience.mdc](mdc:Test Resilience)
+- [mdc:116-testing-environments.mdc](mdc:Testing Environments)
+- [mdc:330-third-party-integration-testing.mdc](mdc:Third-Party Integration Testing)
+- [mdc:examples/testing/HighRiskTestingStrategy.md](mdc:High Risk Testing Strategy)
+- [mdc:examples/testing/RiskAssessmentMatrix.md](mdc:Risk Assessment Matrix)

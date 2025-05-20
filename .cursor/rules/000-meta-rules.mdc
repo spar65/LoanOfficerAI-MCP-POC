@@ -1,0 +1,94 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+description: Core meta-rules that govern the creation and management of all Cursor rules
+globs: **/*
+
+# Cursor Rules Meta Guidelines
+
+These guidelines establish how to create, structure, and maintain Cursor rules within the enterprise.
+
+## Rule File Structure
+
+Each rule file must adhere to this structure:
+
+```
+description: Concise explanation of when this rule applies
+globs: File patterns (e.g., **/*.js, **/*.py)
+
+# Primary Rule Title
+
+Core rule content goes here.
+
+## Subsection Heading
+
+More detailed rules and explanations.
+```
+
+## Naming Conventions
+
+- Files must follow the pattern: `NNN-descriptive-name.mdc` where:
+  - `NNN` is a numeric prefix (e.g., 001, 042, 100)
+  - `descriptive-name` uses kebab-case
+
+## Rule Dependencies
+
+- Use `@include rulename` to include other rules
+- Core rules can be included from any file
+- Avoid circular dependencies
+- Document all dependencies
+
+## Rule Scope and Specificity
+
+- Rules should address a single concern
+- Include specific, actionable guidance
+- Use clear, unambiguous language
+- Provide examples of both compliant and non-compliant code
+
+## Versioning Guidelines
+
+- Document significant changes in rule files
+- Include version information in rule metadata
+- Follow semantic versioning principles
+
+## Exception Handling
+
+- Document valid exceptions to rules
+- Provide a clear process for requesting exceptions
+- Include time limits or conditions for exceptions when applicable
+
+## Implementation Requirements
+
+- Rules must be testable and verifiable
+- Include @test sections for automated validation
+- Rules should work in both global and project-specific contexts
+
+## Documentation Standards
+
+- Use standard Markdown formatting
+- Include sufficient explanation for context
+- Provide links to additional resources when relevant
+- Examples should be properly formatted with code blocks
+
+## Example Documentation
+
+- For complex rules, create accompanying example documentation in the `examples/` directory
+- Example files must use the `.md` extension and follow documentation standards
+- Structure examples as implementation guides, not as importable code
+- Follow these three practices for all examples to ensure they remain accessible after deployment:
+  1. Include direct links to example files from their related rule files
+  2. Reference examples in the central Examples Guide (`003-examples-guide.mdc`)
+  3. Add a "Full Documentation Access" section to explain how to access examples in the original repository
+- Example files should include a disclaimer that they are for reference only
+- Organize examples by domain (security, styling, components, etc.) in appropriate subdirectories
+
+## Change Process
+
+- Follow the established RFC process for significant changes
+- Ensure cross-team review for widely-used rules
+- Deprecated rules should be clearly marked before removal
+
+@include 001-security
+@include 002-compliance

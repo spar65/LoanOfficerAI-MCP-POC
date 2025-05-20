@@ -1,0 +1,240 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Operations & Incident Management Standards
+
+## Context
+
+Effective operations and incident management are critical to maintaining system reliability, minimizing downtime, and ensuring quick recovery from production issues. These standards provide a structured approach to monitoring, alerting, incident response, and continuous operational improvement.
+
+## Requirements
+
+### 1. Monitoring & Alerting Architecture
+
+1. **Monitoring Coverage Required**
+   - All production services MUST implement monitoring for core functions
+   - Key metrics MUST be defined for each critical component
+   - Health checks MUST be implemented for all dependent services
+   - User-impacting flows MUST have end-to-end monitoring
+
+2. **Alert Configuration Standards**
+   - Alerts MUST have clear severity levels (P1-P4)
+   - Alerts MUST include actionable information
+   - Alert thresholds SHOULD be determined based on baseline metrics
+   - Alerts MUST avoid unnecessary noise and false positives
+
+3. **Metric Collection**
+   - System health metrics MUST be collected (CPU, memory, disk, network)
+   - Application performance metrics MUST be tracked (latency, throughput, error rates)
+   - Business metrics SHOULD be monitored (user activity, conversion rates)
+   - Dependency health MUST be monitored (database, cache, third-party services)
+
+### 2. Incident Response Procedures
+
+1. **Incident Classification**
+   - Incidents MUST be classified by severity:
+     - P1: Critical - Significant user impact, complete service outage
+     - P2: Major - Partial service disruption, major feature unavailable
+     - P3: Minor - Limited user impact, degraded performance
+     - P4: Low - Minimal user impact, cosmetic issues
+   
+   - Response times MUST align with severity:
+     - P1: Immediate response (15 minutes)
+     - P2: Rapid response (30 minutes)
+     - P3: Standard response (4 hours)
+     - P4: Scheduled response (next business day)
+
+2. **Incident Coordination**
+   - P1/P2 incidents MUST have a designated incident commander
+   - Communication channels MUST be established for incidents
+   - Updates MUST be provided at regular intervals during incidents
+   - Stakeholders MUST be informed based on incident severity
+
+3. **Runbook Implementation**
+   - Runbooks MUST be maintained for common failure scenarios
+   - Runbooks MUST include diagnostic steps, remediation actions, and verification
+   - Runbooks SHOULD be tested regularly
+   - Runbooks MUST be versioned and reviewed quarterly
+
+### 3. Post-Incident Analysis
+
+1. **Post-Mortem Requirements**
+   - All P1/P2 incidents MUST have a post-mortem
+   - Post-mortems MUST include timeline, impact, root cause, and action items
+   - Post-mortems MUST be shared with all relevant teams
+   - Post-mortems MUST be conducted in a blameless manner
+
+2. **Root Cause Analysis**
+   - Root cause analysis MUST be conducted for all P1/P2 incidents
+   - Multiple analysis methods SHOULD be used (5 Whys, fishbone diagram)
+   - Contributing factors MUST be identified
+   - Findings MUST be backed by evidence (logs, metrics)
+
+3. **Action Item Management**
+   - Action items MUST be tracked in the issue management system
+   - Action items MUST have clear owners and deadlines
+   - Action items MUST be prioritized based on impact
+   - Action items SHOULD be reviewed in team meetings
+
+### 4. Operational Resilience
+
+1. **Recovery Time Objectives**
+   - Services MUST define Recovery Time Objectives (RTOs)
+   - Critical services SHOULD aim for sub-15-minute recovery
+   - Recovery procedures MUST be documented and tested
+   - Automated recovery SHOULD be implemented where possible
+
+2. **Disaster Recovery Planning**
+   - Critical systems MUST have disaster recovery plans
+   - DR plans MUST be tested at least annually
+   - DR scenarios MUST include data center outages and region failures
+   - Recovery point objectives (RPOs) MUST be defined for each service
+
+3. **Chaos Engineering**
+   - Resilience testing SHOULD be conducted regularly
+   - Failure injection SHOULD be performed in non-production environments
+   - Results MUST be documented and improvements tracked
+   - Testing MUST include dependency failures
+
+### 5. Operational Maturity
+
+1. **On-Call Rotation**
+   - On-call rotations MUST be established for all production systems
+   - On-call handoffs MUST include active incidents and known issues
+   - On-call engineers MUST have appropriate access and training
+   - On-call rotations SHOULD be balanced to prevent burnout
+
+2. **SLI/SLO Implementation**
+   - Key services MUST define Service Level Indicators (SLIs)
+   - Service Level Objectives (SLOs) MUST be established for each SLI
+   - SLO attainment MUST be tracked and reported
+   - SLO breaches SHOULD trigger improvement initiatives
+
+3. **Documentation Standards**
+   - System architecture MUST be documented
+   - Operational procedures MUST be documented
+   - Troubleshooting guides MUST be maintained
+   - Documentation MUST be reviewed and updated quarterly
+
+### 6. Automated Remediation
+
+1. **Self-Healing Systems**
+   - Common failures SHOULD have automated remediation
+   - Automated remediation MUST be tested thoroughly
+   - Remediation actions MUST be logged and reported
+   - Manual override MUST be possible for automated actions
+
+2. **Remediation Prioritization**
+   - User-impacting issues MUST be prioritized for automation
+   - High-frequency issues SHOULD be automated first
+   - Automation MUST include verification steps
+   - Failed automation MUST trigger human escalation
+
+## Prohibited Practices
+
+1. **Alert Mismanagement**
+   - ❌ Ignoring alerts without resolution
+   - ❌ Creating alerts without clear remediation steps
+   - ❌ Setting thresholds without baseline data
+   - ❌ Implementing noisy alerts that lead to alert fatigue
+
+2. **Incident Response Anti-Patterns**
+   - ❌ Failing to designate clear incident roles
+   - ❌ Making uncoordinated changes during incidents
+   - ❌ Neglecting to communicate with stakeholders
+   - ❌ Performing root cause analysis without evidence
+
+3. **Operational Negligence**
+   - ❌ Operating without monitoring
+   - ❌ Leaving incidents unresolved
+   - ❌ Ignoring recurring issues
+   - ❌ Failing to learn from past incidents
+
+## Implementation Guidance
+
+### Alert Configuration Example
+
+```yaml
+# Prometheus Alert Rule Example
+groups:
+- name: api_service_alerts
+  rules:
+  - alert: HighErrorRate
+    expr: sum(rate(http_requests_total{status=~"5.."}[5m])) / sum(rate(http_requests_total[5m])) > 0.01
+    for: 2m
+    labels:
+      severity: critical
+    annotations:
+      summary: "High API error rate detected"
+      description: "Error rate is above 1% for the last 2 minutes. Current value: {{ $value }}"
+      runbook: "https://runbooks.example.com/high-error-rate"
+```
+
+### Incident Response Flow
+
+```mermaid
+flowchart TD
+    A[Alert Triggered] --> B{Assess Severity}
+    B -->|P1| C[Activate Incident Response]
+    B -->|P2| D[Notify On-Call Team]
+    B -->|P3/P4| E[Schedule Resolution]
+    
+    C --> F[Assign Incident Commander]
+    F --> G[Establish Communication Channel]
+    G --> H[Begin Investigation]
+    
+    H --> I{Root Cause Identified?}
+    I -->|Yes| J[Implement Mitigation]
+    I -->|No| K[Escalate to Additional Teams]
+    K --> H
+    
+    J --> L[Verify Resolution]
+    L --> M[Communicate Resolution]
+    M --> N[Schedule Post-Mortem]
+    
+    E --> O[Address During Business Hours]
+    D --> H
+```
+
+### SLI/SLO Example
+
+```yaml
+# SLI/SLO Definition Example
+service: payment-processor
+slis:
+  - name: availability
+    description: "API availability rate"
+    metric: "successful_requests / total_requests"
+    slo: 99.95%
+    measurement_window: 30d
+    
+  - name: latency
+    description: "API response time"
+    metric: "requests_below_threshold / total_requests"
+    threshold: 200ms
+    slo: 99.0%
+    measurement_window: 30d
+    
+  - name: error_rate
+    description: "API error rate"
+    metric: "error_count / total_requests"
+    slo: 0.1%
+    measurement_window: 30d
+```
+
+## Examples and Related Resources
+
+- [Incident Response Playbook](mdc:examples/operations/IncidentResponsePlaybook.md)
+- [Alert Configuration Guide](mdc:examples/operations/AlertConfigurationGuide.md)
+- [SLI/SLO Implementation Guide](mdc:examples/operations/SLIImplementationGuide.md)
+- [Post-Mortem Template](mdc:examples/operations/PostMortemTemplate.md)
+- [On-Call Handover Guide](mdc:examples/operations/OnCallHandoverGuide.md)
+
+## Related Rules
+
+- [200-deployment-infrastructure.mdc](mdc:technologies/platforms/200-deployment-infrastructure.mdc) for deployment processes
+- [220-security-monitoring.mdc](mdc:technologies/platforms/220-security-monitoring.mdc) for security-specific monitoring
+- [130-logging-standards.mdc](mdc:departments/engineering/operations/130-logging-standards.mdc) for logging requirements
+- [140-troubleshooting-standards.mdc](mdc:departments/engineering/operations/140-troubleshooting-standards.mdc) for troubleshooting guidance

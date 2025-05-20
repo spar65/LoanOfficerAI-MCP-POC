@@ -1,0 +1,534 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+___
+description: REQUIRED for all TypeScript code to ensure type safety, prevent runtime errors, and maintain consistent code quality
+globs: "**/*.{ts,tsx}"
+___
+
+# TypeScript Linter Standards
+
+## Context
+
+- TypeScript adds static typing to JavaScript, reducing runtime errors
+- Linter errors often indicate potential bugs, type mismatches, or structural issues
+- Addressing linter issues late in development is inefficient and risky
+- Consistent code style improves readability and reduces cognitive load
+- Modern TypeScript projects rely on strict type checking for reliability
+- Many runtime errors can be caught at compile time with proper TypeScript usage
+
+## Core Requirements
+
+### Project Configuration
+
+- **REQUIRED**: Use a standardized `tsconfig.json` with strict type checking
+- **REQUIRED**: Configure ESLint with TypeScript-specific rules
+- **REQUIRED**: Enable `strict: true` in `tsconfig.json` for comprehensive type checking
+- **REQUIRED**: Configure import resolution with appropriate `paths` and `baseUrl`
+- **REQUIRED**: Run type checks and linting in CI/CD pipelines
+- **REQUIRED**: Configure IDE extensions to highlight issues in real-time
+
+### Type Definitions
+
+- **REQUIRED**: Define explicit types for all function parameters and return values
+- **REQUIRED**: Create interfaces or type aliases for complex data structures
+- **REQUIRED**: Avoid the `any` type except in documented exceptional cases
+- **REQUIRED**: Use readonly modifiers for immutable properties and arrays
+- **REQUIRED**: Prefer `unknown` over `any` when type is truly unknown
+- **REQUIRED**: Use union types to represent values with multiple possible types
+- **RECOMMENDED**: Use branded types for type-safe identifiers
+
+```typescript
+// Good: Explicit types with documentation
+/**
+ * Processes user data and returns formatted result
+ * @param userData User information to process
+ * @returns Formatted user display data
+ */
+function processUser(userData: UserData): FormattedUserData {
+  // Implementation
+}
+
+// Good: Using branded types for type-safe identifiers
+type UserId = string & { readonly __brand: unique symbol };
+
+function createUserId(id: string): UserId {
+  return id as UserId;
+}
+
+function getUserById(id: UserId): User {
+  // TypeScript ensures you can't pass a regular string here
+}
+
+// Bad: Using any bypasses type checking
+function processUser(userData: any): any {
+  // Implementation with no type safety
+}
+```
+
+### Null & Undefined Handling
+
+- **REQUIRED**: Enable `strictNullChecks` in TypeScript configuration
+- **REQUIRED**: Use optional chaining (`?.`) for potentially undefined properties
+- **REQUIRED**: Use nullish coalescing (`??`) for null/undefined fallbacks
+- **REQUIRED**: Use the non-null assertion (`!`) only when truly necessary and documented
+- **REQUIRED**: Always check for null/undefined with proper type guards
+
+```typescript
+// Good: Proper null handling with optional chaining
+function getUserName(user?: User): string {
+  return user?.name ?? 'Guest';
+}
+
+// Good: Type guard for null checking
+function processUserData(userData: UserData | null): void {
+  if (userData === null) {
+    logError('Null user data provided');
+    return;
+  }
+  
+  // TypeScript now knows userData is not null
+  processUser(userData);
+}
+
+// Bad: Using non-null assertion without verification
+function getUserName(user?: User): string {
+  return user!.name; // Might cause runtime error
+}
+```
+
+### Import Management
+
+- **REQUIRED**: Verify imported modules exist before usage
+- **REQUIRED**: Use consistent import style (e.g., `import type` for type-only imports)
+- **REQUIRED**: Sort imports consistently (standard library, third-party, local)
+- **REQUIRED**: Remove unused imports as they clutter code and slow compilation
+- **REQUIRED**: Use explicit imports instead of namespace imports
+- **RECOMMENDED**: Use import aliases for deeply nested paths
+
+```typescript
+// Good: Organized imports
+// 1. Standard library
+import { useEffect, useState } from 'react';
+// 2. Third-party
+import { z } from 'zod';
+import type { FormEvent } from 'react';
+// 3. Local modules with aliases
+import { UserCard } from '@/components/user';
+import type { User } from '@/types';
+
+// Bad: Unorganized, potentially unused imports
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import * as Utils from '../utils'; // Namespace import
+import { UserCard, UserAvatar, UserBio } from '@/components/user';
+```
+
+### React Component Typing
+
+- **REQUIRED**: Define explicit interfaces for component props
+- **REQUIRED**: Use precise event types for event handlers
+- **REQUIRED**: Use discriminated unions for conditional rendering
+- **REQUIRED**: Always type custom hooks properly with generics when appropriate
+- **REQUIRED**: Use React.ComponentProps for extending HTML element props
+- **RECOMMENDED**: Use function overloads for components with complex prop relationships
+
+```typescript
+// Good: Properly typed React component
+interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  variant?: 'primary' | 'secondary' | 'danger';
+  isLoading?: boolean;
+  icon?: React.ReactNode;
+}
+
+export function Button({
+  variant = 'primary',
+  isLoading = false,
+  icon,
+  children,
+  ...props
+}: ButtonProps): React.ReactElement {
+  // Implementation
+}
+
+// Good: Properly typed event handler
+function handleSubmit(event: React.FormEvent<HTMLFormElement>): void {
+  event.preventDefault();
+  // Implementation
+}
+
+// Bad: Implicit any props
+function Button({ variant, isLoading, icon, ...props }) {
+  // Implementation with no type checking
+}
+```
+
+### Asynchronous Code
+
+- **REQUIRED**: Explicitly type Promise returns and async functions
+- **REQUIRED**: Use try/catch blocks for error handling in async functions
+- **REQUIRED**: Define Error types or result types for comprehensive error handling
+- **REQUIRED**: Apply proper typing to error objects in catch blocks
+- **RECOMMENDED**: Use discriminated unions for result types
+
+```typescript
+// Good: Properly typed async function with error handling
+interface ApiResponse<T> {
+  data: T;
+  status: number;
+}
+
+interface ApiError {
+  message: string;
+  code: string;
+  status: number;
+}
+
+// Using result type pattern
+type Result<T> = 
+  | { success: true; data: T }
+  | { success: false; error: ApiError };
+
+async function fetchUserData(userId: string): Promise<Result<User>> {
+  try {
+    const response = await fetch(`/api/users/${userId}`);
+    
+    if (!response.ok) {
+      const errorData: ApiError = await response.json();
+      return { success: false, error: errorData };
+    }
+    
+    const userData: User = await response.json();
+    return { success: true, data: userData };
+  } catch (error) {
+    // Proper error typing with instanceof
+    if (error instanceof Error) {
+      return {
+        success: false,
+        error: {
+          message: error.message,
+          code: 'NETWORK_ERROR',
+          status: 0
+        }
+      };
+    }
+    
+    // Fallback for unknown errors
+    return {
+      success: false,
+      error: {
+        message: 'Unknown error occurred',
+        code: 'UNKNOWN_ERROR',
+        status: 0
+      }
+    };
+  }
+}
+
+// Usage with type narrowing
+const result = await fetchUserData('user-123');
+
+if (result.success) {
+  // TypeScript knows result.data is User
+  processUser(result.data);
+} else {
+  // TypeScript knows result.error is ApiError
+  logError(result.error);
+}
+```
+
+### Type Guards and Assertions
+
+- **REQUIRED**: Create custom type guards with type predicates for complex types
+- **REQUIRED**: Use `instanceof` for class instances and `typeof` for primitives
+- **REQUIRED**: Avoid type assertions (`as`) except when TypeScript cannot infer
+- **REQUIRED**: Never use non-null assertion (`!`) without explicit checks
+- **RECOMMENDED**: Use assertion functions for complex validation logic
+
+```typescript
+// Good: Custom type guard with type predicate
+interface User {
+  id: string;
+  name: string;
+  email: string;
+}
+
+interface Admin extends User {
+  permissions: string[];
+  role: 'admin';
+}
+
+// Type predicate function
+function isAdmin(user: User): user is Admin {
+  return 'role' in user && user.role === 'admin';
+}
+
+function handleUser(user: User): void {
+  if (isAdmin(user)) {
+    // TypeScript knows user is Admin here
+    console.log(`Admin ${user.name} has permissions: ${user.permissions.join(', ')}`);
+  } else {
+    // TypeScript knows user is not Admin here
+    console.log(`User ${user.name} is not an admin`);
+  }
+}
+
+// Good: Assertion function
+function assertIsString(value: unknown, errorMessage: string): asserts value is string {
+  if (typeof value !== 'string') {
+    throw new Error(errorMessage);
+  }
+}
+
+function processValue(value: unknown): string {
+  assertIsString(value, 'Value must be a string');
+  // TypeScript knows value is string here
+  return value.toUpperCase();
+}
+```
+
+## Common TypeScript Errors and Solutions
+
+### "Cannot find module 'X' or its corresponding type declarations."
+
+- **REQUIRED**: Install missing `@types` packages for third-party libraries
+- **REQUIRED**: Verify module path and case sensitivity in imports
+- **REQUIRED**: Create ambient type declarations for untyped modules
+- **REQUIRED**: Configure `paths` and `baseUrl` in `tsconfig.json` correctly
+
+```typescript
+// Good: Custom type declaration for untyped module
+// In a .d.ts file
+declare module 'untyped-module' {
+  export interface ModuleOptions {
+    param1: string;
+    param2?: number;
+  }
+  
+  export function doSomething(options: ModuleOptions): void;
+  
+  const defaultExport: {
+    doSomething: typeof doSomething;
+  };
+  
+  export default defaultExport;
+}
+
+// Usage
+import UntypedModule from 'untyped-module';
+```
+
+### "Type 'X' is not assignable to type 'Y'."
+
+- **REQUIRED**: Carefully review type definitions for mismatches
+- **REQUIRED**: Use type guards to narrow types appropriately
+- **REQUIRED**: Create union types when multiple types are valid
+- **REQUIRED**: Use appropriate interface extension or type composition
+- **RECOMMENDED**: Consider structural compatibility issues
+
+```typescript
+// Good: Using type guards to fix assignment
+interface Rectangle {
+  width: number;
+  height: number;
+}
+
+interface Circle {
+  radius: number;
+}
+
+type Shape = Rectangle | Circle;
+
+function calculateArea(shape: Shape): number {
+  // Using type guard to narrow the union type
+  if ('radius' in shape) {
+    // TypeScript knows it's a Circle
+    return Math.PI * shape.radius ** 2;
+  } else {
+    // TypeScript knows it's a Rectangle
+    return shape.width * shape.height;
+  }
+}
+```
+
+### "Property 'X' does not exist on type 'Y'."
+
+- **REQUIRED**: Ensure property exists in the interface/type definition
+- **REQUIRED**: Use optional chaining for potentially missing properties
+- **REQUIRED**: Add properties to interfaces when legitimately needed
+- **REQUIRED**: Use type guards to narrow union types
+- **REQUIRED**: Consider using indexed types for dynamic properties
+
+```typescript
+// Good: Handling dynamic properties
+interface Dictionary<T> {
+  [key: string]: T;
+}
+
+function getProperty<T>(obj: Dictionary<T>, key: string): T | undefined {
+  return obj[key];
+}
+
+// Good: Using type guards for unions
+type FormField = 
+  | { type: 'text'; value: string }
+  | { type: 'number'; value: number }
+  | { type: 'boolean'; value: boolean };
+
+function formatFieldValue(field: FormField): string {
+  switch (field.type) {
+    case 'text':
+      // TypeScript knows field.value is string
+      return field.value;
+    case 'number':
+      // TypeScript knows field.value is number
+      return field.value.toFixed(2);
+    case 'boolean':
+      // TypeScript knows field.value is boolean
+      return field.value ? 'Yes' : 'No';
+  }
+}
+```
+
+### "Parameter 'X' implicitly has an 'any' type."
+
+- **REQUIRED**: Add explicit type annotations to all function parameters
+- **REQUIRED**: Enable `noImplicitAny` in tsconfig.json
+- **REQUIRED**: Define interfaces for complex parameter types
+- **REQUIRED**: Type object parameters with inline types or interfaces
+
+```typescript
+// Good: Explicit parameter typing
+function sortItems<T>(items: T[], sortKey: keyof T, ascending: boolean = true): T[] {
+  return [...items].sort((a, b) => {
+    const aValue = a[sortKey];
+    const bValue = b[sortKey];
+    
+    // Add type checking logic for comparisons
+    const compareResult = 
+      aValue < bValue ? -1 : aValue > bValue ? 1 : 0;
+    
+    return ascending ? compareResult : -compareResult;
+  });
+}
+
+// Good: Typed object destructuring
+function processConfig({
+  endpoint,
+  timeout = 5000,
+  retries = 3
+}: {
+  endpoint: string;
+  timeout?: number;
+  retries?: number;
+}): void {
+  // Implementation
+}
+```
+
+## Implementation Process
+
+### Pre-Implementation
+
+1. **REQUIRED**: Set up proper tsconfig.json with strict mode enabled
+2. **REQUIRED**: Configure ESLint with TypeScript-specific rules
+3. **REQUIRED**: Define interfaces or type definitions before implementation
+4. **REQUIRED**: Install type definitions for third-party libraries
+
+### During Implementation
+
+1. **REQUIRED**: Add proper type annotations as you write code
+2. **REQUIRED**: Address linter warnings immediately, not at the end
+3. **REQUIRED**: Run type checking frequently during development
+4. **REQUIRED**: Use type guards to handle complex type scenarios
+5. **REQUIRED**: Document complex type usage with comments
+
+### Post-Implementation
+
+1. **REQUIRED**: Run full TypeScript compilation with `noEmit: true`
+2. **REQUIRED**: Ensure all ESLint warnings are addressed
+3. **REQUIRED**: Verify type safety with edge case inputs
+4. **REQUIRED**: Run tests to confirm runtime behavior matches type definitions
+5. **REQUIRED**: Document any non-obvious type decisions for future developers
+
+## Recommended ESLint Configuration
+
+### Basic Configuration
+
+```json
+// .eslintrc.json
+{
+  "parser": "@typescript-eslint/parser",
+  "plugins": ["@typescript-eslint", "react", "react-hooks"],
+  "extends": [
+    "eslint:recommended",
+    "plugin:@typescript-eslint/recommended",
+    "plugin:@typescript-eslint/recommended-requiring-type-checking",
+    "plugin:react/recommended",
+    "plugin:react-hooks/recommended"
+  ],
+  "parserOptions": {
+    "ecmaVersion": 2020,
+    "sourceType": "module",
+    "ecmaFeatures": {
+      "jsx": true
+    },
+    "project": "./tsconfig.json"
+  },
+  "rules": {
+    // Critical rules to prevent common errors
+    "@typescript-eslint/no-explicit-any": "error",
+    "@typescript-eslint/explicit-function-return-type": ["error", {
+      "allowExpressions": true,
+      "allowTypedFunctionExpressions": true
+    }],
+    "@typescript-eslint/no-unused-vars": ["error", {
+      "argsIgnorePattern": "^_",
+      "varsIgnorePattern": "^_"
+    }],
+    "@typescript-eslint/no-non-null-assertion": "error",
+    "@typescript-eslint/consistent-type-imports": "error",
+    
+    // React-specific rules
+    "react/prop-types": "off", // TypeScript handles prop validation
+    "react-hooks/rules-of-hooks": "error",
+    "react-hooks/exhaustive-deps": "warn"
+  }
+}
+```
+
+### Recommended VSCode Configuration
+
+```json
+// .vscode/settings.json
+{
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": true
+  },
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "eslint.validate": [
+    "javascript",
+    "javascriptreact",
+    "typescript",
+    "typescriptreact"
+  ],
+  "typescript.preferences.importModuleSpecifier": "non-relative"
+}
+```
+
+## Related Rules
+
+- [100-coding-patterns.mdc](mdc:departments/engineering/coding-standards/100-coding-patterns.mdc) - General coding standards
+- [104-stable-interfaces.mdc](mdc:departments/engineering/coding-standards/104-stable-interfaces.mdc) - Interface stability guidelines
+- [060-api-standards.mdc](mdc:departments/engineering/api/060-api-standards.mdc) - API design standards
+- [042-ui-component-architecture.mdc](mdc:technologies/frameworks/042-ui-component-architecture.mdc) - UI component architecture
+
+## Full Documentation Access
+
+For detailed implementation examples and patterns, refer to:
+
+- [TypeScript Patterns Guide](mdc:examples/typescript/TypeScriptPatternsGuide.md) - Comprehensive examples of TypeScript best practices
+- [React TypeScript Integration](mdc:examples/typescript/ReactTypeScriptIntegration.md) - Specific patterns for React components with TypeScript

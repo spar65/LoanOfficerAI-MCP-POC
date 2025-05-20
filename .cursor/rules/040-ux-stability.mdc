@@ -1,0 +1,635 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+___
+description: IMPLEMENT stable user interfaces when DEVELOPING UI components to ENSURE predictable behavior, layout stability, and robust state management
+globs: "**/{components,pages,screens,views}/**/*.{tsx,ts,jsx,js}, **/app/**/*.{tsx,ts,jsx,js}"
+___
+
+# UX Stability Guidelines
+
+## Context
+- Our platform requires stable user interfaces that maintain state predictably
+- UI components must handle loading, error, and empty states gracefully
+- Users expect consistent behavior across the application
+- Layout shifts and unexpected changes in UI state should be minimized
+- Component lifespans need to be managed carefully to prevent memory leaks
+
+## Requirements
+
+### State Management Stability
+
+- **REQUIRED**: All components with complex state must have well-defined state transitions
+- **REQUIRED**: Loading states should be properly represented to prevent UI jumps
+- **REQUIRED**: Error states must be handled at appropriate component levels
+- **REQUIRED**: Empty states should be presented with helpful guidance
+- **REQUIRED**: Component unmounting must clean up resources and event listeners
+
+```typescript
+// Good: Stable state management
+function DataTable({ fetchData }) {
+  const [data, setData] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+  
+  useEffect(() => {
+    let isMounted = true;
+    
+    const loadData = async () => {
+      setIsLoading(true);
+      setError(null);
+      
+      try {
+        const result = await fetchData();
+        
+        // Only update state if component is still mounted
+        if (isMounted) {
+          setData(result);
+          setIsLoading(false);
+        }
+      } catch (err) {
+        // Only update state if component is still mounted
+        if (isMounted) {
+          setError(err.message || 'Failed to load data');
+          setIsLoading(false);
+        }
+      }
+    };
+    
+    loadData();
+    
+    // Cleanup function prevents state updates after unmount
+    return () => {
+      isMounted = false;
+    };
+  }, [fetchData]);
+  
+  // Loading state with fixed height to prevent layout shifts
+  if (isLoading) {
+    return (
+      <div className="min-h-[300px] flex items-center justify-center">
+        <LoadingSpinner />
+      </div>
+    );
+  }
+  
+  // Error state with retry option
+  if (error) {
+    return (
+      <div className="min-h-[300px] flex flex-col items-center justify-center">
+        <ErrorMessage message={error} />
+        <Button onClick={() => fetchData()}>Retry</Button>
+      </div>
+    );
+  }
+  
+  // Empty state with guidance
+  if (data.length === 0) {
+    return (
+      <div className="min-h-[300px] flex flex-col items-center justify-center">
+        <EmptyState 
+          title="No data available" 
+          description="Try adjusting your filters or create new items"
+        />
+      </div>
+    );
+  }
+  
+  // Normal state
+  return (
+    <table>
+      {/* Table content */}
+    </table>
+  );
+}
+```
+
+### Layout Stability
+
+- **REQUIRED**: Use minimum height/width for containers that load dynamic content
+- **REQUIRED**: Implement content placeholders that match the expected final layout
+- **REQUIRED**: Avoid abrupt transitions between states that cause layout shifts
+- Maintain consistent spacing and alignment across state changes
+- Use CSS Grid or Flexbox for predictable layouts
+
+```typescript
+// Good: Layout stability with placeholders
+function UserProfile({ userId }) {
+  const { data: user, isLoading, error } = useUser(userId);
+  
+  return (
+    <div className="profile-card min-h-[200px] min-w-[300px]">
+      {isLoading ? (
+        // Placeholder that matches the final layout
+        <div className="flex flex-col space-y-4 p-4">
+          <div className="flex items-center space-x-3">
+            <div className="skeleton-avatar h-12 w-12 rounded-full" />
+            <div className="skeleton-text h-5 w-32" />
+          </div>
+          <div className="skeleton-text h-4 w-full" />
+          <div className="skeleton-text h-4 w-3/4" />
+          <div className="skeleton-text h-4 w-1/2" />
+        </div>
+      ) : error ? (
+        // Error state with the same dimensions
+        <div className="flex items-center justify-center h-full p-4">
+          <ErrorMessage message="Could not load user profile" />
+        </div>
+      ) : (
+        // Actual content with the same layout structure
+        <div className="flex flex-col space-y-4 p-4">
+          <div className="flex items-center space-x-3">
+            <Avatar user={user} className="h-12 w-12" />
+            <h3 className="text-lg font-medium">{user.name}</h3>
+          </div>
+          <p>{user.bio}</p>
+          <UserStats user={user} />
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+### Interaction Stability
+
+- **REQUIRED**: Disable buttons during form submission to prevent double submissions
+- **REQUIRED**: Implement debounce for search inputs and other high-frequency updates
+- **REQUIRED**: Add confirmation dialogs for destructive or irreversible actions
+- Maintain scroll position when content changes
+- Provide visual feedback for all user interactions
+
+```typescript
+// Good: Stable interaction handling
+function SearchInput({ onSearch }) {
+  const [query, setQuery] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
+  
+  // Debounced search function to prevent excessive API calls
+  const debouncedSearch = useCallback(
+    debounce((searchTerm) => {
+      setIsSearching(true);
+      onSearch(searchTerm)
+        .finally(() => setIsSearching(false));
+    }, 300),
+    [onSearch]
+  );
+  
+  const handleChange = (e) => {
+    const newQuery = e.target.value;
+    setQuery(newQuery);
+    debouncedSearch(newQuery);
+  };
+  
+  return (
+    <div className="relative">
+      <input
+        type="text"
+        value={query}
+        onChange={handleChange}
+        placeholder="Search..."
+        className="w-full px-4 py-2 border rounded-md"
+      />
+      {isSearching && (
+        <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+          <Spinner size="sm" />
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+### Navigation Stability
+
+- **REQUIRED**: Prevent unexpected page navigations during form submissions
+- **REQUIRED**: Confirm before navigating away from unsaved changes
+- **REQUIRED**: Maintain form values when navigating back to a form
+- Preserve filter and sort states across page navigations
+- Handle browser back/forward navigation gracefully
+
+```typescript
+// Good: Form with navigation protection
+function EditForm({ initialData, onSave }) {
+  const [formData, setFormData] = useState(initialData);
+  const [isDirty, setIsDirty] = useState(false);
+  const router = useRouter();
+  
+  // Update dirty state when form data changes
+  useEffect(() => {
+    const hasChanges = !isEqual(formData, initialData);
+    setIsDirty(hasChanges);
+  }, [formData, initialData]);
+  
+  // Prevent accidental navigation with unsaved changes
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      if (isDirty) {
+        // Standard browser confirmation dialog
+        e.preventDefault();
+        e.returnValue = '';
+        return '';
+      }
+    };
+    
+    // For browser close/refresh
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    
+    // For Next.js routing
+    const handleRouteChange = (url) => {
+      if (isDirty && !confirm('You have unsaved changes. Are you sure you want to leave?')) {
+        router.events.emit('routeChangeError');
+        throw 'Navigation cancelled by user';
+      }
+    };
+    
+    router.events.on('routeChangeStart', handleRouteChange);
+    
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      router.events.off('routeChangeStart', handleRouteChange);
+    };
+  }, [isDirty, router]);
+  
+  // Form handlers
+  const handleChange = (e) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value
+    });
+  };
+  
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    await onSave(formData);
+    setIsDirty(false);
+  };
+  
+  return (
+    <form onSubmit={handleSubmit}>
+      {/* Form fields */}
+      <div className="flex justify-end space-x-2 mt-4">
+        <Button type="button" variant="outline" onClick={() => router.back()}>
+          Cancel
+        </Button>
+        <Button type="submit" disabled={!isDirty}>
+          Save Changes
+        </Button>
+      </div>
+    </form>
+  );
+}
+```
+
+## Examples
+
+<example>
+// Good: Complete data fetching component with all states handled
+import { useState, useEffect } from 'react';
+import { Spinner, ErrorDisplay, EmptyState, Button } from '@/components/ui';
+
+function DataFetchingComponent({ endpoint, renderItem }) {
+  const [data, setData] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+  
+  const fetchData = async () => {
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      const response = await fetch(endpoint);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP Error: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      setData(result);
+    } catch (err) {
+      setError(err.message || 'An error occurred');
+      console.error('Fetch error:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  useEffect(() => {
+    // Cleanup and prevent state updates after unmount
+    let isMounted = true;
+    
+    const loadData = async () => {
+      setIsLoading(true);
+      setError(null);
+      
+      try {
+        const response = await fetch(endpoint);
+        
+        if (!response.ok) {
+          throw new Error(`HTTP Error: ${response.status}`);
+        }
+        
+        const result = await response.json();
+        
+        // Only update state if still mounted
+        if (isMounted) {
+          setData(result);
+          setIsLoading(false);
+        }
+      } catch (err) {
+        // Only update state if still mounted
+        if (isMounted) {
+          setError(err.message || 'An error occurred');
+          setIsLoading(false);
+          console.error('Fetch error:', err);
+        }
+      }
+    };
+    
+    loadData();
+    
+    // Cleanup function
+    return () => {
+      isMounted = false;
+    };
+  }, [endpoint]);
+  
+  return (
+    <div className="data-container min-h-[300px]">
+      {isLoading ? (
+        <div className="flex items-center justify-center h-full py-8">
+          <Spinner size="lg" />
+        </div>
+      ) : error ? (
+        <div className="flex flex-col items-center justify-center h-full py-8 text-center">
+          <ErrorDisplay message={error} />
+          <Button 
+            onClick={fetchData} 
+            variant="primary" 
+            className="mt-4"
+          >
+            Try Again
+          </Button>
+        </div>
+      ) : data.length === 0 ? (
+        <EmptyState 
+          title="No items found" 
+          description="Try changing your search criteria or add a new item"
+          action={<Button variant="primary">Add Item</Button>}
+        />
+      ) : (
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+          {data.map((item) => (
+            <div key={item.id} className="bg-white rounded-lg shadow p-4">
+              {renderItem(item)}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+</example>
+
+<example>
+// Good: Skeleton loader that maintains layout stability
+function ArticleCardSkeleton() {
+  return (
+    <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+      {/* Image placeholder */}
+      <div className="w-full h-48 bg-gray-200 animate-pulse" />
+      
+      <div className="p-4 space-y-3">
+        {/* Title placeholder */}
+        <div className="h-6 bg-gray-200 rounded animate-pulse w-3/4" />
+        
+        {/* Author placeholder */}
+        <div className="flex items-center space-x-2">
+          <div className="h-8 w-8 bg-gray-200 rounded-full animate-pulse" />
+          <div className="h-4 bg-gray-200 rounded animate-pulse w-24" />
+        </div>
+        
+        {/* Content placeholder */}
+        <div className="space-y-2">
+          <div className="h-4 bg-gray-200 rounded animate-pulse w-full" />
+          <div className="h-4 bg-gray-200 rounded animate-pulse w-full" />
+          <div className="h-4 bg-gray-200 rounded animate-pulse w-2/3" />
+        </div>
+        
+        {/* Tags/metadata placeholder */}
+        <div className="flex space-x-2">
+          <div className="h-6 bg-gray-200 rounded-full animate-pulse w-16" />
+          <div className="h-6 bg-gray-200 rounded-full animate-pulse w-16" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ArticleList() {
+  const { articles, loading } = useArticles();
+  
+  return (
+    <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+      {loading ? (
+        // Show skeletons while loading with same layout as actual articles
+        Array.from({ length: 6 }).map((_, index) => (
+          <ArticleCardSkeleton key={index} />
+        ))
+      ) : (
+        articles.map(article => (
+          <ArticleCard key={article.id} article={article} />
+        ))
+      )}
+    </div>
+  );
+}
+</example>
+
+<example type="invalid">
+// Bad: Missing loader and error states
+function BadDataTable({ fetchData }) {
+  const [data, setData] = useState([]);
+  
+  useEffect(() => {
+    // ❌ No loading state shown
+    // ❌ No error handling
+    fetchData()
+      .then(result => setData(result));
+  }, [fetchData]);
+  
+  // ❌ No handling of empty state
+  return (
+    <div>
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Email</th>
+          </tr>
+        </thead>
+        <tbody>
+          {data.map(item => (
+            <tr key={item.id}>
+              <td>{item.name}</td>
+              <td>{item.email}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+</example>
+
+<example type="invalid">
+// Bad: Form without navigation protection
+function UnsafeForm({ onSubmit }) {
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    message: ''
+  });
+  
+  // ❌ No tracking of dirty state
+  // ❌ No protection against navigation
+  // ❌ No disabling during submission
+  
+  const handleChange = (e) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value
+    });
+  };
+  
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    onSubmit(formData);
+  };
+  
+  return (
+    <form onSubmit={handleSubmit}>
+      <input
+        type="text"
+        name="name"
+        value={formData.name}
+        onChange={handleChange}
+      />
+      <input
+        type="email"
+        name="email"
+        value={formData.email}
+        onChange={handleChange}
+      />
+      <textarea
+        name="message"
+        value={formData.message}
+        onChange={handleChange}
+      />
+      <button type="submit">Submit</button>
+    </form>
+  );
+}
+</example>
+
+## Testing UX Stability
+
+UX stability tests should verify:
+
+1. Components render correctly in all states (loading, error, empty, normal)
+2. Layout maintains stability during state transitions
+3. User interactions are handled properly with appropriate feedback
+4. Form state is preserved when expected and cleared when appropriate
+5. Navigation behaves predictably and protects unsaved changes
+
+```typescript
+// Good: Testing UX stability
+describe('DataTable Component', () => {
+  it('renders loading state correctly', () => {
+    const mockFetch = jest.fn().mockReturnValue(new Promise(() => {})); // Never resolves
+    render(<DataTable fetchData={mockFetch} />);
+    
+    expect(screen.getByTestId('loading-spinner')).toBeInTheDocument();
+  });
+  
+  it('renders error state correctly with retry option', async () => {
+    const mockFetch = jest.fn().mockRejectedValue(new Error('Test error'));
+    render(<DataTable fetchData={mockFetch} />);
+    
+    // Should show error message
+    expect(await screen.findByText('Test error')).toBeInTheDocument();
+    
+    // Should have retry button
+    const retryButton = screen.getByRole('button', { name: /retry/i });
+    expect(retryButton).toBeInTheDocument();
+    
+    // Clicking retry should call fetchData again
+    fireEvent.click(retryButton);
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+  
+  it('renders empty state with guidance when no data', async () => {
+    const mockFetch = jest.fn().mockResolvedValue([]);
+    render(<DataTable fetchData={mockFetch} />);
+    
+    expect(await screen.findByText('No data available')).toBeInTheDocument();
+    expect(screen.getByText('Try adjusting your filters or create new items')).toBeInTheDocument();
+  });
+  
+  it('maintains layout stability during state transitions', async () => {
+    // Test that container heights remain consistent
+    const mockFetch = jest.fn()
+      .mockResolvedValueOnce([]) // Empty state first
+      .mockResolvedValueOnce([{ id: 1, name: 'Test' }]); // Then with data
+    
+    const { container, rerender } = render(<DataTable fetchData={mockFetch} />);
+    
+    // Get initial height in empty state
+    await screen.findByText('No data available');
+    const initialHeight = container.firstChild.getBoundingClientRect().height;
+    
+    // Trigger refetch with data
+    rerender(<DataTable fetchData={mockFetch} />);
+    
+    // Check height after data loads
+    await screen.findByText('Test');
+    const finalHeight = container.firstChild.getBoundingClientRect().height;
+    
+    // Heights should be the same or very similar
+    expect(Math.abs(finalHeight - initialHeight)).toBeLessThanOrEqual(5);
+  });
+});
+```
+
+## Reference Implementations
+
+For detailed implementation examples, refer to our documentation examples:
+
+- [DataFetchingExample.md](mdc:examples/components/DataFetchingExample.md): A comprehensive example component showcasing all aspects of UX stability
+- [UX-Stability-Implementation-Guide.md](mdc:examples/UX-Stability-Implementation-Guide.md): Practical guide with additional examples and common pitfalls
+
+**Important Note**: These reference implementations are provided as documentation examples only and are not meant to be imported or used directly in your codebase. They demonstrate the patterns and practices that should be followed when implementing UX stability in your components.
+
+## Best Practices
+
+1. **Defensive Rendering**: Always check for null/undefined values before accessing properties
+2. **Container Sizing**: Set explicit min-height/min-width for containers to prevent layout shifts
+3. **Animation Timing**: Use consistent animation durations (150-300ms) for transitions
+4. **Resource Cleanup**: Always clean up event listeners, timers, and subscriptions
+5. **Loading Indicators**: Show loading indicators for operations taking more than 300ms
+6. **Clear Feedback**: Provide clear feedback for all user actions (success, error, in-progress)
+7. **Progressive Loading**: Use skeleton loaders that match the final content layout
+
+## Related Rules
+- [departments/product/030-visual-style-consolidated.mdc](mdc:departments/product/030-visual-style-consolidated.mdc) - Visual design system
+- [departments/engineering/frontend/045-browser-state-management.mdc](mdc:departments/engineering/frontend/045-browser-state-management.mdc) - Browser state management
+- [technologies/languages/javascript/054-accessibility-requirements.mdc](mdc:technologies/languages/javascript/054-accessibility-requirements.mdc) - Accessibility standards
+- [technologies/frameworks/042-ui-component-architecture.mdc](mdc:technologies/frameworks/042-ui-component-architecture.mdc) - UI component structure
+
+## Full Documentation Access
+
+To access the complete documentation including all examples, please refer to the original enterprise-cursor-rules repository. The examples directory in the repository contains detailed implementation guides that are referenced above.
+
+The flat structure of the Cursor rules deployment may not include these examples directly, but they remain available in the source repository.

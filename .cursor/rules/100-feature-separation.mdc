@@ -1,0 +1,501 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+___
+description: IMPLEMENT consistent feature traceability when DESIGNING and DEVELOPING features to ENSURE end-to-end visibility from business requirements to code implementation and testing
+globs: "**/*.{ts,js,jsx,tsx,java,py,rb,go,cs,php,sql}"
+___
+
+# Feature Separation & Traceability
+
+## Context
+- Enterprise software development requires clear traceability from business needs to technical implementation
+- Features span multiple system layers (UI, API, services, databases)
+- Multiple teams often collaborate on different aspects of the same feature
+- Post-deployment, features need monitoring and metrics for business value evaluation
+- Proper separation and traceability enables effective auditing, troubleshooting, and enhancement
+
+## Business-to-Implementation Traceability
+
+### Feature Identification & Documentation
+- **REQUIRED**: Assign a unique identifier to each business feature (e.g., `FEAT-YYYY-NN`)
+- **REQUIRED**: Document detailed business requirements for each feature
+- **REQUIRED**: Document success metrics and acceptance criteria
+- **REQUIRED**: Map features to technical components in architecture documentation
+- **REQUIRED**: Maintain living documentation throughout the feature lifecycle
+- Link related features to establish feature dependency graph
+- Document feature ownership and stakeholders
+
+```yaml
+# Example Feature Documentation Template
+feature_id: FEAT-2023-45
+title: Customer Self-Service Portal
+business_owner: Sarah Johnson, Customer Service Director
+technical_owner: Mark Smith, Engineering Lead
+priority: High
+status: In Development
+target_release: v3.2 (Q3 2023)
+business_value: >
+  Enable customers to manage their own account settings, 
+  reducing support calls by an estimated 30%.
+success_metrics:
+  - Reduce account-related support tickets by 25% within 3 months
+  - Achieve 70% customer adoption within 6 months
+requirements:
+  - Customers must be able to update contact information
+  - Customers must be able to manage preferences
+  - All changes must be audit-logged
+  - Changes must propagate to downstream systems within 5 minutes
+```
+
+### Technical Documentation
+- **REQUIRED**: Create technical documentation mapping business requirements to system components
+- **REQUIRED**: Document component relationships and interactions relevant to each feature
+- **REQUIRED**: Maintain up-to-date diagrams showing feature implementation across system layers
+- **REQUIRED**: Include database schema changes in feature documentation
+- Create automated documentation generation where possible
+- Include performance considerations for each component
+
+```markdown
+# Technical Implementation: FEAT-2023-45
+
+## Architecture Components
+- User Interface: Account Settings Module
+- API: User Profile Endpoints
+- Services: User Service, Audit Service, Notification Service
+- Database: User Schema Extensions, Audit Logging Schema
+
+## Database Changes
+- Add fields to user_profiles table (details in migration script)
+- Create new audit_logs table
+- Add relevant indices
+
+## Integration Points
+- Authentication System: Requires user validation
+- Notification System: For email confirmations
+- CRM System: User profile data sync
+
+## Performance Considerations
+- Expected throughput: 100 requests/minute peak
+- Database query optimization required for user profile lookup
+- Implement caching for frequently accessed profiles
+```
+
+## Code Organization
+
+### Feature-Based Module Structure
+- **REQUIRED**: Organize code around business features rather than technical layers
+- **REQUIRED**: Use consistent naming conventions reflecting feature identifiers
+- **REQUIRED**: Group related components together in feature modules
+- **REQUIRED**: Maintain separation between feature-specific code and shared infrastructure
+- Leverage domain-driven design principles where appropriate
+- Follow hexagonal architecture patterns for complex features
+
+```
+// Feature-oriented directory structure
+src/
+  features/
+    user-management/                  # Feature area
+      account-settings/               # FEAT-2023-45
+        components/                   # UI components
+          ProfileEditor.tsx
+          PreferencesForm.tsx
+        api/                          # API layer
+          profileApi.ts
+          preferencesApi.ts
+        services/                     # Service layer 
+          profileService.ts
+          preferencesService.ts
+        hooks/                        # React hooks
+          useProfile.ts
+        types/                        # Type definitions
+          profile.types.ts
+        utils/                        # Feature-specific utilities
+          profileValidation.ts
+        tests/                        # Feature tests
+          profileEditor.test.tsx
+          profileService.test.ts
+        index.ts                      # Public API
+      user-authentication/            # Another feature
+        // Similar structure
+  shared/                             # Shared code across features
+    components/
+    hooks/
+    utils/
+```
+
+### Code Annotations
+- **REQUIRED**: Add feature ID annotations to all code related to a specific feature
+- **REQUIRED**: Include requirement ID references in code implementing specific requirements
+- **REQUIRED**: Use consistent annotation format across all languages and files
+- Ensure annotations are machine-readable for automated tracing
+- Include annotations in comments, not in code itself
+
+```typescript
+/**
+ * @feature FEAT-2023-45 (Customer Self-Service Portal)
+ * @component ProfileEditor
+ * @implements REQ-2023-45-001 (Update contact information)
+ */
+export class ProfileEditorComponent {
+  // Implementation...
+}
+```
+
+```sql
+-- @feature FEAT-2023-45 (Customer Self-Service Portal)
+-- @implements REQ-2023-45-003 (Audit logging)
+CREATE TABLE user_profile_changes (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id),
+  field_name VARCHAR(100) NOT NULL,
+  old_value TEXT,
+  new_value TEXT,
+  changed_by INTEGER NOT NULL REFERENCES users(id),
+  change_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  feature_id VARCHAR(20) NOT NULL -- Tracks which feature triggered the change
+);
+```
+
+### Implementation Boundaries
+- **REQUIRED**: Define clear boundaries between features
+- **REQUIRED**: Use dependency injection to manage feature dependencies
+- **REQUIRED**: Implement feature flags for controlled rollout
+- **REQUIRED**: Follow interface segregation principle for cross-feature interactions
+- Create facade/adapter layers for legacy system integration
+- Document and manage cross-feature dependencies
+
+```typescript
+// Feature flag implementation example
+export function AccountSettingsFeature({ userId }) {
+  const { isEnabled } = useFeatureFlag('FEAT-2023-45');
+  
+  if (!isEnabled) {
+    return <LegacyAccountSettings userId={userId} />;
+  }
+  
+  return <NewAccountSettings userId={userId} />;
+}
+```
+
+## Testing Traceability
+
+### Test Coverage Requirements
+- **REQUIRED**: Create tests specifically mapped to business requirements
+- **REQUIRED**: Add feature and requirement annotations to test files
+- **REQUIRED**: Implement integration tests verifying cross-component feature behavior
+- **REQUIRED**: Include test coverage metrics in feature documentation
+- **REQUIRED**: Create end-to-end tests for critical feature workflows
+- Automate test reporting tied to feature identifiers
+- Implement feature-specific alerting in monitoring
+
+```typescript
+/**
+ * @feature FEAT-2023-45 (Customer Self-Service Portal)
+ * @tests REQ-2023-45-001 (Update contact information)
+ */
+describe('ProfileService', () => {
+  it('should update user profile with valid data', async () => {
+    // Test implementation...
+  });
+  
+  it('should validate required fields', async () => {
+    // Test implementation...
+  });
+  
+  /**
+   * @requirement REQ-2023-45-003 (Audit logging)
+   */
+  it('should create audit record when profile is updated', async () => {
+    // Test implementation...
+  });
+});
+```
+
+### Test Case Mapping
+- **REQUIRED**: Map test cases to specific requirements
+- **REQUIRED**: Create traceability matrix linking requirements to test cases
+- **REQUIRED**: Ensure all requirements have corresponding test coverage
+- Group tests logically based on feature modules
+- Add performance tests for load-intensive features
+
+```markdown
+# Test Coverage Matrix: FEAT-2023-45
+
+| Requirement ID | Requirement Description | Test File(s) | Test Status |
+|---------------|------------------------|-------------|------------|
+| REQ-2023-45-001 | Update contact information | profile.test.ts:L45-L80 | ✅ Passing |
+| REQ-2023-45-002 | Manage preferences | preferences.test.ts:L12-L50 | ✅ Passing |
+| REQ-2023-45-003 | Audit logging | audit.test.ts:L10-L45 | ✅ Passing |
+| REQ-2023-45-004 | Downstream propagation | integration/sync.test.ts:L30-L55 | ⚠️ Flaky |
+```
+
+## Release & Deployment
+
+### Feature Versioning
+- **REQUIRED**: Include feature metadata in deployment artifacts
+- **REQUIRED**: Track feature status through the deployment pipeline
+- **REQUIRED**: Implement feature toggles for all features in development
+- Include feature status in application health checks
+- Monitor feature activations and performance post-deployment
+
+```typescript
+// Feature registry definition
+export const FeatureRegistry = {
+  'FEAT-2023-45': {
+    name: 'Customer Self-Service Portal',
+    status: 'released',
+    version: '1.0.0',
+    releaseDate: '2023-06-15',
+    deploymentRollback: '/rollback/scripts/FEAT-2023-45-rollback.sh',
+    toggleConfigKey: 'features.customer.self_service_portal'
+  },
+  // Other features...
+};
+```
+
+### CI/CD Integration
+- **REQUIRED**: Configure CI/CD pipelines to be feature-aware
+- **REQUIRED**: Run feature-specific tests based on changed components
+- **REQUIRED**: Add feature ID to deployment metadata
+- **REQUIRED**: Track feature status in deployment dashboards
+- Integrate feature metrics into deployment success criteria
+- Add automated rollback procedures for feature failures
+
+```yaml
+# Example CI pipeline configuration
+name: Feature Pipeline
+
+on:
+  push:
+    branches:
+      - 'feature/FEAT-*'
+  pull_request:
+    branches: [ main, develop ]
+    
+jobs:
+  identify-feature:
+    runs-on: ubuntu-latest
+    outputs:
+      feature_id: ${{ steps.extract-feature.outputs.feature_id }}
+    steps:
+      - name: Extract feature ID
+        id: extract-feature
+        run: |
+          BRANCH_NAME=${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}
+          if [[ $BRANCH_NAME =~ feature/FEAT-[0-9]+-[0-9]+ ]]; then
+            FEATURE_ID=$(echo $BRANCH_NAME | sed -E 's/feature\/(FEAT-[0-9]+-[0-9]+).*/\1/')
+            echo "feature_id=$FEATURE_ID" >> $GITHUB_OUTPUT
+          else
+            echo "No feature ID found in branch name"
+            exit 1
+          fi
+  
+  feature-tests:
+    needs: identify-feature
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Run feature-specific tests
+        run: |
+          FEATURE_ID="${{ needs.identify-feature.outputs.feature_id }}"
+          echo "Running tests for $FEATURE_ID"
+          npm run test:feature $FEATURE_ID
+      
+      # Additional feature-specific steps...
+```
+
+## Monitoring & Analytics
+
+### Feature Observability
+- **REQUIRED**: Track feature usage metrics in monitoring systems
+- **REQUIRED**: Include feature identifiers in logs and monitoring events
+- **REQUIRED**: Create dashboards showing feature performance and usage
+- **REQUIRED**: Set up alerts for feature-specific failures
+- Use business metrics to evaluate feature success against goals
+- Implement feedback mechanisms for feature improvement
+
+```typescript
+// Feature-aware logging example
+logger.info('Profile updated successfully', {
+  event: 'PROFILE_UPDATE',
+  featureId: 'FEAT-2023-45',
+  userId: user.id,
+  fieldsUpdated: ['firstName', 'lastName', 'email'],
+  metadata: {
+    requestId: req.requestId,
+    source: 'web-app'
+  }
+});
+
+// Feature metric tracking
+metrics.increment('profile.updates', {
+  featureId: 'FEAT-2023-45',
+  status: 'success',
+  channelType: 'self-service'
+});
+```
+
+### Success Metrics Tracking
+- **REQUIRED**: Define measurable success criteria for each feature
+- **REQUIRED**: Implement tracking for key performance indicators
+- **REQUIRED**: Create automated reports for feature business value
+- **REQUIRED**: Review feature performance against success metrics
+- Add A/B testing capabilities for feature variants
+- Use data to drive feature enhancement decisions
+
+```typescript
+// Example success metrics tracking
+class FeatureMetricsCollector {
+  recordFeatureUsage(featureId: string, action: string, metadata: any) {
+    analytics.track({
+      eventType: 'FEATURE_USAGE',
+      featureId,
+      action,
+      metadata,
+      timestamp: new Date()
+    });
+  }
+  
+  async getFeatureAdoptionRate(featureId: string, timeRange: TimeRange) {
+    const totalEligibleUsers = await userService.countEligibleUsers(featureId);
+    const usersWhoUsedFeature = await analyticsService.countUniqueUsers({
+      eventType: 'FEATURE_USAGE',
+      featureId,
+      timeRange
+    });
+    
+    return {
+      adoptionRate: (usersWhoUsedFeature / totalEligibleUsers) * 100,
+      eligibleUsers: totalEligibleUsers,
+      activeUsers: usersWhoUsedFeature,
+      timeRange
+    };
+  }
+}
+```
+
+## Business-IT Alignment
+
+### Feature Lifecycle Management
+- **REQUIRED**: Implement a formal feature request process
+- **REQUIRED**: Establish regular feature review meetings with business stakeholders
+- **REQUIRED**: Document business value and ROI calculations for features
+- **REQUIRED**: Create feature roadmaps aligned with business priorities
+- Assign clear ownership for features (business and technical)
+- Create feedback loops between business and development teams
+
+```markdown
+# Feature Lifecycle Process
+
+1. **Feature Proposal**
+   - Business submits feature request with value proposition
+   - Assign unique feature ID (FEAT-YYYY-NN)
+   - Initial business case review
+
+2. **Feature Definition**
+   - Collaborative workshop with business and IT
+   - Document detailed requirements
+   - Define success metrics
+   - Technical feasibility assessment
+   
+3. **Feature Planning**
+   - Technical architecture design
+   - Effort estimation
+   - Dependency analysis
+   - Prioritization and scheduling
+   
+4. **Feature Implementation**
+   - Development with regular business reviews
+   - Continuous testing against requirements
+   - Documentation updates
+   
+5. **Feature Deployment**
+   - Controlled rollout with feature flags
+   - Monitoring for technical and business metrics
+   - Regular status reporting
+   
+6. **Feature Evaluation**
+   - Measure actual vs. expected business outcomes
+   - Gather user feedback
+   - Identify improvement opportunities
+   
+7. **Feature Optimization**
+   - Implement enhancements based on data
+   - Update documentation
+   - Measure improvement impacts
+```
+
+### Feature Request Workflow
+- **REQUIRED**: Use standardized templates for feature requests
+- **REQUIRED**: Include business context and expected outcomes in requests
+- **REQUIRED**: Establish clear criteria for feature acceptance
+- **REQUIRED**: Create definition of done that includes business validation
+- Create automated workflows for feature proposal and approval
+- Use data-driven approaches for feature prioritization
+
+```yaml
+# Feature Request Template
+title: New Feature Request
+feature_name: "Account Self-Service Portal"
+requestor: "Sarah Johnson, Customer Service Director"
+business_unit: "Customer Support"
+priority: High/Medium/Low
+problem_statement: >
+  Customers currently must contact support for basic account changes,
+  creating unnecessary load on the support team and delaying resolution
+  for customers.
+proposed_solution: >
+  Implement a self-service portal where customers can update their own
+  account information, preferences, and view their transaction history.
+business_value:
+  - Reduce call center volume by 25% for account-related inquiries
+  - Improve customer satisfaction through immediate self-service
+  - Free up support team for more complex customer issues
+success_metrics:
+  - Support ticket reduction for account changes
+  - Customer adoption rate of self-service features
+  - Customer satisfaction scores for account management
+constraints:
+  - Must integrate with existing identity management system
+  - Must be available on both web and mobile platforms
+  - Must comply with data privacy regulations
+target_users:
+  - All current customers (estimated 250,000)
+target_date: Q3 2023
+```
+
+## Implementation Examples
+
+For detailed examples of feature traceability implementation patterns, refer to our example documentation:
+
+- [FeatureLifecycleTraceability.md](mdc:examples/feature-management/FeatureLifecycleTraceability.md)
+
+**Important Note**: These reference implementations are provided as documentation examples only and are not meant to be imported or used directly in your codebase.
+
+## Full Documentation Access
+
+To access the complete documentation including all examples, please refer to the original enterprise-cursor-rules repository. The examples directory in the repository contains detailed implementation guides that are referenced above.
+
+## Related Rules
+
+- [016-platform-hierarchy.mdc](mdc:departments/engineering/architecture/016-platform-hierarchy.mdc) - Platform architecture structure
+- [015-feature-flags.mdc](mdc:departments/engineering/operations/015-feature-flags.mdc) - Feature flag implementation
+- [025-cicd-pipelines.mdc](mdc:departments/engineering/devops/025-cicd-pipelines.mdc) - CI/CD pipeline configuration
+- [030-business-requirements.mdc](mdc:departments/product/030-business-requirements.mdc) - Business requirement documentation
+
+## Implementation Checklist
+
+- [ ] Unique feature IDs assigned to all business features
+- [ ] Feature annotations added to all relevant code
+- [ ] Feature-specific test coverage for all requirements
+- [ ] Feature boundaries clearly defined in codebase
+- [ ] Feature documentation created and maintained
+- [ ] Feature tracking implemented in CI/CD pipeline
+- [ ] Feature metrics incorporated in monitoring dashboards
+- [ ] Feature success criteria defined and measured
+- [ ] Feature review process established with business stakeholders
+- [ ] Feature traceability matrix kept up-to-date

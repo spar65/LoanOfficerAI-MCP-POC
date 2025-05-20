@@ -1,0 +1,291 @@
+description: Use when implementing, reviewing or modifying logging functionality to ensure consistent, structured, and effective logging practices across the codebase
+globs: **/*.{js,ts,jsx,tsx,py,java,c,cpp,go,rb,php,swift,rs}
+
+# Logging Standards & Best Practices
+
+This rule defines the standard approach to logging throughout applications to ensure consistency, security, and usefulness of logs for debugging, monitoring, and auditing purposes.
+
+## Core Principles
+
+### Structured Logging Over Plain Text
+- Always use structured logging formats (JSON, key-value pairs) instead of plain text.
+- Include contextual metadata with every log entry.
+- Organize log fields consistently across the application.
+
+### Appropriate Log Levels
+- ERROR: Critical issues requiring immediate attention.
+- WARN: Potential issues that don't prevent operation but require monitoring.
+- INFO: Standard operational information and significant events.
+- DEBUG: Detailed information useful during development and troubleshooting.
+- TRACE/VERBOSE: Very detailed diagnostic information.
+
+### Centralized Configuration
+- All logging should use a centralized logger configuration.
+- Configure logging transports based on environment (development, testing, production).
+- Maintain consistent log formats across all application components.
+
+### Contextual Information
+- Include request IDs in all logs to enable request tracing.
+- Include user/entity IDs when available (except for sensitive operations).
+- Include relevant operation metadata (e.g., transaction amounts, status codes).
+- Include timestamps in a standardized format (preferably ISO 8601).
+
+### Security in Logging
+- Never log sensitive information (passwords, tokens, full PII).
+- Mask/redact sensitive fields when they must be included.
+- Sanitize user input before logging to prevent log injection.
+- Apply appropriate access controls to log files and log aggregation systems.
+
+### Performance Considerations
+- Use asynchronous logging where possible to avoid blocking operations.
+- Implement sampling for high-volume log events in production.
+- Consider log storage and rotation strategies from the beginning.
+- Avoid excessive logging in critical performance paths.
+
+## Implementation Guidelines
+
+### Logger Setup
+
+1. **Centralized Logger Definition**:
+   ```typescript
+   // src/utils/logger.ts
+   import winston from 'winston';
+   
+   const logger = winston.createLogger({
+     level: process.env.LOG_LEVEL || 'info',
+     format: winston.format.combine(
+       winston.format.timestamp(),
+       winston.format.json()
+     ),
+     transports: [
+       new winston.transports.Console(),
+       new winston.transports.File({ filename: 'error.log', level: 'error' }),
+       new winston.transports.File({ filename: 'combined.log' })
+     ]
+   });
+   
+   export default logger;
+   ```
+
+2. **Request Context Middleware**:
+   ```typescript
+   // src/middleware/loggingMiddleware.ts
+   import { v4 as uuidv4 } from 'uuid';
+   import logger from '../utils/logger';
+   
+   export const loggingMiddleware = (req, res, next) => {
+     req.requestId = uuidv4();
+     res.setHeader('X-Request-ID', req.requestId);
+     
+     logger.info('Request received', {
+       method: req.method,
+       path: req.path,
+       requestId: req.requestId,
+       ip: req.ip
+     });
+     
+     next();
+   };
+   ```
+
+3. **Database Logging**:
+   ```typescript
+   // src/utils/databaseLogger.ts
+   import logger from './logger';
+   
+   export const mongooseLogger = (schema) => {
+     schema.pre('save', function(next) {
+       logger.debug('Saving document', {
+         collection: this.constructor.modelName,
+         documentId: this._id
+       });
+       next();
+     });
+     
+     // Add similar hooks for other operations
+   };
+   ```
+
+### Usage Examples
+
+#### Good Log Examples
+
+```typescript
+// Good - Includes context and appropriate level
+logger.info('User registered successfully', { 
+  userId: user.id,
+  email: user.email.substring(0, 3) + '***' // Partial email for identification
+});
+
+// Good - Error logging with context
+try {
+  // Operation that might fail
+} catch (error) {
+  logger.error('Payment processing failed', {
+    error: {
+      message: error.message,
+      stack: error.stack,
+      code: error.code
+    },
+    userId: user.id,
+    amount: payment.amount,
+    requestId: req.requestId
+  });
+  throw error;
+}
+
+// Good - Warning with actionable information
+logger.warn('API rate limit threshold approaching', {
+  userId: user.id,
+  endpoint: '/api/resource',
+  currentUsage: 85,
+  limit: 100,
+  requestId: req.requestId
+});
+```
+
+#### Bad Log Examples
+
+```typescript
+// Bad - No structured data
+logger.info('User logged in');
+
+// Bad - Logs sensitive information
+logger.debug(`User ${username} entered password ${password}`);
+
+// Bad - Wrong log level for error
+logger.info('Database connection failed: ' + error.message);
+
+// Bad - Hard to parse or analyze
+logger.error(`Error occurred at ${new Date()}: could not process user request for ${userId}`);
+```
+
+## Logging Patterns
+
+### Request Lifecycle Logging
+
+```typescript
+// Request received
+logger.info('Request received', requestContext);
+
+// Processing steps
+logger.debug('Processing step complete', { ...requestContext, step: 'validation' });
+
+// Request complete
+logger.info('Response sent', { 
+  ...requestContext, 
+  statusCode: res.statusCode,
+  responseTime: Date.now() - requestStartTime
+});
+```
+
+### Error Boundary Logging
+
+```typescript
+// Component error boundary
+try {
+  await processData(input);
+} catch (error) {
+  logger.error('Error in data processing', {
+    component: 'DataProcessor',
+    input: sanitizeInput(input),
+    error: {
+      name: error.name,
+      message: error.message,
+      stack: error.stack
+    }
+  });
+  // Handle error appropriately
+}
+```
+
+### Audit Logging
+
+```typescript
+// Log sensitive operations for audit purposes
+logger.info('User data accessed', {
+  action: 'DATA_ACCESS',
+  userId: requestingUser.id,
+  targetUserId: targetUser.id,
+  fields: ['email', 'address'],
+  reason: 'Customer support request #12345',
+  timestamp: new Date().toISOString()
+});
+```
+
+## Automated Checks
+
+Automated checks for logging should verify:
+
+1. Logger is imported from the central configuration
+2. Log statements include context objects
+3. Appropriate log levels are used
+4. No sensitive data appears in logs
+5. Error logging includes error objects
+6. Request context is propagated
+
+Example ESLint rule:
+
+```json
+{
+  "rules": {
+    "no-console": "error",
+    "no-restricted-imports": [
+      "error", 
+      {
+        "paths": [{
+          "name": "winston",
+          "message": "Import logger from '/utils/logger' instead."
+        }]
+      }
+    ]
+  }
+}
+```
+
+## Testing Logging
+
+Test logging configuration and behavior:
+
+```typescript
+// Mock logger for testing
+jest.mock('../utils/logger', () => ({
+  error: jest.fn(),
+  warn: jest.fn(),
+  info: jest.fn(),
+  debug: jest.fn()
+}));
+
+test('logs error when API call fails', async () => {
+  // Arrange
+  const error = new Error('API failure');
+  apiClient.get.mockRejectedValue(error);
+  
+  // Act
+  await service.getData();
+  
+  // Assert
+  expect(logger.error).toHaveBeenCalledWith(
+    'Failed to fetch data',
+    expect.objectContaining({
+      error: expect.objectContaining({
+        message: 'API failure'
+      })
+    })
+  );
+});
+```
+
+## Log Aggregation & Analysis
+
+Recommend configuring logs to be easily aggregated and analyzed:
+
+1. Use consistent field names across all services
+2. Include correlation IDs for distributed tracing
+3. Add service/component names to all logs
+4. Use structured formats compatible with log aggregation tools
+5. Consider exporters for OpenTelemetry or similar standards
+
+---
+
+By following these logging standards, applications will produce consistent, useful logs that enhance debugging, monitoring, and security compliance efforts. 

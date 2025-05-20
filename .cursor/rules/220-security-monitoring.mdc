@@ -1,0 +1,190 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Security Monitoring Standards
+
+## Context
+
+Security monitoring is a critical component of an organization's cybersecurity posture, providing the capability to detect, investigate, and respond to security incidents in a timely manner. These standards establish requirements for comprehensive security monitoring across applications, infrastructure, and data to ensure threats are detected early and addressed effectively.
+
+## Requirements
+
+### 1. Logging & Monitoring Architecture
+
+1. **Centralized Logging Required**
+   - All applications MUST send security-relevant logs to a centralized logging system
+   - Log retention MUST adhere to legal and compliance requirements (minimum 90 days)
+   - Logs MUST be stored in a tamper-evident manner to prevent unauthorized modification
+
+2. **Security Event Collection**
+   - Applications MUST log security-relevant events including:
+     - Authentication attempts (successful and failed)
+     - Authorization decisions (access granted and denied)
+     - Administrative actions
+     - Data access or modification of sensitive information
+     - System and configuration changes
+   - Logs MUST include essential context:
+     - Timestamp (in UTC with millisecond precision)
+     - Source (IP address, device ID)
+     - User identity (when applicable)
+     - Action performed
+     - Resource affected
+     - Outcome (success/failure)
+
+3. **Log Format Standardization**
+   - Security logs SHOULD follow a consistent format across applications
+   - Structured logging (JSON or similar) SHOULD be used to facilitate parsing
+   - Timestamps MUST use ISO 8601 format
+   - Personally Identifiable Information (PII) MUST be properly masked in logs
+
+### 2. Security Monitoring Capabilities
+
+1. **Threat Detection Rules**
+   - A comprehensive set of detection rules MUST be implemented covering:
+     - Known attack patterns and techniques (MITRE ATT&CK framework)
+     - Brute force and credential stuffing attacks
+     - Unusual access patterns and potential data exfiltration
+     - Privilege escalation and lateral movement
+     - Infrastructure and configuration changes
+   - Rules MUST be regularly updated based on emerging threats
+   - False positive reduction strategies MUST be implemented
+
+2. **Real-time Alerting**
+   - Critical security events MUST trigger real-time alerts
+   - Alerts MUST be prioritized based on risk and impact
+   - Alert fatigue MUST be minimized through proper tuning and aggregation
+   - Alert delivery MUST use multiple channels (email, SMS, ticketing systems)
+
+3. **Security Dashboards**
+   - Security monitoring dashboards MUST be maintained for:
+     - Incident overview and trends
+     - Active threats and ongoing investigations
+     - Compliance status and key security metrics
+   - Dashboards MUST be accessible to security personnel and other authorized stakeholders
+   - Filtering and search capabilities MUST enable efficient incident investigation
+
+### 3. Threat Detection Implementation
+
+1. **Authentication Monitoring**
+   - Systems MUST detect and alert on:
+     - Multiple failed login attempts within a short period
+     - Successful logins from unusual locations or devices
+     - Logins outside of normal business hours (for critical systems)
+     - Password resets and multi-factor authentication changes
+     - Privilege escalation or role changes
+
+2. **Network Traffic Analysis**
+   - Network monitoring MUST include:
+     - Unusual outbound connections or data transfers
+     - Access to known malicious domains or IP addresses
+     - Unexpected protocol usage or port access
+     - Lateral movement between network segments
+     - Unusual API usage patterns
+
+3. **Application Behavior Monitoring**
+   - Applications MUST implement monitoring for:
+     - SQL injection and other injection attack attempts
+     - Cross-site scripting (XSS) attempts
+     - Unusual query patterns or high-volume requests
+     - API abuse and rate limit violations
+     - File upload attempts with suspicious content
+
+4. **Infrastructure & Configuration Monitoring**
+   - Systems MUST detect and alert on:
+     - Unauthorized configuration changes
+     - Changes to security controls or policies
+     - Cloud resource provisioning or permission changes
+     - Container or VM image modifications
+     - Changes to network security groups or firewalls
+
+5. **Data Access Monitoring**
+   - Monitoring MUST be implemented for:
+     - Access to sensitive data repositories
+     - Bulk data downloads or exports
+     - Data transfers to untrusted locations
+     - Database schema or permission changes
+     - Access pattern anomalies that may indicate data theft
+
+### 4. Security Incident Response Integration
+
+1. **Automated Response Capabilities**
+   - Critical threats SHOULD trigger automated response actions such as:
+     - Account lockout after multiple failed login attempts
+     - Network isolation of potentially compromised systems
+     - Blocking of malicious IP addresses
+     - Termination of suspicious processes or connections
+   - Automated responses MUST be thoroughly tested and include safety mechanisms
+
+2. **Incident Management Integration**
+   - Security alerts MUST integrate with the organization's incident management system
+   - Relevant context and evidence MUST be automatically included with alerts
+   - Alert workflows MUST include escalation paths and ownership assignment
+   - Incident tracking MUST maintain an audit trail of detection, investigation, and response
+
+3. **Threat Intelligence Integration**
+   - Security monitoring MUST incorporate threat intelligence feeds
+   - Known indicators of compromise (IOCs) MUST be continuously monitored
+   - Threat intelligence MUST be regularly updated and properly categorized
+   - False positives from threat intelligence MUST be tracked and used to improve quality
+
+### 5. Vulnerability & Patch Monitoring
+
+1. **Vulnerability Scanning**
+   - Regular automated vulnerability scanning MUST be performed on:
+     - All internet-facing applications and infrastructure
+     - Internal critical systems and applications
+     - Third-party components and dependencies
+   - Vulnerabilities MUST be prioritized based on risk, exploitability, and impact
+
+2. **Patch Management Visibility**
+   - Security monitoring MUST include visibility into patch status
+   - Systems with missing critical security patches MUST be flagged
+   - Patch SLAs MUST be tracked and reported on
+   - Exceptions to patching requirements MUST be documented and time-limited
+
+### 6. Security Monitoring Governance
+
+1. **Regular Review and Testing**
+   - Security monitoring capabilities MUST be tested regularly through:
+     - Red team exercises and purple team activities
+     - Controlled injection of suspicious activities
+     - Testing of alerting channels and response procedures
+     - Review of missed detections in post-incident analyses
+
+2. **Continuous Improvement**
+   - Security monitoring MUST evolve through:
+     - Regular review of detection efficacy metrics
+     - Incorporation of lessons learned from incidents
+     - Updates based on emerging threats and attack techniques
+     - Feedback from security operations personnel
+
+3. **Documentation and Training**
+   - Documentation MUST be maintained for:
+     - Monitoring architecture and data flows
+     - Detection rules and alerting criteria
+     - Response procedures for different alert types
+     - Escalation paths and contact information
+   - Security operations personnel MUST receive regular training
+
+4. **Compliance Alignment**
+   - Security monitoring capabilities MUST be mapped to relevant compliance requirements
+   - Evidence collection MUST support audit and investigation needs
+   - Monitoring coverage MUST be regularly assessed against compliance obligations
+
+## Implementation Guidelines
+
+1. Security monitoring is a defense-in-depth approach that complements, but does not replace, proactive security measures.
+2. Balance comprehensive monitoring with performance considerations, focusing on high-risk areas when resources are limited.
+3. Consider privacy implications and legal requirements when implementing monitoring, especially for user activity.
+4. Develop security monitoring capabilities incrementally, starting with the most critical systems and highest-risk threats.
+5. Regularly validate monitoring effectiveness through controlled tests and attack simulations.
+
+## References
+
+1. NIST SP 800-53: Security and Privacy Controls
+2. MITRE ATT&CK Framework
+3. CIS Critical Security Controls
+4. OWASP Application Security Verification Standard (ASVS)
+5. ISO 27001 Information Security Management

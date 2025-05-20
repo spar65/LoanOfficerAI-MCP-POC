@@ -1,0 +1,292 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# Component Visual Testing
+
+**Cursor Rule**: 310-component-visual-testing
+**Priority**: P1 (Important)
+**Globs**: `**/*.stories.{js,jsx,ts,tsx}`, `**/*.spec.{js,jsx,ts,tsx}`, `**/visual-tests/**`
+**Rule type**: Engineering Practice
+
+## Context
+
+Visual regression testing ensures UI components render consistently across updates and changes. This rule establishes standards for component visual testing, ensuring visual integrity across the application while providing a safety net for UI changes.
+
+## Requirements
+
+### REQUIRED:
+
+- All reusable UI components MUST have associated visual tests
+- Visual tests MUST capture snapshots or screenshots of components in their primary states
+- Visual testing MUST be integrated into CI/CD pipelines for automated verification
+- All components MUST be tested across supported screen sizes (mobile, tablet, desktop)
+- Test failures MUST block PRs when component visual appearance changes unexpectedly
+- Each component's visual test MUST include:
+  - Default state
+  - Key interaction states (hover, active, disabled)
+  - Error and loading states when applicable
+  - Variations of the component as determined by props
+- Visual tests MUST be updated when deliberate visual changes are made
+
+### RECOMMENDED:
+
+- Use a component development environment (Storybook, Ladle, etc.) for component visual testing
+- Implement automated accessibility checks within visual tests
+- Create visual test references for each supported theme/brand
+- Perform cross-browser visual testing for critical components
+- Test components with various content lengths and types
+- Use parameterized testing to test multiple component variations
+- Include visual documentation alongside test cases
+- Maintain a visual design system reference as a baseline for tests
+
+## Examples
+
+**Good**:
+```typescript
+// Button.stories.tsx - Storybook example
+import { Button } from './Button';
+import type { Meta, StoryObj } from '@storybook/react';
+
+const meta: Meta<typeof Button> = {
+  component: Button,
+  title: 'Components/Button',
+  argTypes: {
+    variant: { 
+      control: 'select',
+      options: ['primary', 'secondary', 'tertiary']
+    },
+    size: {
+      control: 'radio',
+      options: ['small', 'medium', 'large']
+    },
+    disabled: { control: 'boolean' },
+    onClick: { action: 'clicked' }
+  },
+  parameters: {
+    a11y: { disable: false }, // Enable accessibility checks
+    layout: 'centered',
+    chromatic: {
+      viewports: [320, 768, 1200] // Test across mobile, tablet, desktop
+    }
+  }
+};
+
+export default meta;
+type Story = StoryObj<typeof Button>;
+
+// Capture all primary states and variants
+export const Primary: Story = {
+  args: {
+    variant: 'primary',
+    children: 'Primary Button',
+    size: 'medium',
+  },
+};
+
+export const Secondary: Story = {
+  args: {
+    variant: 'secondary',
+    children: 'Secondary Button',
+    size: 'medium',
+  },
+};
+
+export const Tertiary: Story = {
+  args: {
+    variant: 'tertiary',
+    children: 'Tertiary Button',
+    size: 'medium',
+  },
+};
+
+export const Small: Story = {
+  args: {
+    size: 'small',
+    children: 'Small Button',
+    variant: 'primary',
+  },
+};
+
+export const Large: Story = {
+  args: {
+    size: 'large',
+    children: 'Large Button',
+    variant: 'primary',
+  },
+};
+
+export const Disabled: Story = {
+  args: {
+    disabled: true,
+    children: 'Disabled Button',
+    variant: 'primary',
+  },
+};
+
+export const WithIcon: Story = {
+  args: {
+    children: 'With Icon',
+    variant: 'primary',
+    iconLeft: <Icon name="arrow-right" />,
+  },
+};
+
+// Visual test with Jest and React Testing Library
+// Button.spec.tsx
+import { render } from '@testing-library/react';
+import { composeStories } from '@storybook/react';
+import * as stories from './Button.stories';
+
+// Import all component stories for snapshot testing
+const { Primary, Secondary, Disabled, Small, Large } = composeStories(stories);
+
+describe('Button visual tests', () => {
+  it('renders primary button correctly', () => {
+    const { container } = render(<Primary />);
+    expect(container.firstChild).toMatchSnapshot();
+  });
+
+  it('renders secondary button correctly', () => {
+    const { container } = render(<Secondary />);
+    expect(container.firstChild).toMatchSnapshot();
+  });
+
+  it('renders disabled state correctly', () => {
+    const { container } = render(<Disabled />);
+    expect(container.firstChild).toMatchSnapshot();
+  });
+
+  it('renders sizes correctly', () => {
+    // Small size
+    const { container: smallContainer } = render(<Small />);
+    expect(smallContainer.firstChild).toMatchSnapshot();
+    
+    // Large size
+    const { container: largeContainer } = render(<Large />);
+    expect(largeContainer.firstChild).toMatchSnapshot();
+  });
+});
+```
+
+**Bad**:
+```typescript
+// Missing visual tests completely
+// Button.tsx with no visual tests
+
+// Or tests that don't cover visual aspects
+// Button.test.tsx without visual snapshots
+import { render, fireEvent } from '@testing-library/react';
+import { Button } from './Button';
+
+describe('Button', () => {
+  it('calls onClick when clicked', () => {
+    const handleClick = jest.fn();
+    const { getByText } = render(<Button onClick={handleClick}>Click me</Button>);
+    fireEvent.click(getByText('Click me'));
+    expect(handleClick).toHaveBeenCalledTimes(1);
+    // No visual testing at all
+  });
+  
+  // Only functional tests, no visual regression tests
+});
+
+// Or insufficient coverage of states and variants
+// Button.stories.tsx with minimal coverage
+import { Button } from './Button';
+
+export default {
+  title: 'Components/Button',
+  component: Button
+};
+
+// Only testing default state, missing variants, sizes, states
+export const Default = () => <Button>Default Button</Button>;
+```
+
+## Implementation
+
+### Visual Testing Tools
+
+Choose the appropriate tooling based on your project requirements:
+
+1. **Component Development Environment**:
+   - Storybook for React, Vue, Angular
+   - Ladle for React projects
+   - Histoire for Vue projects
+
+2. **Visual Testing Frameworks**:
+   - Chromatic for Storybook integration
+   - Percy for cross-browser visual testing
+   - Loki for component screenshot comparison
+   - Jest Snapshots for simple component snapshots
+   - Playwright for end-to-end visual comparisons
+   - Cypress Visual Testing for component and application testing
+
+### Integration with CI/CD
+
+Configure your CI/CD pipeline to run visual tests automatically:
+
+```yaml
+# Example GitHub Actions workflow for visual testing
+name: Visual Testing
+
+on:
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  visual-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Storybook
+        run: npm run build-storybook
+
+      - name: Run Chromatic
+        uses: chromaui/action@v1
+        with:
+          projectToken: ${{ secrets.CHROMATIC_PROJECT_TOKEN }}
+          exitOnceUploaded: true
+```
+
+### Visual Test Organization
+
+Organize visual tests in a standardized structure:
+
+```
+src/
+├── components/
+│   └── Button/
+│       ├── Button.tsx          # Component implementation
+│       ├── Button.stories.tsx  # Visual test scenarios in Storybook
+│       ├── Button.test.tsx     # Functional tests
+│       └── Button.spec.tsx     # Visual snapshot tests
+```
+
+### Visual Test-Driven Development Workflow
+
+1. **Define Visual Requirements**: Document the expected visual appearance
+2. **Create Visual Test Cases**: Build Storybook stories or other visual tests
+3. **Implement Component**: Develop until visual tests pass
+4. **Capture Baseline**: Save approved visual snapshots
+5. **Monitor for Regressions**: Run visual tests on changes
+
+## Full Documentation Access
+
+- [Component Visual Testing Guide](mdc:examples/testing/ComponentVisualTestingGuide.md)
+- [Storybook Best Practices](mdc:examples/testing/StorybookBestPractices.md)
+- [Visual Test Automation](mdc:examples/testing/VisualTestAutomation.md)

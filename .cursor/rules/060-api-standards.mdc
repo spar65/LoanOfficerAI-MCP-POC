@@ -1,0 +1,640 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+___
+description: IMPLEMENT consistent API standards when DESIGNING APIs to ENSURE immutability, backward compatibility, and enterprise-level management
+globs: "**/api/**/*.{ts,js}, **/server/**/*.{ts,js}, **/routes/**/*.{ts,js}"
+___
+
+# API Standards & Database Interaction Guidelines
+
+## Context
+- Our platform is a multi-tenant application with organization-scoped data
+- APIs represent critical contracts between services, clients, and the database
+- Once published, API contracts must remain immutable for a given version
+- Enterprise-level API management requires governance, monitoring, and formal versioning
+- APIs must support multi-tenancy and proper data isolation
+- Documentation and discovery are essential for developer productivity
+
+## API Immutability & Versioning Requirements
+
+### API Versioning Strategy
+
+- **REQUIRED**: All production APIs must be explicitly versioned (e.g., `/api/v1/...`)
+- **REQUIRED**: Once published, API contracts must not introduce breaking changes
+- **REQUIRED**: New features must be introduced in a backward-compatible way or via new API versions
+- **REQUIRED**: Each published API version must have a defined lifecycle (preview, stable, deprecated, retired)
+- Use URL path versioning (e.g., `/api/v1/...`) for all public-facing APIs
+- Document deprecation timelines when newer versions are available
+- Include version information in response headers (`X-API-Version`)
+
+```typescript
+// Good: Properly versioned API
+// /api/v1/organizations/:orgId/users
+export async function getUsersV1(req: Request, res: Response) {
+  // V1 implementation
+}
+
+// /api/v2/organizations/:orgId/users (adds new features)
+export async function getUsersV2(req: Request, res: Response) {
+  // V2 implementation with new features
+}
+
+// Bad: Unversioned API
+export async function getUsers(req: Request, res: Response) {
+  // Implementation that might change over time
+}
+```
+
+### Breaking vs. Non-Breaking Changes
+
+- **REQUIRED**: Create a new API version for any breaking changes
+- Breaking changes include:
+  - Removing or renaming fields in responses
+  - Changing field data types or formats
+  - Removing endpoints
+  - Changing response status codes
+  - Adding required request parameters
+- Non-breaking changes (allowed in same version):
+  - Adding new optional fields
+  - Adding new endpoints
+  - Adding optional query parameters
+  - Extending enumerations
+  - Bug fixes that maintain expected behavior
+
+```typescript
+// Good: Non-breaking change - adding an optional field
+interface UserResponseV1 {
+  id: string;
+  name: string;
+  email: string;
+  created_at: string;
+  avatar_url?: string; // New optional field (non-breaking)
+}
+
+// Bad: Breaking change without version increment
+interface UserResponse { // Don't do this
+  id: string;
+  firstName: string; // Was previously "name"
+  lastName: string; // Was previously included in "name"
+  email: string;
+  createdAt: string; // Was previously "created_at"
+}
+```
+
+### API Lifecycle Management
+
+- **REQUIRED**: Define and document the status of each API version (preview, stable, deprecated, retired)
+- **REQUIRED**: Provide at least 6 months' notice before retiring a deprecated API
+- Include deprecation headers for deprecated APIs
+- Document upgrade paths from deprecated to current versions
+- Maintain at least one prior version when releasing a new version
+- Monitor usage of deprecated APIs to identify affected clients
+
+```typescript
+// Good: API version metadata registry
+const API_VERSIONS = {
+  'v1': {
+    status: 'deprecated',
+    deprecationDate: '2023-01-15',
+    retirementDate: '2023-07-15',
+    successor: 'v2',
+    upgradeGuide: '/docs/api/migration-v1-to-v2'
+  },
+  'v2': {
+    status: 'stable',
+    releaseDate: '2022-12-01'
+  }
+};
+
+// Middleware to add deprecation notice headers
+function apiVersionHeadersMiddleware(req, res, next) {
+  const version = req.params.version;
+  const versionInfo = API_VERSIONS[version];
+  
+  if (versionInfo) {
+    // Add version info to response headers
+    res.setHeader('X-API-Version', version);
+    
+    if (versionInfo.status === 'deprecated') {
+      res.setHeader('Deprecation', 'true');
+      res.setHeader('Sunset', new Date(versionInfo.retirementDate).toISOString());
+      
+      if (versionInfo.successor) {
+        const currentPath = req.path;
+        const newPath = currentPath.replace(`/v${version}/`, `/v${versionInfo.successor}/`);
+        res.setHeader('Link', `<${newPath}>; rel="successor-version"`);
+      }
+    }
+  }
+  
+  next();
+}
+```
+
+## API URL & Resource Structure
+
+### URL Patterns
+- **REQUIRED**: Organization-scoped resources: `/api/v{n}/organizations/:orgId/[resource]`
+- **REQUIRED**: Platform-level resources: `/api/v{n}/platform/[resource]`
+- **REQUIRED**: Authentication endpoints: `/api/v{n}/auth/[action]`
+- Use plural nouns for collection endpoints (e.g., `/users` not `/user`)
+- Use nested resources for representing relationships (e.g., `/organizations/:orgId/users`)
+- Use query parameters for filtering, sorting, and pagination
+- Keep URL paths lowercase with hyphens for multi-word resources
+
+### Query Parameter Conventions
+- **REQUIRED**: Use consistent query parameter naming across all APIs
+- Standard parameters:
+  - `page`: Page number for pagination (1-based)
+  - `limit` or `page_size`: Number of items per page
+  - `sort`: Field to sort by (e.g., `created_at`)
+  - `order` or `direction`: Sort direction (`asc` or `desc`)
+  - `filter` or field-specific filters
+- Document all supported query parameters in API documentation
+
+## Standard Response Formats
+
+### For Collection Endpoints (Lists)
+```typescript
+// Good: GET /api/v1/organizations/:orgId/users
+{
+  data: T[], // Array of items
+  pagination: {
+    page: number,
+    limit: number,
+    totalPages: number,
+    totalItems: number
+  },
+  links?: {
+    self: string,
+    next?: string,
+    prev?: string
+  }
+}
+```
+
+### For Single Item Endpoints
+```typescript
+// Good: GET /api/v1/organizations/:orgId/users/:id
+{
+  data: T // Single item
+}
+```
+
+### For Create/Update Operations
+```typescript
+// Good: POST/PUT/PATCH responses
+{
+  data: T, // Created/updated item
+  message: string // Success message
+}
+```
+
+### For Delete Operations
+```typescript
+// Good: DELETE responses
+{
+  message: string // Success message
+}
+```
+
+### For Error Responses
+```typescript
+// Good: Error responses
+{
+  error: {
+    code: string, // Machine-readable error code
+    message: string, // Human-readable message
+    details?: any[] // Optional additional details
+  }
+}
+```
+
+### Standard HTTP Status Codes
+- **REQUIRED**: Use appropriate HTTP status codes consistently
+- `200`: Successful GET/PUT/PATCH operations
+- `201`: Successful resource creation (POST)
+- `204`: Successful resource deletion (DELETE)
+- `400`: Bad request (invalid input)
+- `401`: Unauthorized (not authenticated)
+- `403`: Forbidden (not authorized)
+- `404`: Resource not found
+- `409`: Conflict (e.g., duplicate resource)
+- `422`: Validation error
+- `429`: Too many requests (rate limit exceeded)
+- `500`: Server error
+
+## API Implementation Patterns
+
+### Interface-First Development
+
+- **REQUIRED**: Define TypeScript interfaces for all API requests and responses
+- **REQUIRED**: Keep interfaces in a central location (e.g., `types/api/*.ts`)
+- **REQUIRED**: Version interfaces along with API endpoints
+- Use interface inheritance to maintain backward compatibility
+- Separate internal data models from API response interfaces
+- Document interfaces with JSDoc comments
+
+```typescript
+// Good: Typed interfaces in a central location
+// types/api/v1/users.ts
+export interface UserV1 {
+  id: string;
+  name: string;
+  email: string;
+  created_at: string;
+}
+
+export interface GetUsersRequestV1 {
+  page?: number;
+  limit?: number;
+  filter?: {
+    role?: string;
+    status?: string;
+  };
+}
+
+export interface GetUsersResponseV1 {
+  data: UserV1[];
+  pagination: {
+    page: number;
+    limit: number;
+    totalPages: number;
+    totalItems: number;
+  };
+}
+```
+
+### Adapter Pattern for API Versioning
+
+- **REQUIRED**: Implement adapters to map between internal models and API versions
+- Keep version-specific logic isolated in dedicated adapters
+- Add new adapters for new API versions
+- Maintain backward compatibility in existing adapters
+
+```typescript
+// Good: Adapter pattern for API versions
+// adapters/users/v1.ts
+export class UserAdapterV1 {
+  // Map from internal model to V1 API response
+  static toResponse(user: UserModel): UserV1 {
+    return {
+      id: user.id,
+      name: `${user.firstName} ${user.lastName}`,
+      email: user.email,
+      created_at: user.createdAt.toISOString()
+    };
+  }
+  
+  // Map from V1 API request to internal model
+  static fromRequest(data: any): Partial<UserModel> {
+    const { name, email } = data;
+    const [firstName, lastName] = (name || '').split(' ', 2);
+    
+    return {
+      firstName: firstName || '',
+      lastName: lastName || '',
+      email
+    };
+  }
+}
+
+// adapters/users/v2.ts
+export class UserAdapterV2 {
+  // Map from internal model to V2 API response
+  static toResponse(user: UserModel): UserV2 {
+    return {
+      id: user.id,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      email: user.email,
+      role: user.role,
+      createdAt: user.createdAt.toISOString(),
+      updatedAt: user.updatedAt.toISOString()
+    };
+  }
+  
+  // Map from V2 API request to internal model
+  static fromRequest(data: any): Partial<UserModel> {
+    const { firstName, lastName, email, role } = data;
+    
+    return {
+      firstName,
+      lastName,
+      email,
+      role
+    };
+  }
+}
+```
+
+## Database Interaction Requirements
+
+### Organization Scoping
+- **REQUIRED**: All user-related data must include organization ID
+- **REQUIRED**: Queries must filter by organization ID for multi-tenant data
+- **REQUIRED**: Prevent cross-tenant data access through middleware validation
+- Platform-level data should be explicitly marked and handled separately
+- Use database-level constraints to enforce organization boundaries
+
+### Schema Design
+- Include standardized fields across models:
+  ```typescript
+  // Base fields for all models
+  {
+    id: string,
+    createdAt: Date,
+    updatedAt: Date
+  }
+  
+  // Organization-scoped models should include
+  {
+    organizationId: string
+  }
+  ```
+
+### TypeScript Interface Structure
+```typescript
+// Good: Base model interface
+interface BaseModel {
+  id: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// Good: Organization-scoped model
+interface OrgScopedModel extends BaseModel {
+  organizationId: string;
+}
+
+// Good: Response interfaces
+interface ListResponse<T> {
+  data: T[];
+  pagination: {
+    page: number;
+    limit: number;
+    totalPages: number;
+    totalItems: number;
+  };
+}
+
+interface ItemResponse<T> {
+  data: T;
+}
+
+interface ErrorResponse {
+  error: {
+    code: string;
+    message: string;
+    details?: any[];
+  };
+}
+```
+
+## Enterprise API Governance
+
+### API Registry & Discovery
+
+- **REQUIRED**: Register all APIs in a central API registry or portal
+- **REQUIRED**: Include API metadata (owner, version, status, documentation link)
+- **REQUIRED**: Provide OpenAPI/Swagger documentation for all APIs
+- Create a developer portal for API discovery and documentation
+- Include example requests and responses in documentation
+- Implement dependency tracking between services and API versions
+
+```typescript
+// Good: API registry implementation
+interface ApiEndpointInfo {
+  path: string;
+  method: string;
+  version: string;
+  status: 'preview' | 'stable' | 'deprecated' | 'retired';
+  description: string;
+  owner: string;
+  authRequired: boolean;
+  documentationUrl: string;
+  rateLimit?: {
+    requests: number;
+    period: string; // e.g., "1m", "1h", "1d"
+  };
+}
+
+// API registry with discovery capabilities
+class ApiRegistry {
+  private endpoints: ApiEndpointInfo[] = [];
+  
+  registerEndpoint(info: ApiEndpointInfo): void {
+    this.endpoints.push(info);
+  }
+  
+  getEndpoints(filter?: Partial<ApiEndpointInfo>): ApiEndpointInfo[] {
+    if (!filter) {
+      return this.endpoints;
+    }
+    
+    return this.endpoints.filter(endpoint => {
+      return Object.entries(filter).every(([key, value]) => {
+        return endpoint[key] === value;
+      });
+    });
+  }
+  
+  getEndpointsByVersion(version: string): ApiEndpointInfo[] {
+    return this.getEndpoints({ version });
+  }
+  
+  getDeprecatedEndpoints(): ApiEndpointInfo[] {
+    return this.getEndpoints({ status: 'deprecated' });
+  }
+}
+```
+
+### API Change Management
+
+- **REQUIRED**: Follow a formal change management process for API changes
+- **REQUIRED**: Maintain a changelog for each API version
+- Require peer reviews for API interface changes
+- Implement automated compatibility testing between versions
+- Communicate changes to API consumers through a consistent channel
+- Enforce versioning rules through linting and CI/CD checks
+
+### API Metrics & Monitoring
+
+- **REQUIRED**: Track usage metrics for all API endpoints and versions
+- **REQUIRED**: Monitor error rates by API version and endpoint
+- Implement health checks for all API services
+- Set up alerts for unusual error rates or performance degradation
+- Track usage of deprecated APIs to inform retirement decisions
+- Monitor average response times and optimize slow endpoints
+
+```typescript
+// Good: API metrics middleware
+function apiMetricsMiddleware(req: Request, res: Response, next: NextFunction) {
+  const startTime = Date.now();
+  const version = req.params.version || 'v1';
+  const method = req.method;
+  const path = req.route.path;
+  
+  // Continue with request
+  next();
+  
+  // After response is sent, record metrics
+  res.on('finish', () => {
+    const duration = Date.now() - startTime;
+    const statusCode = res.statusCode;
+    
+    // Record metrics
+    metrics.increment('api.requests.total', {
+      version,
+      method,
+      path,
+      status_code: statusCode
+    });
+    
+    metrics.histogram('api.requests.duration', duration, {
+      version,
+      method,
+      path
+    });
+    
+    // Log API usage
+    logger.info('API Request', {
+      version,
+      method,
+      path,
+      status_code: statusCode,
+      duration
+    });
+  });
+}
+```
+
+## API Implementation Examples
+
+### Good Organization-Scoped API Usage
+
+```typescript
+// Good: API routes with proper version prefixing
+// routes/v1/users.ts
+router.get('/api/v1/organizations/:orgId/users', authenticate, async (req, res) => {
+  try {
+    const { orgId } = req.params;
+    const { page = 1, limit = 10 } = req.query;
+    
+    // Validate organization access
+    if (!await hasOrgAccess(req.user.id, orgId)) {
+      return res.status(403).json({
+        error: {
+          code: 'FORBIDDEN',
+          message: 'You do not have access to this organization'
+        }
+      });
+    }
+    
+    const result = await userService.getUsers(orgId, { page, limit });
+    
+    // Using the defined response format
+    return res.json({
+      data: result.users.map(UserAdapterV1.toResponse),
+      pagination: {
+        page,
+        limit,
+        totalPages: result.totalPages,
+        totalItems: result.totalItems
+      }
+    });
+  } catch (error) {
+    // Error handling with standard format
+    return res.status(500).json({
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: 'An unexpected error occurred',
+        details: [error.message]
+      }
+    });
+  }
+});
+
+// Good: Properly scope database queries by organization
+async function getUsersByOrganization(orgId: string, options: QueryOptions) {
+  const { page = 1, limit = 10, filter = {} } = options;
+  
+  const query = { organizationId: orgId, ...filter };
+  const skip = (page - 1) * limit;
+  
+  // Always include organization ID in queries
+  const [users, totalItems] = await Promise.all([
+    db.users.find(query).skip(skip).limit(limit).toArray(),
+    db.users.countDocuments(query)
+  ]);
+  
+  const totalPages = Math.ceil(totalItems / limit);
+  
+  return { users, totalItems, totalPages };
+}
+```
+
+### Poor API Practices to Avoid
+
+```typescript
+// Bad: Missing organization scope in database query
+async function getAllUsers() {
+  return await db.users.find({}).toArray(); // No org filtering!
+}
+
+// Bad: Changing API response format without versioning
+export async function getUsers(req: Request, res: Response) {
+  // Previously returned { data: [...] }
+  // Now directly returning the array, breaking clients
+  const users = await userService.findAll();
+  return res.json(users); // Breaking change!
+}
+
+// Bad: Inconsistent error handling
+export async function createUser(req: Request, res: Response) {
+  try {
+    // Implementation...
+  } catch (error) {
+    // Using non-standard error format
+    return res.status(500).json({ 
+      message: error.message 
+    });
+  }
+}
+```
+
+## Relationship with Other Rules
+
+- [departments/engineering/api/061-api-security.mdc](mdc:departments/engineering/api/061-api-security.mdc) - API security requirements
+- [departments/engineering/architecture/025-multi-tenancy.mdc](mdc:departments/engineering/architecture/025-multi-tenancy.mdc) - Multi-tenancy patterns
+- [technologies/languages/javascript/054-accessibility-requirements.mdc](mdc:technologies/languages/javascript/054-accessibility-requirements.mdc) - Accessibility standards
+
+## Reference Implementations
+
+For detailed examples of API versioning, immutability, and enterprise-level management, refer to our documentation:
+
+- [APIVersioningGuide.md](mdc:examples/api/APIVersioningGuide.md) - Comprehensive guide to API versioning and immutability
+
+**Important Note**: These reference implementations are provided as documentation examples only and are not meant to be imported or used directly in your codebase. They demonstrate the patterns and practices that should be followed when implementing APIs.
+
+## Full Documentation Access
+
+To access the complete documentation including all examples, please refer to the original enterprise-cursor-rules repository. The examples directory in the repository contains detailed implementation guides that are referenced above.
+
+The flat structure of the Cursor rules deployment may not include these examples directly, but they remain available in the source repository.
+
+## Implementation Checklist
+
+- [ ] All APIs are properly versioned in their URL paths
+- [ ] API interfaces are defined in TypeScript with proper versioning
+- [ ] Breaking changes are introduced in new API versions only
+- [ ] All API responses follow the standard response format
+- [ ] Error handling is consistent across all endpoints
+- [ ] Organization/tenant context is included in all data operations
+- [ ] API lifecycle stages are defined and documented
+- [ ] API metrics are collected and monitored
+- [ ] OpenAPI/Swagger documentation exists for all APIs
+- [ ] Deprecated APIs include proper headers and migration guides
