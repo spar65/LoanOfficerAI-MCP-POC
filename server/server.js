@@ -592,6 +592,63 @@ app.get('/api/loans/:id', (req, res, next) => {
   }
 });
 
+// OpenAI proxy endpoint
+app.post('/api/openai/chat', authMiddleware.verifyToken, async (req, res) => {
+  try {
+    console.log('POST /api/openai/chat - Processing OpenAI request');
+    
+    // Validate request body
+    const { messages, functions, function_call } = req.body;
+    if (!messages || !Array.isArray(messages)) {
+      console.error('Invalid request format: Messages array is missing or invalid');
+      return res.status(400).json({ error: 'Invalid request format. Messages array is required.' });
+    }
+    
+    console.log(`Request contains ${messages.length} messages and ${functions ? functions.length : 0} functions`);
+    
+    // Import OpenAI - make sure to install this package
+    const { OpenAI } = require('openai');
+    
+    // IMPORTANT: You must set the OPENAI_API_KEY environment variable before running the server
+    // You can do this by:
+    // 1. Creating a .env file in the server directory with OPENAI_API_KEY=your_key
+    // 2. Setting it in your shell: export OPENAI_API_KEY=your_key
+    // 3. Setting it when running the server: OPENAI_API_KEY=your_key node server.js
+    if (!process.env.OPENAI_API_KEY) {
+      console.error('ERROR: OPENAI_API_KEY environment variable is not set');
+      return res.status(500).json({ error: 'OpenAI API key is not configured on the server' });
+    }
+    
+    // Initialize OpenAI client with API key from environment variable
+    const openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY
+    });
+    
+    console.log('Making request to OpenAI API...');
+    
+    // Make request to OpenAI
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o",  // Using GPT-4o for best results
+      messages,
+      functions,
+      function_call,
+    });
+    
+    console.log('OpenAI response received successfully');
+    res.json(response.choices[0].message);
+  } catch (error) {
+    console.error('Error calling OpenAI API:', error.message);
+    console.error('Error details:', error);
+    
+    // Send a more detailed error response
+    res.status(500).json({ 
+      error: 'Failed to process OpenAI request',
+      details: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+  }
+});
+
 // Only start the server if this file is executed directly (not when required by tests)
 if (process.env.NODE_ENV !== 'test') {
   const PORT = 3001;

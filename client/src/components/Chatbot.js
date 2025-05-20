@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import mcpClient from '../mcp/client';
+import axios from 'axios';
+import authService from '../mcp/authService';  // Import auth service
 import {
   Box,
   Typography,
@@ -13,7 +15,8 @@ import {
   ListItem,
   Divider,
   IconButton,
-  Chip
+  Chip,
+  CircularProgress
 } from '@mui/material';
 import SendIcon from '@mui/icons-material/Send';
 import SmartToyIcon from '@mui/icons-material/SmartToy';
@@ -23,54 +26,115 @@ import DescriptionIcon from '@mui/icons-material/Description';
 import PaymentsIcon from '@mui/icons-material/Payments';
 import AssessmentIcon from '@mui/icons-material/Assessment';
 
+// Define MCP function schemas for OpenAI
+const MCP_FUNCTIONS = [
+  {
+    name: "getAllLoans",
+    description: "Get a list of all loans in the system",
+    parameters: { type: "object", properties: {}, required: [] },
+  },
+  {
+    name: "getLoanDetails",
+    description: "Get detailed information about a specific loan",
+    parameters: {
+      type: "object",
+      properties: {
+        loan_id: {
+          type: "string",
+          description: "The ID of the loan to retrieve",
+        },
+      },
+      required: ["loan_id"],
+    },
+  },
+  {
+    name: "getLoanStatus",
+    description: "Get the status of a specific loan",
+    parameters: {
+      type: "object",
+      properties: {
+        loan_id: {
+          type: "string",
+          description: "The ID of the loan to retrieve the status for",
+        },
+      },
+      required: ["loan_id"],
+    },
+  },
+  {
+    name: "getActiveLoans",
+    description: "Get a list of all active loans",
+    parameters: { type: "object", properties: {}, required: [] },
+  },
+  {
+    name: "getLoansByBorrower",
+    description: "Get loans for a specific borrower by name",
+    parameters: {
+      type: "object",
+      properties: {
+        borrower: {
+          type: "string",
+          description: "The name of the borrower to retrieve loans for",
+        },
+      },
+      required: ["borrower"],
+    },
+  },
+  {
+    name: "getLoanPayments",
+    description: "Get payment history for a specific loan",
+    parameters: {
+      type: "object",
+      properties: {
+        loan_id: {
+          type: "string",
+          description: "The ID of the loan to retrieve payment history for",
+        },
+      },
+      required: ["loan_id"],
+    },
+  },
+  {
+    name: "getLoanCollateral",
+    description: "Get collateral information for a specific loan",
+    parameters: {
+      type: "object",
+      properties: {
+        loan_id: {
+          type: "string",
+          description: "The ID of the loan to retrieve collateral for",
+        },
+      },
+      required: ["loan_id"],
+    },
+  },
+  {
+    name: "getLoanSummary",
+    description: "Get summary statistics about all loans",
+    parameters: { type: "object", properties: {}, required: [] },
+  },
+];
+
 const Chatbot = ({ onClose }) => {
-  const [messages, setMessages] = useState([
-    { text: 'Hello! Ask about loan status, details, payments, collateral, active loans, or loans by borrower.', sender: 'bot' },
+  // Convert initial bot message to OpenAI format
+  const [conversationHistory, setConversationHistory] = useState([
+    { role: "system", content: "You are an AI Farm Loan Assistant. You help users find information about agricultural loans using the available MCP functions. Keep your responses concise and professional. Always format currency values and percentages correctly. If you don't know the answer, ask for clarification." },
+    { role: "assistant", content: "Hello! I'm your Farm Loan Assistant. Ask me about loan status, details, payments, collateral, active loans, or loans by borrower." }
   ]);
+  
+  // For display in the UI
+  const [messages, setMessages] = useState([
+    { text: 'Hello! I\'m your Farm Loan Assistant. Ask me about loan status, details, payments, collateral, active loans, or loans by borrower.', sender: 'bot' },
+  ]);
+  
   const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef(null);
 
   // Scroll to bottom whenever messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
-
-  // In production, replace rule-based parsing with an NLP service like Dialogflow or Rasa
-  const parseMessage = (message) => {
-    const lowerMsg = message.toLowerCase().replace(/[^\w\s]/g, '');
-    
-    // Extract loan ID if present
-    let loanId = null;
-    const loanIdMatch = lowerMsg.match(/loan\s+(\w+)/) || lowerMsg.match(/loan[^\w]*([\w\d]+)/);
-    if (loanIdMatch) {
-      loanId = loanIdMatch[1];
-      // Add L prefix if it's just numbers
-      if (/^\d+$/.test(loanId)) {
-        // Format with leading zeros if needed (e.g., 1 becomes L001)
-        const numericPart = loanId.padStart(3, '0');
-        loanId = `L${numericPart}`;
-      }
-    }
-    
-    if (lowerMsg.includes('status') && loanId) {
-      return { action: 'getStatus', loanId };
-    } else if (lowerMsg.includes('details') && loanId) {
-      return { action: 'getDetails', loanId };
-    } else if (lowerMsg.includes('payment') && loanId) {
-      return { action: 'getPayments', loanId };
-    } else if (lowerMsg.includes('collateral') && loanId) {
-      return { action: 'getCollateral', loanId };
-    } else if (lowerMsg.includes('active loans')) {
-      return { action: 'getActiveLoans' };
-    } else if (lowerMsg.includes('loans for')) {
-      const borrower = lowerMsg.split('for')[1]?.trim();
-      return { action: 'getLoansByBorrower', borrower };
-    } else if (lowerMsg.includes('summary') || lowerMsg.includes('portfolio overview')) {
-      return { action: 'getSummary' };
-    } else {
-      return { action: 'unknown' };
-    }
-  };
 
   // Format currency values
   const formatCurrency = (amount) => {
@@ -82,66 +146,160 @@ const Chatbot = ({ onClose }) => {
     });
   };
 
-  const handleSend = async () => {
-    if (!input.trim()) return;
-    const userMessage = { text: input, sender: 'user' };
-    setMessages((prev) => [...prev, userMessage]);
-    const parsed = parseMessage(input);
-    let responseText;
+  // Process function calls from OpenAI
+  const processFunctionCall = async (functionCall) => {
     try {
-      if (parsed.action === 'getStatus') {
-        const status = await mcpClient.getLoanStatus(parsed.loanId);
-        responseText = `The status of loan ${parsed.loanId} is ${status}.`;
-      } else if (parsed.action === 'getDetails') {
-        const details = await mcpClient.getLoanDetails(parsed.loanId);
-        responseText = `Loan ${details.loan_id}:\nBorrower: ${details.borrower}\nAmount: ${formatCurrency(details.loan_amount)}\nInterest Rate: ${details.interest_rate}%\nTerm: ${details.term_length} months\nStatus: ${details.status}\nType: ${details.loan_type}`;
-      } else if (parsed.action === 'getPayments') {
-        const payments = await mcpClient.getLoanPayments(parsed.loanId);
-        if (payments.length > 0) {
-          responseText = `Payment history for loan ${parsed.loanId}:\n${payments.map(p => 
-            `${p.payment_date}: ${formatCurrency(p.amount)} (${p.status})`
-          ).join('\n')}`;
-        } else {
-          responseText = `No payments found for loan ${parsed.loanId}.`;
+      const { name, arguments: argsString } = functionCall;
+      console.log(`Executing function: ${name} with args: ${argsString}`);
+      
+      // Parse function arguments
+      const args = JSON.parse(argsString);
+      console.log('Parsed args:', args);
+      
+      // Execute the appropriate function based on the name
+      if (typeof mcpClient[name] === 'function') {
+        let result;
+        
+        // Call with appropriate arguments based on function name
+        switch(name) {
+          case 'getAllLoans':
+          case 'getActiveLoans':
+          case 'getLoanSummary':
+            // These functions take no arguments
+            result = await mcpClient[name]();
+            break;
+            
+          case 'getLoanStatus':
+          case 'getLoanDetails':
+          case 'getLoanPayments':
+          case 'getLoanCollateral':
+            // These functions take loan_id
+            result = await mcpClient[name](args.loan_id);
+            break;
+            
+          case 'getLoansByBorrower':
+            // Takes borrower name
+            result = await mcpClient[name](args.borrower);
+            break;
+            
+          default:
+            throw new Error(`Unsupported function: ${name}`);
         }
-      } else if (parsed.action === 'getCollateral') {
-        const collateral = await mcpClient.getLoanCollateral(parsed.loanId);
-        if (collateral.length > 0) {
-          responseText = `Collateral for loan ${parsed.loanId}:\n${collateral.map(c => 
-            `${c.description}: ${formatCurrency(c.value)}`
-          ).join('\n')}`;
-        } else {
-          responseText = `No collateral found for loan ${parsed.loanId}.`;
-        }
-      } else if (parsed.action === 'getActiveLoans') {
-        const activeLoans = await mcpClient.getActiveLoans();
-        responseText = activeLoans.length > 0
-          ? `Active loans: ${activeLoans.map(l => l.loan_id).join(', ')}`
-          : 'No active loans found.';
-      } else if (parsed.action === 'getLoansByBorrower') {
-        const loans = await mcpClient.getLoansByBorrower(parsed.borrower);
-        responseText = loans.length > 0
-          ? `Loans for ${parsed.borrower}: ${loans.map(l => l.loan_id).join(', ')}`
-          : `No loans found for ${parsed.borrower}.`;
-      } else if (parsed.action === 'getSummary') {
-        const summary = await mcpClient.getLoanSummary();
-        responseText = `Loan Portfolio Summary:\nTotal Loans: ${summary.totalLoans}\nActive Loans: ${summary.activeLoans}\nTotal Amount: ${formatCurrency(summary.totalAmount)}\nDelinquency Rate: ${summary.delinquencyRate.toFixed(2)}%`;
+        
+        console.log(`Function ${name} executed successfully`);
+        return { role: "function", name, content: JSON.stringify(result) };
       } else {
-        responseText = "Sorry, I didn't understand. Try: 'status of loan L001', 'details of loan L002', 'payments for loan L001', 'collateral for loan L002', 'active loans', 'loans for John', or 'portfolio summary'.";
+        throw new Error(`Function ${name} not found in mcpClient`);
       }
     } catch (error) {
-      console.error("API error:", error);
-      responseText = 'Error fetching data. Please check the loan ID or try again.';
+      console.error("Error executing function:", error);
+      return { 
+        role: "function", 
+        name: functionCall.name, 
+        content: JSON.stringify({ error: error.message }) 
+      };
     }
-    const botMessage = { text: responseText, sender: 'bot' };
-    setMessages((prev) => [...prev, botMessage]);
+  };
+
+  const handleSend = async () => {
+    if (!input.trim() || loading) return;
+    
+    const userMessage = { text: input, sender: 'user' };
+    const userMessageForAPI = { role: "user", content: input };
+    
+    setMessages(prev => [...prev, userMessage]);
+    setConversationHistory(prev => [...prev, userMessageForAPI]);
     setInput('');
+    setLoading(true);
+    
+    try {
+      // Get auth token using the auth service
+      const token = authService.getToken();
+      
+      if (!token) {
+        console.error('No authentication token available');
+        throw new Error('Authentication required');
+      }
+      
+      // Add typing indicator
+      setMessages(prev => [...prev, { text: '...', sender: 'bot', isTyping: true }]);
+      
+      // Make API request to our OpenAI proxy
+      const response = await axios.post(`${mcpClient.baseURL}/openai/chat`, {
+        messages: [...conversationHistory, userMessageForAPI],
+        functions: MCP_FUNCTIONS,
+        function_call: 'auto'
+      }, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      // Remove typing indicator
+      setMessages(prev => prev.filter(msg => !msg.isTyping));
+      
+      // Handle the response
+      const aiMessage = response.data;
+      let responseText = aiMessage.content;
+      let updatedHistory = [...conversationHistory, userMessageForAPI, aiMessage];
+      
+      // Handle function call if present
+      if (aiMessage.function_call) {
+        // Execute the function
+        const functionResult = await processFunctionCall(aiMessage.function_call);
+        updatedHistory.push(functionResult);
+        
+        // Get a second response from OpenAI that incorporates the function result
+        const secondResponse = await axios.post(`${mcpClient.baseURL}/openai/chat`, {
+          messages: updatedHistory,
+          functions: MCP_FUNCTIONS,
+          function_call: 'auto'
+        }, {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        
+        // Update with the final response
+        const finalAiMessage = secondResponse.data;
+        responseText = finalAiMessage.content;
+        updatedHistory.push(finalAiMessage);
+      }
+      
+      // Add final message to UI
+      const botMessage = { text: responseText, sender: 'bot' };
+      setMessages(prev => [...prev.filter(msg => !msg.isTyping), botMessage]);
+      
+      // Update conversation history
+      setConversationHistory(updatedHistory);
+      
+    } catch (error) {
+      console.error("Error calling OpenAI API:", error);
+      
+      // Remove typing indicator
+      setMessages(prev => prev.filter(msg => !msg.isTyping));
+      
+      // Add error message
+      const errorMessage = { 
+        text: `Sorry, I encountered an error: ${error.message || 'Unknown error'}. Please try again.`, 
+        sender: 'bot' 
+      };
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Get icon for message based on content
   const getMessageIcon = (message) => {
     if (message.sender === 'user') {
       return <PersonIcon />;
+    }
+    
+    if (message.isTyping) {
+      return <CircularProgress size={20} />;
     }
     
     const text = message.text.toLowerCase();
@@ -247,9 +405,9 @@ const Chatbot = ({ onClose }) => {
                   <IconButton 
                     color="primary" 
                     onClick={handleSend}
-                    disabled={!input.trim()}
+                    disabled={!input.trim() || loading}
                   >
-                    <SendIcon />
+                    {loading ? <CircularProgress size={24} /> : <SendIcon />}
                   </IconButton>
                 </InputAdornment>
               ),
@@ -265,7 +423,7 @@ const Chatbot = ({ onClose }) => {
             color="primary" 
             variant="outlined" 
             onClick={() => {
-              setInput('Show me active loans');
+              setInput('Show me all active loans');
               setTimeout(handleSend, 100);
             }}
           />
@@ -275,7 +433,7 @@ const Chatbot = ({ onClose }) => {
             color="primary" 
             variant="outlined" 
             onClick={() => {
-              setInput('Portfolio summary');
+              setInput('Give me the portfolio summary');
               setTimeout(handleSend, 100);
             }} 
           />
@@ -284,7 +442,7 @@ const Chatbot = ({ onClose }) => {
             size="small" 
             color="primary" 
             variant="outlined" 
-            onClick={() => setInput('Status of loan L001')} 
+            onClick={() => setInput('What is the status of loan L001?')} 
           />
         </Box>
       </Box>
