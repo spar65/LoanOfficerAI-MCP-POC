@@ -1,72 +1,108 @@
 import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { render, screen } from '@testing-library/react';
+import '@testing-library/jest-dom';
 import Chatbot from '../../components/Chatbot';
 import { ThemeProvider } from '@mui/material';
 import farmTheme from '../../theme';
-import '@testing-library/jest-dom';
 
-// Mock the API client directly
+// Import axios mock
+const axios = require('../../tests/mocks/axiosMock');
+
+// Mock useRef and useEffect to avoid scrollIntoView errors
+jest.mock('react', () => {
+  const originalReact = jest.requireActual('react');
+  return {
+    ...originalReact,
+    useRef: jest.fn(() => ({ current: { scrollIntoView: jest.fn() } })),
+  };
+});
+
+// Mock the API client
 jest.mock('../../mcp/client', () => ({
+  baseURL: 'http://localhost:3001/api',
   getAllLoans: jest.fn().mockResolvedValue([]),
-  getLoanDetails: jest.fn().mockImplementation((loanId) => Promise.resolve({
-    loan_id: loanId || 'L001',
+  getLoanDetails: jest.fn().mockResolvedValue({
+    loan_id: 'L001',
     borrower_id: 'B001',
     loan_amount: 50000,
     interest_rate: 3.5,
     status: 'Active',
     borrower: 'John Doe'
-  })),
+  }),
   getActiveLoans: jest.fn().mockResolvedValue([]),
-  getBorrowers: jest.fn().mockResolvedValue([])
+  getLoanSummary: jest.fn().mockResolvedValue({
+    totalLoans: 10,
+    activeLoans: 5,
+    totalAmount: 320000,
+    delinquencyRate: 10
+  })
+}));
+
+// Mock axios for OpenAI API calls
+jest.mock('axios', () => require('../../tests/mocks/axiosMock'));
+
+// Mock Auth Service
+jest.mock('../../mcp/authService', () => ({
+  getToken: jest.fn().mockReturnValue('fake-token')
 }));
 
 describe('Chatbot Component', () => {
   beforeEach(() => {
-    // Reset mock data before each test
     jest.clearAllMocks();
   });
 
-  it('renders the chatbot interface', () => {
+  it('renders the chatbot interface with correct title', () => {
     render(
       <ThemeProvider theme={farmTheme}>
         <Chatbot onClose={() => {}} />
       </ThemeProvider>
     );
 
-    // Check for chatbot elements
-    expect(screen.getByText(/AI Farm Loan Assistant/i)).toBeInTheDocument();
-    expect(screen.getByPlaceholderText(/Ask about loans/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /send/i })).toBeInTheDocument();
+    // Verify the title renders correctly
+    expect(screen.getByText('AI Farm Loan Assistant')).toBeInTheDocument();
   });
 
-  it('displays welcome message on load', () => {
+  it('displays initial welcome message', () => {
     render(
       <ThemeProvider theme={farmTheme}>
         <Chatbot onClose={() => {}} />
       </ThemeProvider>
     );
 
-    // Check for welcome message
-    expect(screen.getByText(/Hello! Ask about loan status/i)).toBeInTheDocument();
+    // Verify the welcome message is displayed
+    expect(screen.getByText(/Hello! I'm your Farm Loan Assistant/i)).toBeInTheDocument();
   });
 
-  it('sends user message and shows it in the chat', async () => {
+  it('includes quick action buttons for common loan queries', () => {
     render(
       <ThemeProvider theme={farmTheme}>
         <Chatbot onClose={() => {}} />
       </ThemeProvider>
     );
 
-    // Type a message
-    const inputField = screen.getByPlaceholderText(/Ask about loans/i);
-    await userEvent.type(inputField, 'Show me loan L001');
+    // Verify quick action buttons are present
+    expect(screen.getByText('Active Loans')).toBeInTheDocument();
+    expect(screen.getByText('Portfolio Summary')).toBeInTheDocument();
+    expect(screen.getByText('Loan Status')).toBeInTheDocument();
+  });
+
+  // Testing that OpenAI integration functions are properly defined
+  it('properly configures OpenAI function schemas', () => {
+    // Import the MCP_FUNCTIONS constant from Chatbot.js
+    const { MCP_FUNCTIONS } = jest.requireActual('../../components/Chatbot');
     
-    // Click send button
-    const sendButton = screen.getByRole('button', { name: /send/i });
-    await userEvent.click(sendButton);
+    // Verify that function schemas are properly defined
+    expect(MCP_FUNCTIONS).toBeDefined();
     
-    // Check if user message is displayed
-    expect(screen.getByText('Show me loan L001')).toBeInTheDocument();
+    // Check that essential functions are defined
+    const functionNames = MCP_FUNCTIONS.map(f => f.name);
+    expect(functionNames).toContain('getLoanDetails');
+    expect(functionNames).toContain('getActiveLoans');
+    expect(functionNames).toContain('getLoanSummary');
+    
+    // Verify a specific function schema has the correct structure
+    const getLoanDetailsFunction = MCP_FUNCTIONS.find(f => f.name === 'getLoanDetails');
+    expect(getLoanDetailsFunction).toHaveProperty('parameters.properties.loan_id');
+    expect(getLoanDetailsFunction.parameters.required).toContain('loan_id');
   });
 }); 

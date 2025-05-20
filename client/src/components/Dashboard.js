@@ -285,166 +285,90 @@ const Dashboard = () => {
           onClose={handleCloseDetails}
           fullWidth
           maxWidth="md"
+          PaperProps={{
+            sx: { overflow: 'visible' }
+          }}
         >
           {selectedLoanDetails && (
             <>
-              <DialogTitle sx={{ bgcolor: 'primary.main', color: 'white', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <DialogTitle 
+                sx={{ 
+                  bgcolor: 'primary.main', 
+                  color: 'white', 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  alignItems: 'center',
+                  p: 1.5
+                }}
+              >
                 <Typography variant="h6">
                   Loan Details: {selectedLoanDetails.loan_id}
                 </Typography>
-                <IconButton color="inherit" onClick={handleCloseDetails}>
+                <IconButton color="inherit" onClick={handleCloseDetails} size="small">
                   <CloseIcon />
                 </IconButton>
               </DialogTitle>
-              <DialogContent dividers>
-                <Grid container spacing={2}>
-                  {/* Loan Information */}
-                  <Grid sx={{ width: { xs: '100%', md: '50%' }, p: 1 }}>
-                    <Card variant="outlined" sx={{ height: '100%' }}>
+              <DialogContent sx={{ p: 1 }}>
+                {/* Two-column layout */}
+                <Box sx={{ display: 'flex', flexDirection: 'row', gap: 1 }}>
+                  {/* Left Column */}
+                  <Box sx={{ width: '50%', display: 'flex', flexDirection: 'column', gap: 1 }}>
+                    {/* Loan Information */}
+                    <Card variant="outlined">
                       <CardHeader 
                         title="Loan Information" 
                         titleTypographyProps={{ variant: 'subtitle1' }}
-                        sx={{ backgroundColor: 'primary.light', py: 1 }}
+                        sx={{ backgroundColor: 'primary.light', py: 0.75, px: 1.5 }}
                       />
-                      <CardContent sx={{ px: 2, pt: 2, pb: 1 }}>
-                        <Grid container spacing={1}>
-                          <Grid sx={{ width: '50%', p: 0.5 }}>
-                            <Stack direction="row" spacing={1} alignItems="center">
-                              <AttachMoneyIcon fontSize="small" color="primary" />
-                              <Typography variant="body2" component="span" color="text.secondary">Amount:</Typography>
-                            </Stack>
-                            <Typography variant="body1" sx={{ fontWeight: 'medium', ml: 4 }}>
-                              {formatCurrency(selectedLoanDetails.loan_amount)}
-                            </Typography>
-                          </Grid>
-                          <Grid sx={{ width: '50%', p: 0.5 }}>
-                            <Stack direction="row" spacing={1} alignItems="center">
-                              <TrendingUpIcon fontSize="small" color="primary" />
-                              <Typography variant="body2" component="span" color="text.secondary">Interest Rate:</Typography>
-                            </Stack>
-                            <Typography variant="body1" sx={{ fontWeight: 'medium', ml: 4 }}>
-                              {selectedLoanDetails.interest_rate}%
-                            </Typography>
-                          </Grid>
-                          <Grid sx={{ width: '50%', p: 0.5 }}>
-                            <Typography variant="body2" color="text.secondary">Term Length:</Typography>
-                            <Typography variant="body1" sx={{ fontWeight: 'medium' }}>
-                              {selectedLoanDetails.term_length} months
-                            </Typography>
-                          </Grid>
-                          <Grid sx={{ width: '50%', p: 0.5 }}>
-                            <Typography variant="body2" color="text.secondary">Status:</Typography>
-                            <Chip 
-                              label={selectedLoanDetails.status} 
-                              color={getStatusColor(selectedLoanDetails.status)}
-                              size="small"
-                              sx={{ mt: 0.5 }}
-                            />
-                          </Grid>
-                          <Grid sx={{ width: '50%', p: 0.5 }}>
-                            <Typography variant="body2" color="text.secondary">Start Date:</Typography>
-                            <Typography variant="body1" sx={{ fontWeight: 'medium' }}>
-                              {formatDate(selectedLoanDetails.start_date)}
-                            </Typography>
-                          </Grid>
-                          <Grid sx={{ width: '50%', p: 0.5 }}>
-                            <Typography variant="body2" color="text.secondary">End Date:</Typography>
-                            <Typography variant="body1" sx={{ fontWeight: 'medium' }}>
-                              {formatDate(selectedLoanDetails.end_date)}
-                            </Typography>
-                          </Grid>
-                          <Grid sx={{ width: '50%', p: 0.5 }}>
-                            <Typography variant="body2" color="text.secondary">Type:</Typography>
-                            <Typography variant="body1" sx={{ fontWeight: 'medium' }}>
-                              {selectedLoanDetails.loan_type}
-                            </Typography>
-                          </Grid>
-                        </Grid>
+                      <CardContent sx={{ px: 1.5, py: 1 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                          <AttachMoneyIcon fontSize="small" color="primary" />
+                          <Typography variant="body2" component="span" color="text.secondary">Amount:</Typography>
+                          <Typography variant="body1">{formatCurrency(selectedLoanDetails.loan_amount)}</Typography>
+                          
+                          <Box sx={{ ml: 2, display: 'flex', alignItems: 'center' }}>
+                            <TrendingUpIcon fontSize="small" color="primary" sx={{ mr: 0.5 }} />
+                            <Typography variant="body2" component="span" color="text.secondary">Interest Rate:</Typography>
+                            <Typography variant="body1" sx={{ ml: 0.5 }}>{selectedLoanDetails.interest_rate}%</Typography>
+                          </Box>
+                        </Box>
+                        
+                        <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
+                          <Typography variant="body2" component="span" color="text.secondary" sx={{ mr: 0.5 }}>Term Length:</Typography>
+                          <Typography variant="body1" sx={{ mr: 2 }}>{selectedLoanDetails.term_length} months</Typography>
+                          
+                          <Typography variant="body2" component="span" color="text.secondary" sx={{ mr: 0.5 }}>Status:</Typography>
+                          <Chip 
+                            label={selectedLoanDetails.status} 
+                            color={getStatusColor(selectedLoanDetails.status)}
+                            size="small"
+                          />
+                        </Box>
+                        
+                        <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
+                          <Typography variant="body2" component="span" color="text.secondary" sx={{ mr: 0.5 }}>Start Date:</Typography>
+                          <Typography variant="body1" sx={{ mr: 2 }}>{formatDate(selectedLoanDetails.start_date)}</Typography>
+                          
+                          <Typography variant="body2" component="span" color="text.secondary" sx={{ mr: 0.5 }}>End Date:</Typography>
+                          <Typography variant="body1">{formatDate(selectedLoanDetails.end_date)}</Typography>
+                        </Box>
+                        
+                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                          <Typography variant="body2" component="span" color="text.secondary" sx={{ mr: 0.5 }}>Type:</Typography>
+                          <Typography variant="body1">{selectedLoanDetails.loan_type}</Typography>
+                        </Box>
                       </CardContent>
                     </Card>
-                  </Grid>
-
-                  {/* Borrower Information */}
-                  {selectedLoanDetails.borrower_details && (
-                    <Grid sx={{ width: { xs: '100%', md: '50%' }, p: 1 }}>
-                      <Card variant="outlined" sx={{ height: '100%' }}>
-                        <CardHeader 
-                          title="Borrower Information" 
-                          titleTypographyProps={{ variant: 'subtitle1' }}
-                          sx={{ backgroundColor: 'primary.light', py: 1 }}
-                        />
-                        <CardContent sx={{ px: 2, pt: 2, pb: 1 }}>
-                          <Grid container spacing={1}>
-                            <Grid sx={{ width: '100%', p: 0.5 }}>
-                              <Stack direction="row" spacing={1} alignItems="center">
-                                <PersonIcon fontSize="small" color="primary" />
-                                <Typography variant="body2" component="span" color="text.secondary">Name:</Typography>
-                                <Typography variant="body1" sx={{ fontWeight: 'medium' }}>
-                                  {selectedLoanDetails.borrower_details.first_name} {selectedLoanDetails.borrower_details.last_name}
-                                </Typography>
-                              </Stack>
-                            </Grid>
-                            <Grid sx={{ width: '100%', p: 0.5 }}>
-                              <Stack direction="row" spacing={1} alignItems="center">
-                                <EmailIcon fontSize="small" color="primary" />
-                                <Typography variant="body2" component="span" color="text.secondary">Email:</Typography>
-                                <Typography variant="body1" sx={{ fontWeight: 'medium' }}>
-                                  {selectedLoanDetails.borrower_details.email}
-                                </Typography>
-                              </Stack>
-                            </Grid>
-                            <Grid sx={{ width: '100%', p: 0.5 }}>
-                              <Stack direction="row" spacing={1} alignItems="center">
-                                <PhoneIcon fontSize="small" color="primary" />
-                                <Typography variant="body2" component="span" color="text.secondary">Phone:</Typography>
-                                <Typography variant="body1" sx={{ fontWeight: 'medium' }}>
-                                  {selectedLoanDetails.borrower_details.phone}
-                                </Typography>
-                              </Stack>
-                            </Grid>
-                            <Grid sx={{ width: '100%', p: 0.5 }}>
-                              <Stack direction="row" spacing={1} alignItems="center">
-                                <HomeIcon fontSize="small" color="primary" />
-                                <Typography variant="body2" component="span" color="text.secondary">Address:</Typography>
-                                <Typography variant="body1" sx={{ fontWeight: 'medium' }}>
-                                  {selectedLoanDetails.borrower_details.address}
-                                </Typography>
-                              </Stack>
-                            </Grid>
-                            <Grid sx={{ width: '50%', p: 0.5 }}>
-                              <Typography variant="body2" color="text.secondary">Credit Score:</Typography>
-                              <Typography variant="body1" sx={{ fontWeight: 'medium' }}>
-                                {selectedLoanDetails.borrower_details.credit_score}
-                              </Typography>
-                            </Grid>
-                            <Grid sx={{ width: '50%', p: 0.5 }}>
-                              <Typography variant="body2" color="text.secondary">Annual Income:</Typography>
-                              <Typography variant="body1" sx={{ fontWeight: 'medium' }}>
-                                {formatCurrency(selectedLoanDetails.borrower_details.income)}
-                              </Typography>
-                            </Grid>
-                            <Grid sx={{ width: '50%', p: 0.5 }}>
-                              <Typography variant="body2" color="text.secondary">Farm Size:</Typography>
-                              <Typography variant="body1" sx={{ fontWeight: 'medium' }}>
-                                {selectedLoanDetails.borrower_details.farm_size} acres
-                              </Typography>
-                            </Grid>
-                          </Grid>
-                        </CardContent>
-                      </Card>
-                    </Grid>
-                  )}
-
-                  {/* Payment History */}
-                  {selectedLoanDetails.payments && selectedLoanDetails.payments.length > 0 && (
-                    <Grid sx={{ width: { xs: '100%', md: '50%' }, p: 1 }}>
-                      <Card variant="outlined" sx={{ height: '100%' }}>
+                    
+                    {/* Payment History */}
+                    {selectedLoanDetails.payments && selectedLoanDetails.payments.length > 0 && (
+                      <Card variant="outlined">
                         <CardHeader 
                           title="Payment History" 
                           titleTypographyProps={{ variant: 'subtitle1' }}
-                          sx={{ backgroundColor: 'primary.light', py: 1 }}
+                          sx={{ backgroundColor: 'primary.light', py: 0.75, px: 1.5 }}
                         />
-                        <CardContent sx={{ px: 0, py: 0 }}>
+                        <CardContent sx={{ p: 0 }}>
                           <Table size="small">
                             <TableHead>
                               <TableRow>
@@ -471,19 +395,87 @@ const Dashboard = () => {
                           </Table>
                         </CardContent>
                       </Card>
-                    </Grid>
-                  )}
+                    )}
+                  </Box>
                   
-                  {/* Collateral Information */}
-                  {selectedLoanDetails.collateral && selectedLoanDetails.collateral.length > 0 && (
-                    <Grid sx={{ width: { xs: '100%', md: '50%' }, p: 1 }}>
-                      <Card variant="outlined" sx={{ height: '100%' }}>
+                  {/* Right Column */}
+                  <Box sx={{ width: '50%', display: 'flex', flexDirection: 'column', gap: 1 }}>
+                    {/* Borrower Information */}
+                    {selectedLoanDetails.borrower_details && (
+                      <Card variant="outlined">
+                        <CardHeader 
+                          title="Borrower Information" 
+                          titleTypographyProps={{ variant: 'subtitle1' }}
+                          sx={{ backgroundColor: 'primary.light', py: 0.75, px: 1.5 }}
+                        />
+                        <CardContent sx={{ px: 1.5, py: 1 }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
+                            <PersonIcon fontSize="small" color="primary" sx={{ mr: 0.5 }} />
+                            <Typography variant="body2" component="span" color="text.secondary" sx={{ mr: 0.5 }}>Name:</Typography>
+                            <Typography variant="body1">
+                              {selectedLoanDetails.borrower_details.first_name} {selectedLoanDetails.borrower_details.last_name}
+                            </Typography>
+                          </Box>
+                          
+                          <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
+                            <EmailIcon fontSize="small" color="primary" sx={{ mr: 0.5 }} />
+                            <Typography variant="body2" component="span" color="text.secondary" sx={{ mr: 0.5 }}>Email:</Typography>
+                            <Typography variant="body1">
+                              {selectedLoanDetails.borrower_details.email}
+                            </Typography>
+                          </Box>
+                          
+                          <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
+                            <PhoneIcon fontSize="small" color="primary" sx={{ mr: 0.5 }} />
+                            <Typography variant="body2" component="span" color="text.secondary" sx={{ mr: 0.5 }}>Phone:</Typography>
+                            <Typography variant="body1">
+                              {selectedLoanDetails.borrower_details.phone}
+                            </Typography>
+                          </Box>
+                          
+                          <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
+                            <HomeIcon fontSize="small" color="primary" sx={{ mr: 0.5 }} />
+                            <Typography variant="body2" component="span" color="text.secondary" sx={{ mr: 0.5 }}>Address:</Typography>
+                            <Typography variant="body1">
+                              {selectedLoanDetails.borrower_details.address}
+                            </Typography>
+                          </Box>
+                          
+                          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                            <Box sx={{ mr: 2 }}>
+                              <Typography variant="body2" color="text.secondary">Credit Score:</Typography>
+                              <Typography variant="body1">
+                                {selectedLoanDetails.borrower_details.credit_score}
+                              </Typography>
+                            </Box>
+                            
+                            <Box sx={{ mr: 2 }}>
+                              <Typography variant="body2" color="text.secondary">Annual Income:</Typography>
+                              <Typography variant="body1">
+                                {formatCurrency(selectedLoanDetails.borrower_details.income)}
+                              </Typography>
+                            </Box>
+                            
+                            <Box>
+                              <Typography variant="body2" color="text.secondary">Farm Size:</Typography>
+                              <Typography variant="body1">
+                                {selectedLoanDetails.borrower_details.farm_size} acres
+                              </Typography>
+                            </Box>
+                          </Box>
+                        </CardContent>
+                      </Card>
+                    )}
+                    
+                    {/* Collateral Information */}
+                    {selectedLoanDetails.collateral && selectedLoanDetails.collateral.length > 0 && (
+                      <Card variant="outlined">
                         <CardHeader 
                           title="Collateral" 
                           titleTypographyProps={{ variant: 'subtitle1' }}
-                          sx={{ backgroundColor: 'primary.light', py: 1 }}
+                          sx={{ backgroundColor: 'primary.light', py: 0.75, px: 1.5 }}
                         />
-                        <CardContent sx={{ px: 0, py: 0 }}>
+                        <CardContent sx={{ p: 0 }}>
                           <Table size="small">
                             <TableHead>
                               <TableRow>
@@ -495,7 +487,7 @@ const Dashboard = () => {
                               {selectedLoanDetails.collateral.map(collateral => (
                                 <TableRow key={collateral.collateral_id}>
                                   <TableCell>
-                                    <Stack direction="row" spacing={1} alignItems="center">
+                                    <Stack direction="row" spacing={0.5} alignItems="center">
                                       <LandscapeIcon fontSize="small" color="primary" />
                                       <Typography variant="body2">
                                         {collateral.description}
@@ -509,9 +501,9 @@ const Dashboard = () => {
                           </Table>
                         </CardContent>
                       </Card>
-                    </Grid>
-                  )}
-                </Grid>
+                    )}
+                  </Box>
+                </Box>
               </DialogContent>
             </>
           )}

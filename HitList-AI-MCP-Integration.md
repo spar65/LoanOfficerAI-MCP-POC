@@ -2,48 +2,48 @@
 
 ## Phase 1: Setup OpenAI API Access
 
-- [ ] 1.1 Create OpenAI API account and generate an API key
-- [ ] 1.2 Install OpenAI SDK in the client application
+- [x] 1.1 Create OpenAI API account and generate an API key
+- [x] 1.2 Install OpenAI SDK in the client application
       `bash
-    cd loan-chatbot-poc/client-new
-    npm install openai
-    `
-- [ ] 1.3 Set up secure environment variables for API key storage
+cd loan-chatbot-poc/client-new
+npm install openai
+`
+- [x] 1.3 Set up secure environment variables for API key storage
 
 ## Phase 2: Modify the Chatbot Component
 
-- [ ] 2.1 Replace rule-based parsing with ChatGPT API calls
-- [ ] 2.2 Implement function calling to maintain MCP client integration
-- [ ] 2.3 Update handleSend function to maintain conversation history
-- [ ] 2.4 Add loading states and error handling for API calls
+- [x] 2.1 Replace rule-based parsing with ChatGPT API calls
+- [x] 2.2 Implement function calling to maintain MCP client integration
+- [x] 2.3 Update handleSend function to maintain conversation history
+- [x] 2.4 Add loading states and error handling for API calls
 
 ## Phase 3: Security and Backend Integration
 
-- [ ] 3.1 Create a proxy server endpoint to secure the OpenAI API key
-- [ ] 3.2 Update Chatbot client to use the proxy server endpoint
-- [ ] 3.3 Add authentication to secure API endpoints
-- [ ] 3.4 Implement rate limiting to manage API usage
+- [x] 3.1 Create a proxy server endpoint to secure the OpenAI API key
+- [x] 3.2 Update Chatbot client to use the proxy server endpoint
+- [x] 3.3 Add authentication to secure API endpoints
+- [x] 3.4 Implement rate limiting to manage API usage
 
 ## Phase 4: Enhance MCP Integration
 
-- [ ] 4.1 Create an MCP context provider endpoint to supply metadata to ChatGPT
-- [ ] 4.2 Update the Chatbot to fetch and include this context in prompts
-- [ ] 4.3 Define specific function schemas for each MCP endpoint
-- [ ] 4.4 Optimize system messages for loan officer domain expertise
+- [x] 4.1 Create an MCP context provider endpoint to supply metadata to ChatGPT
+- [x] 4.2 Update the Chatbot to fetch and include this context in prompts
+- [x] 4.3 Define specific function schemas for each MCP endpoint
+- [x] 4.4 Optimize system messages for loan officer domain expertise
 
 ## Phase 5: Testing and Refinement
 
-- [ ] 5.1 Test the chatbot with various loan queries
-- [ ] 5.2 Refine system messages based on test results
-- [ ] 5.3 Add more specific function definitions as needed
-- [ ] 5.4 Implement caching for common queries
+- [x] 5.1 Test the chatbot with various loan queries
+- [x] 5.2 Refine system messages based on test results
+- [x] 5.3 Add more specific function definitions as needed
+- [x] 5.4 Implement caching for common queries
 
 ## Phase 6: Production Optimization
 
-- [ ] 6.1 Implement streaming responses for a more responsive UI
-- [ ] 6.2 Add fallback mechanisms for API failures
-- [ ] 6.3 Create a feedback mechanism to improve AI responses
-- [ ] 6.4 Consider fine-tuning a custom model for loan domain
+- [x] 6.1 Implement streaming responses for a more responsive UI
+- [x] 6.2 Add fallback mechanisms for API failures
+- [x] 6.3 Create a feedback mechanism to improve AI responses
+- [x] 6.4 Consider fine-tuning a custom model for loan domain
 
 ## Technical Implementation Notes
 
@@ -101,7 +101,7 @@ const getChatGPTResponse = async (message, conversationHistory) => {
 
     return responseMessage.content;
   } catch (error) {
-    console.error("Error calling ChatGPT API:", error);
+    console.error("Error calling ChatGPT API:", error.message);
     return "Sorry, I encountered an error when processing your request.";
   }
 };

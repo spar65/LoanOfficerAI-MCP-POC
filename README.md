@@ -8,7 +8,8 @@ A proof-of-concept application demonstrating AI-powered agricultural lending int
 - Detailed borrower profiles with farm characteristics
 - Equipment tracking with maintenance history
 - AI-powered risk assessment based on payment history
-- Interactive chatbot for loan officers
+- Interactive chatbot for loan officers with OpenAI integration
+- Natural language processing for loan inquiries
 
 ## Data Model
 
@@ -22,7 +23,20 @@ The application uses a comprehensive data model designed for agricultural lendin
 
 ## Setup
 
-1. **Start the server**:
+1. **Set up environment variables**:
+
+   The server uses OpenAI for the chatbot. Create a `.env` file in the server directory:
+
+   ```
+   # server/.env
+   OPENAI_API_KEY=your_openai_api_key
+   PORT=3001
+   NODE_ENV=development
+   ```
+
+   You can obtain an OpenAI API key from the [OpenAI platform](https://platform.openai.com/api-keys).
+
+2. **Start the server**:
 
    ```bash
    cd server
@@ -30,7 +44,15 @@ The application uses a comprehensive data model designed for agricultural lendin
    npm start
    ```
 
-2. **Start the client**:
+   Alternatively, you can provide the API key directly when starting the server:
+
+   ```bash
+   cd server
+   npm install
+   OPENAI_API_KEY=your_openai_api_key npm start
+   ```
+
+3. **Start the client**:
 
    ```bash
    cd client
@@ -38,14 +60,17 @@ The application uses a comprehensive data model designed for agricultural lendin
    npm start
    ```
 
-3. Open http://localhost:3000 in your browser
+4. Open http://localhost:3000 in your browser
 
 ## Technology Stack
 
 - **Frontend**: React with Material UI
 - **Backend**: Node.js/Express
 - **Database**: JSON files (simulated database)
-- **AI Integration**: Rule-based intelligence with agricultural lending models
+- **AI Integration**:
+  - OpenAI's GPT models for natural language understanding
+  - Function calling for structured data retrieval
+  - Rule-based intelligence with agricultural lending models
 
 ## Testing Overview
 

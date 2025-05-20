@@ -15,11 +15,15 @@ module.exports = {
   setupFilesAfterEnv: ['<rootDir>/src/tests/setup.js'],
   moduleNameMapper: {
     '\\.(css|less|scss|sass)$': '<rootDir>/src/tests/mocks/styleMock.js',
-    '\\.(jpg|jpeg|png|gif|webp|svg)$': '<rootDir>/src/tests/mocks/fileMock.js'
+    '\\.(jpg|jpeg|png|gif|webp|svg)$': '<rootDir>/src/tests/mocks/fileMock.js',
+    '^axios$': '<rootDir>/src/tests/mocks/axiosMock.js'
   },
   transform: {
     '^.+\\.(js|jsx|ts|tsx)$': 'babel-jest'
   },
   testPathIgnorePatterns: ['/node_modules/'],
+  transformIgnorePatterns: [
+    '/node_modules/(?!axios)/'
+  ],
   verbose: true
 }; 
