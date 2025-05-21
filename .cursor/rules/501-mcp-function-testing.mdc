@@ -1,0 +1,411 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# 501: MCP Function Testing Standards
+
+## Rule
+
+All Model Completion Protocol (MCP) functions must have comprehensive test coverage that verifies their functionality at multiple levels, from individual components through integration testing to end-to-end testing with language model interactions.
+
+## Context
+
+The Model Completion Protocol (MCP) functions in the LoanOfficerAI application form the critical bridge between natural language queries and structured data operations. Unlike standard API endpoints, MCP functions have additional complexity because they:
+
+1. Must interpret natural language requests correctly
+2. Need to be resilient to partial or ambiguous information
+3. Require fallback mechanisms when primary data retrieval fails
+4. Need to format responses for both programmatic use and human readability
+
+## RuleDetails
+
+### Test Structure
+
+Each MCP function must have the following test coverage:
+
+1. **Unit Tests**
+   - Test function parameter extraction and validation
+   - Test error handling for invalid parameters
+   - Test error handling for API failures
+   - Mock external dependencies
+
+2. **Integration Tests**
+   - Test the full function implementation without LLM interaction
+   - Verify data retrieval from actual endpoints
+   - Verify fallback mechanisms work as expected
+   - Test with realistic data scenarios
+
+3. **End-to-End Tests**
+   - Test the full MCP workflow including language model interaction
+   - Verify natural language queries correctly invoke the function
+   - Verify the response is correctly formatted for the LLM
+   - Test common variation phrasings for function invocation
+
+### Test Script Structure
+
+Every MCP function should have a dedicated test script following this structure:
+
+```javascript
+/**
+ * Test script for [MCP function name]
+ * 
+ * This script tests the [function name] MCP function by:
+ * 1. Verifying the entity exists
+ * 2. Testing the individual API endpoints
+ * 3. Testing the MCP function handler directly
+ * 4. Testing the end-to-end LLM function calling
+ */
+require('dotenv').config();
+const axios = require('axios');
+const LogService = require('../services/logService');
+const dataService = require('../services/dataService');
+
+// 1. Verify test data exists
+LogService.info('Verifying that test data exists');
+try {
+  // Verify entity exists (e.g., borrower)
+  const data = dataService.loadData(dataService.paths.entityName);
+  const testEntity = data.find(e => e.id === 'TEST_ID');
+  if (testEntity) {
+    LogService.info('Test entity found:', testEntity);
+  } else {
+    LogService.error('Test entity not found in data');
+  }
+} catch (error) {
+  LogService.error('Error verifying test data:', error);
+}
+
+const PORT = process.env.PORT || 3001;
+const BASE_URL = `http://localhost:${PORT}`;
+
+async function runTest() {
+  try {
+    // 2. Test entity retrieval API
+    LogService.info('Testing entity retrieval API');
+    const entityRes = await axios.get(`${BASE_URL}/api/entity/TEST_ID`, {
+      headers: {
+        'Accept': 'application/json',
+        'X-Internal-Call': 'true',
+        'Authorization': 'Bearer SYSTEM_INTERNAL_CALL'
+      }
+    });
+    
+    // Validate entity API response
+    // Log success or failure
+    
+    // 3. Test primary function API endpoint
+    LogService.info('Testing primary function API endpoint');
+    const primaryRes = await axios.get(`${BASE_URL}/api/primary/endpoint/TEST_ID`, {
+      headers: {
+        'Accept': 'application/json',
+        'X-Internal-Call': 'true',
+        'Authorization': 'Bearer SYSTEM_INTERNAL_CALL'
+      }
+    });
+    
+    // Validate primary endpoint response
+    // Log success or failure
+    
+    // 4. Test fallback API endpoint
+    LogService.info('Testing fallback API endpoint');
+    const fallbackRes = await axios.get(`${BASE_URL}/api/fallback/endpoint/TEST_ID`, {
+      headers: {
+        'Accept': 'application/json',
+        'X-Internal-Call': 'true',
+        'Authorization': 'Bearer SYSTEM_INTERNAL_CALL'
+      }
+    });
+    
+    // Validate fallback endpoint response
+    // Log success or failure
+    
+    // 5. Test MCP function via OpenAI endpoint
+    LogService.info('Testing MCP function via OpenAI endpoint');
+    const openaiRes = await axios.post(`${BASE_URL}/api/openai/chat`, {
+      messages: [{ 
+        role: 'user', 
+        content: "Natural language query that should trigger function" 
+      }],
+      function_call: 'auto'
+    }, {
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'X-Internal-Call': 'true',
+        'Authorization': 'Bearer SYSTEM_INTERNAL_CALL'
+      }
+    });
+    
+    // Validate OpenAI response
+    // Check that function was called
+    // Check that response contains expected information
+    
+    LogService.info('Test completed successfully');
+  } catch (error) {
+    LogService.error('Test failed with error:', error);
+  }
+}
+
+// Only run if server is already running
+axios.get(`${BASE_URL}/api/health`)
+  .then(() => {
+    LogService.info(`Server is running at ${BASE_URL}`);
+    runTest();
+  })
+  .catch((error) => {
+    LogService.error(`Server is not running at ${BASE_URL}. Start the server first.`, error);
+  });
+```
+
+### Test Scenarios
+
+Each MCP function test should cover the following scenarios:
+
+1. **Happy Path**
+   - Test with complete and valid parameters
+   - Verify the response contains expected data
+   - Verify response format matches schema
+
+2. **Edge Cases**
+   - Test with minimum required parameters
+   - Test with optional parameters omitted
+   - Test with boundary values (e.g., empty arrays, minimum/maximum values)
+
+3. **Error Cases**
+   - Test with invalid parameters
+   - Test with non-existent entities
+   - Test with simulated API failures
+   - Test with simulated database errors
+
+4. **Integration Cases**
+   - Test interactions with dependent services
+   - Test tenant isolation
+   - Test authentication and authorization
+
+### Test Data Management
+
+1. **Test Data Setup**
+   - Each test should ensure required test data exists
+   - Test data should be representative of real-world scenarios
+   - Consider using a dedicated test database
+
+2. **Test Data Isolation**
+   - Tests should not interfere with each other
+   - Use unique identifiers for test entities
+   - Clean up any created test data after tests complete
+
+### Test Execution
+
+1. **Automated Tests**
+   - Tests should be runnable via CI/CD pipeline
+   - Tests should have deterministic results
+   - Tests should fail loudly and clearly when issues are found
+
+2. **Manual Tests**
+   - Document manual test scenarios that can't be automated
+   - Provide test scripts for manual verification
+   - Include screenshot examples for UI interactions
+
+## Examples
+
+### Good Example
+
+```javascript
+// Good MCP function test
+/**
+ * Test script for getBorrowerDefaultRisk
+ */
+require('dotenv').config();
+const axios = require('axios');
+const LogService = require('./services/logService');
+const dataService = require('./services/dataService');
+
+// Ensure test borrower exists
+LogService.info('Verifying that test borrower B003 exists');
+try {
+  const borrowers = dataService.loadData(dataService.paths.borrowers);
+  const testBorrower = borrowers.find(b => b.borrower_id === 'B003');
+  if (testBorrower) {
+    LogService.info('Test borrower found:', {
+      name: `${testBorrower.first_name} ${testBorrower.last_name}`,
+      credit_score: testBorrower.credit_score
+    });
+  } else {
+    LogService.error('Test borrower B003 not found');
+  }
+} catch (error) {
+  LogService.error('Error verifying test borrower:', error);
+}
+
+const PORT = process.env.PORT || 3001;
+const BASE_URL = `http://localhost:${PORT}`;
+
+async function testDefaultRisk() {
+  LogService.info('Starting default risk prediction test...');
+  
+  try {
+    // Step 1: Test borrower retrieval
+    LogService.info('Step 1: Testing borrower retrieval');
+    const borrowerRes = await axios.get(`${BASE_URL}/api/borrowers/B003`, {
+      headers: {
+        'Accept': 'application/json',
+        'X-Internal-Call': 'true',
+        'Authorization': 'Bearer SYSTEM_INTERNAL_CALL'
+      }
+    });
+    
+    if (borrowerRes.data && borrowerRes.data.borrower_id === 'B003') {
+      LogService.info('✓ Successfully retrieved borrower B003:', borrowerRes.data);
+    } else {
+      LogService.error('✗ Failed to retrieve borrower B003:', borrowerRes.data);
+      return;
+    }
+    
+    // Step 2: Test risk endpoint
+    LogService.info('Step 2: Testing risk/default endpoint');
+    const riskRes = await axios.get(`${BASE_URL}/api/risk/default/B003?time_horizon=short_term`, {
+      headers: {
+        'Accept': 'application/json',
+        'X-Internal-Call': 'true',
+        'Authorization': 'Bearer SYSTEM_INTERNAL_CALL'
+      }
+    });
+    
+    if (riskRes.data && riskRes.data.borrower_id === 'B003') {
+      LogService.info('✓ Successfully retrieved default risk:', riskRes.data);
+    } else {
+      LogService.error('✗ Failed to retrieve default risk:', riskRes.data);
+    }
+    
+    // Step 3: Test analytics endpoint
+    LogService.info('Step 3: Testing analytics/predict/default-risk endpoint');
+    const analyticsRes = await axios.get(`${BASE_URL}/api/analytics/predict/default-risk/B003?time_horizon=3m`, {
+      headers: {
+        'Accept': 'application/json',
+        'X-Internal-Call': 'true',
+        'Authorization': 'Bearer SYSTEM_INTERNAL_CALL'
+      }
+    });
+    
+    if (analyticsRes.data && analyticsRes.data.borrower_id === 'B003') {
+      LogService.info('✓ Successfully retrieved risk prediction:', analyticsRes.data);
+    } else {
+      LogService.error('✗ Failed to retrieve risk prediction:', analyticsRes.data);
+    }
+    
+    // Step 4: Test OpenAI function calling
+    LogService.info('Step 4: Testing OpenAI function calling');
+    const openaiRes = await axios.post(`${BASE_URL}/api/openai/chat`, {
+      messages: [{ 
+        role: 'user', 
+        content: "What's the default risk for borrower B003 in the next 3 months?" 
+      }],
+      function_call: 'auto'
+    }, {
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'X-Internal-Call': 'true',
+        'Authorization': 'Bearer SYSTEM_INTERNAL_CALL'
+      }
+    });
+    
+    if (openaiRes.data && openaiRes.data.content && openaiRes.data.content.includes('B003')) {
+      LogService.info('✓ Successfully received OpenAI response for B003 default risk');
+    } else {
+      LogService.error('✗ Unexpected OpenAI response:', openaiRes.data);
+    }
+    
+    // Additional edge case: Try with non-existent borrower
+    LogService.info('Testing with non-existent borrower');
+    try {
+      const nonExistentRes = await axios.get(`${BASE_URL}/api/risk/default/NONEXISTENT`, {
+        headers: {
+          'Accept': 'application/json',
+          'X-Internal-Call': 'true',
+          'Authorization': 'Bearer SYSTEM_INTERNAL_CALL'
+        }
+      });
+      
+      if (nonExistentRes.data && nonExistentRes.data.error) {
+        LogService.info('✓ Correctly handled non-existent borrower with error:', nonExistentRes.data);
+      } else {
+        LogService.warn('✗ Failed to properly handle non-existent borrower:', nonExistentRes.data);
+      }
+    } catch (nonExistentErr) {
+      if (nonExistentErr.response && nonExistentErr.response.status === 404) {
+        LogService.info('✓ Correctly received 404 for non-existent borrower');
+      } else {
+        LogService.error('✗ Unexpected error for non-existent borrower:', nonExistentErr);
+      }
+    }
+    
+    LogService.info('Default risk test completed successfully');
+  } catch (error) {
+    LogService.error('Test failed with error:', {
+      message: error.message,
+      stack: error.stack
+    });
+  }
+}
+
+// Run test if server is available
+axios.get(`${BASE_URL}/api/health`)
+  .then(() => {
+    LogService.info(`Server is running at ${BASE_URL}`);
+    testDefaultRisk();
+  })
+  .catch((error) => {
+    LogService.error(`Server is not running at ${BASE_URL}. Start the server first.`, {
+      message: error.message
+    });
+  });
+```
+
+### Bad Example
+
+```javascript
+// Bad MCP function test - DO NOT FOLLOW THIS
+/**
+ * Test the getBorrowerRisk function
+ */
+const axios = require('axios');
+
+// No data verification
+// No structured test steps
+// No error handling
+
+// Just call the endpoint directly
+axios.get('http://localhost:3001/api/risk/default/B001')
+  .then(response => {
+    console.log('Result:', response.data);
+  })
+  .catch(error => {
+    console.error('Error:', error);
+  });
+```
+
+## Rationale
+
+Comprehensive testing of MCP functions is critical because:
+
+1. They serve as the interface between natural language and structured data
+2. They must be resilient to a wide variety of input variations
+3. They require multi-layered fallback mechanisms
+4. Failures impact user trust in the AI system as a whole
+5. Debugging issues requires visibility into each layer of the stack
+
+## Enforcement
+
+We will enforce these testing standards through:
+
+1. Required test scripts for all MCP functions
+2. Code reviews with specific focus on test coverage
+3. Test coverage metrics for MCP function handlers
+4. Integration of tests into CI/CD pipelines
+5. Regular manual verification of end-to-end scenarios
+
+## Exceptions
+
+Exceptions to these testing requirements must be documented with clear rationale and approved by the lead developer or QA manager.

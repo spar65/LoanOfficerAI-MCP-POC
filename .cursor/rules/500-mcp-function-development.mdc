@@ -1,0 +1,270 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# 500: MCP Function Development Standards
+
+## Rule
+
+When developing Model Completion Protocol (MCP) functions, you must follow these standards to ensure consistent, secure, and reliable function implementations that properly handle natural language requests and transform them into programmatic actions.
+
+## Context
+
+The Model Completion Protocol (MCP) is a framework for enabling large language models (LLMs) to call functions in response to natural language queries. In our LoanOfficerAI application, MCP enables the AI to respond to user queries about loan data by dynamically calling the appropriate backend functions rather than just generating text.
+
+## RuleDetails
+
+### Function Definition
+
+1. **Schema Definition**
+   - Define clear, structured JSON schemas for each function
+   - Include comprehensive descriptions for all parameters
+   - Mark required parameters appropriately
+   - Use proper data types and constraints
+   - Example:
+   ```javascript
+   {
+     name: "getBorrowerDefaultRisk",
+     description: "Get default risk assessment for a specific borrower",
+     parameters: {
+       type: "object",
+       properties: {
+         borrowerId: {
+           type: "string",
+           description: "The ID of the borrower (e.g., B001)"
+         },
+         timeHorizon: {
+           type: "string",
+           enum: ["short_term", "medium_term", "long_term"],
+           description: "The time horizon for risk assessment"
+         }
+       },
+       required: ["borrowerId"]
+     }
+   }
+   ```
+
+2. **Function Naming**
+   - Use camelCase for function names
+   - Name should clearly indicate the action and entity
+   - Use verb-noun format (e.g., `getBorrowerDetails`, `predictDefaultRisk`)
+   - Names should be unique across the entire MCP function registry
+
+3. **Parameter Design**
+   - Use descriptive parameter names
+   - Include validation constraints where appropriate (e.g., enum for limited choices)
+   - Default values should be specified in the function implementation, not the schema
+   - For complex or nested objects, define a clear structure
+
+### Function Implementation
+
+1. **Function Handler Structure**
+   ```javascript
+   if (functionName === 'yourFunctionName') {
+     // 1. Extract and validate parameters
+     const { param1, param2 = 'defaultValue' } = functionArgs;
+     
+     // 2. Log the function call with meaningful context
+     LogService.mcp(`Processing ${functionName}`, {
+       parameters: { param1, param2 },
+       endpoint: `/api/path/to/endpoint/${param1}`
+     });
+     
+     try {
+       // 3. Verify required entities exist (e.g., borrower exists)
+       const entityCheck = await callInternalApi(`/api/entity/${param1}`);
+       
+       // 4. Handle cases where entity doesn't exist
+       if (entityCheck.error) {
+         LogService.warn(`Entity check failed: ${entityCheck.error}`);
+         return { error: 'Entity not found', details: `Unable to find ${param1}` };
+       }
+       
+       // 5. Call the appropriate internal API
+       const result = await McpService.call(
+         () => callInternalApi(`/api/actual/endpoint/${param1}?param2=${param2}`),
+         functionName,
+         param1,
+         param2
+       );
+       
+       // 6. Add fallback mechanisms if the primary API fails
+       if (result.error) {
+         // Try alternative endpoint or return graceful error
+       }
+       
+       return result;
+     } catch (error) {
+       // 7. Proper error handling
+       LogService.error(`Error in ${functionName}:`, {
+         message: error.message,
+         stack: error.stack
+       });
+       
+       return {
+         error: `Failed to process ${functionName}`,
+         details: error.message
+       };
+     }
+   }
+   ```
+
+2. **Error Handling**
+   - Always wrap function calls in try/catch blocks
+   - Return structured error responses that can be parsed by the LLM
+   - Include specific error information to help debug issues
+   - Handle edge cases explicitly (e.g., empty results, invalid parameters)
+
+3. **Logging**
+   - Use LogService.mcp for MCP-specific operations
+   - Log function calls with parameters (sanitize sensitive data)
+   - Log successful completions with timing information
+   - Log errors with detailed context
+
+4. **Security Considerations**
+   - Validate all parameters before use
+   - Use internal API calls with system authentication
+   - Don't expose sensitive data in logs or responses
+   - Apply proper tenant isolation
+
+### Response Format
+
+1. **Structure**
+   - Return JSON objects with consistent structure
+   - Include a unique identifier for the entity (e.g., borrower_id)
+   - For list responses, include count and pagination metadata
+   - For empty results, return empty arrays rather than null
+
+2. **Error Format**
+   ```javascript
+   {
+     error: 'Descriptive error message',
+     details: 'More detailed explanation',
+     code: 'ERROR_CODE' // Optional
+   }
+   ```
+
+3. **Success Format Example**
+   ```javascript
+   {
+     borrower_id: "B001",
+     borrower_name: "John Doe",
+     risk_score: 45,
+     risk_level: "medium",
+     risk_factors: ["Credit score below average"],
+     recommendations: ["Monitor payment patterns"]
+   }
+   ```
+
+### API Integration
+
+1. **Internal API Calling**
+   - Use the callInternalApi helper function
+   - Set proper headers for internal system calls
+   - Handle API errors and distinguish between different response codes
+   - Follow RESTful patterns for endpoint structure
+
+2. **MCP Service Integration**
+   - Use McpService.call to wrap function calls
+   - Include metadata for timing and logging
+   - Standardize parameter passing
+
+## Examples
+
+### Good Example
+
+```javascript
+// Good MCP function implementation
+if (functionName === 'getBorrowerNonAccrualRisk') {
+  const { borrowerId } = functionArgs;
+  LogService.mcp(`Processing non-accrual risk for borrower: ${borrowerId}`, {
+    endpoint: `/api/risk/non-accrual/${borrowerId}`,
+    functionName: 'getBorrowerNonAccrualRisk'
+  });
+  
+  try {
+    // First, verify borrower exists by calling the borrowers endpoint
+    const borrowerCheck = await callInternalApi(`/api/borrowers/${borrowerId}`);
+    
+    if (borrowerCheck.error) {
+      LogService.warn(`Borrower check failed for ${borrowerId}: ${borrowerCheck.error}`);
+      functionResult = {
+        error: 'Borrower not found',
+        borrower_id: borrowerId,
+        details: `Unable to verify borrower with ID ${borrowerId}`
+      };
+    } else {
+      // Borrower exists, proceed with non-accrual risk assessment
+      LogService.debug(`Borrower ${borrowerId} verified, proceeding with non-accrual risk assessment`);
+      
+      const riskResult = await callInternalApi(`/api/risk/non-accrual/${borrowerId}`);
+      functionResult = await McpService.call(
+        () => Promise.resolve(riskResult), // Use the already fetched result
+        'getBorrowerNonAccrualRisk',
+        borrowerId
+      );
+      
+      // If the response indicates borrower not found but we know it exists
+      if (functionResult.error === 'Borrower not found') {
+        LogService.warn(`Risk endpoint reports borrower ${borrowerId} not found, but borrower endpoint verified it exists`);
+        
+        // Try the analytics endpoint as a fallback
+        const analyticsFallback = await callInternalApi(`/api/analytics/predict/non-accrual-risk/${borrowerId}`);
+        if (!analyticsFallback.error) {
+          LogService.info(`Successfully retrieved non-accrual risk from analytics endpoint for borrower ${borrowerId}`);
+          functionResult = analyticsFallback;
+        }
+      }
+    }
+  } catch (error) {
+    LogService.error(`Error in getBorrowerNonAccrualRisk for ${borrowerId}:`, {
+      message: error.message,
+      stack: error.stack
+    });
+    
+    functionResult = {
+      error: 'Failed to assess non-accrual risk',
+      borrower_id: borrowerId,
+      details: error.message
+    };
+  }
+}
+```
+
+### Bad Example
+
+```javascript
+// Bad MCP function implementation - DO NOT FOLLOW THIS
+if (functionName === 'getBorrowerRisk') {
+  const args = JSON.parse(message.function_call.arguments);
+  const id = args.id;
+  
+  // No validation or error handling
+  const result = callInternalApi(`/api/risk/${id}`);
+  return result;
+}
+```
+
+## Rationale
+
+Following these standards ensures:
+
+1. **Reliability** - Functions will handle errors and edge cases properly
+2. **Consistency** - Users will receive predictable responses
+3. **Security** - Parameters are validated and data is properly isolated
+4. **Maintainability** - New developers can easily understand the pattern
+5. **Observability** - Comprehensive logging enables monitoring and debugging
+
+## Enforcement
+
+We will enforce these standards through:
+
+1. Code reviews focusing on MCP implementation patterns
+2. Automated testing of MCP functions
+3. Documentation of all MCP functions in a central registry
+4. Runtime validation of function parameters
+
+## Exceptions
+
+Exceptions to these rules must be documented with clear rationale and approved by the lead developer.

@@ -1,0 +1,1018 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+description: IMPLEMENT when designing application bootstrapping and initialization to leverage MCP functions instead of traditional API calls
+globs: "client/src/**/*.{js,jsx,ts,tsx}"
+
+# 507: MCP Application Bootstrapping
+
+## Rule
+
+When initializing application state and loading initial data, prefer using Model Completion Protocol (MCP) functions over traditional REST API calls to provide a consistent access pattern, enable more intelligent data loading, and simplify the client architecture.
+
+## Context
+
+Traditionally, applications use REST API calls to bootstrap initial data (e.g., loading all loans after login). Using MCP functions instead offers several advantages:
+
+1. **Consistent Data Access Pattern** - The same MCP infrastructure handles both user queries and system initialization
+2. **Intelligent Data Loading** - MCP functions can determine what data to load based on user context and permissions
+3. **Natural Language System Prompts** - The system can use predefined natural language prompts for initialization
+4. **Simplified Client Architecture** - Clients don't need to maintain separate API and MCP service layers
+5. **Contextual Data Selection** - MCP can load data tailored to the user's role and recent activity
+
+Implementing consistent bootstrapping patterns with MCP ensures a more cohesive architecture and can reduce code duplication.
+
+## RuleDetails
+
+### Initialization Design Patterns
+
+1. **System-Initiated MCP Calls**
+   - Implement predefined system prompts for initialization sequences
+   - Trigger MCP calls automatically after authentication
+   - Define a clear bootstrapping sequence for critical application data
+   - Cache bootstrapped data appropriately
+   - Support incremental loading for large datasets
+
+```javascript
+// Application bootstrapping with MCP
+async function bootstrapApplication(user) {
+  const mcpClient = getMcpClient();
+  
+  // System prompt for initialization
+  const systemMessage = {
+    role: 'system',
+    content: `Initialize application for user ${user.name} with role ${user.role}. Load active loans, recent borrowers, and user preferences.`
+  };
+  
+  try {
+    // Track bootstrap progress
+    dispatch({ type: 'BOOTSTRAP_START' });
+    
+    // Execute bootstrap MCP call
+    const response = await mcpClient.executeSystemPrompt(systemMessage);
+    
+    // Process bootstrap results
+    const { loans, borrowers, preferences } = response.data;
+    
+    // Update application state
+    dispatch({ 
+      type: 'BOOTSTRAP_SUCCESS', 
+      payload: { loans, borrowers, preferences } 
+    });
+    
+    return true;
+  } catch (error) {
+    dispatch({ 
+      type: 'BOOTSTRAP_FAILURE', 
+      error: error.message 
+    });
+    
+    return false;
+  }
+}
+```
+
+2. **Two-Phase Bootstrap**
+   - Implement a critical first phase for essential functionality
+   - Add a second phase for non-critical supplementary data
+   - Show minimal UI after first phase completes
+   - Load additional data progressively in the background
+   - Support continuing even if second phase fails
+
+```javascript
+// Two-phase bootstrap implementation
+async function twoPhaseBootstrap() {
+  // Phase 1: Critical data (must succeed)
+  try {
+    dispatch({ type: 'PHASE1_START' });
+    
+    // Critical MCP call for minimal functionality
+    const criticalData = await mcpClient.executeFunction(
+      'getCriticalBootstrapData',
+      { userId: currentUser.id }
+    );
+    
+    dispatch({ 
+      type: 'PHASE1_SUCCESS', 
+      payload: criticalData 
+    });
+    
+    // Proceed to phase 2 only after phase 1 succeeds
+    await phase2Bootstrap();
+  } catch (error) {
+    dispatch({ type: 'PHASE1_FAILURE', error });
+    showBootstrapErrorModal('Critical initialization failed', error);
+    return false;
+  }
+}
+
+async function phase2Bootstrap() {
+  // Phase 2: Non-critical enhancements (can fail gracefully)
+  try {
+    dispatch({ type: 'PHASE2_START' });
+    
+    // Parallel non-critical MCP calls
+    const [
+      recentActivity, 
+      recommendations, 
+      dashboardData
+    ] = await Promise.allSettled([
+      mcpClient.executeFunction('getRecentActivity'),
+      mcpClient.executeFunction('getRecommendations'),
+      mcpClient.executeFunction('getDashboardData')
+    ]);
+    
+    // Process results, handling individual failures
+    const enhancementData = {
+      recentActivity: recentActivity.status === 'fulfilled' ? recentActivity.value : null,
+      recommendations: recommendations.status === 'fulfilled' ? recommendations.value : null,
+      dashboardData: dashboardData.status === 'fulfilled' ? dashboardData.value : null
+    };
+    
+    dispatch({ 
+      type: 'PHASE2_SUCCESS', 
+      payload: enhancementData 
+    });
+  } catch (error) {
+    // Log but don't block app usage for phase 2 failures
+    dispatch({ type: 'PHASE2_FAILURE', error });
+    logError('Non-critical bootstrap phase failed', error);
+  }
+}
+```
+
+### Application-Specific MCP Functions
+
+1. **Bootstrap Functions**
+   - Create dedicated MCP functions for application initialization
+   - Return normalized data structures for efficient client-side usage
+   - Include metadata about data freshness and completeness
+   - Support parameters for customizing the bootstrap process
+   - Document bootstrap function dependencies
+
+```javascript
+// Server-side bootstrap MCP function
+{
+  name: "initializeUserDashboard",
+  description: "Initialize the user dashboard with required data",
+  parameters: {
+    type: "object",
+    properties: {
+      userId: {
+        type: "string",
+        description: "The user ID for personalization"
+      },
+      role: {
+        type: "string",
+        description: "The user role for permission-based content"
+      },
+      dataScope: {
+        type: "string",
+        enum: ["minimal", "complete"],
+        description: "The scope of data to retrieve"
+      }
+    },
+    required: ["userId"]
+  }
+}
+
+// Handler implementation
+async function handleInitializeUserDashboard(args) {
+  const { userId, role = 'user', dataScope = 'complete' } = args;
+  
+  try {
+    // Get user profile
+    const user = await getUserById(userId);
+    if (!user) {
+      throw new Error(`User ${userId} not found`);
+    }
+    
+    // Get relevant permissions
+    const permissions = await getUserPermissions(userId);
+    
+    // Prepare result object
+    const result = {
+      user: {
+        id: user.id,
+        name: user.name,
+        role: user.role,
+        preferences: user.preferences,
+        permissions
+      },
+      timestamp: new Date().toISOString(),
+      dataScope
+    };
+    
+    // Always include in minimal scope
+    if (dataScope === 'minimal' || dataScope === 'complete') {
+      // Get active loans (limited to 10 most recent for minimal)
+      const loanLimit = dataScope === 'minimal' ? 10 : undefined;
+      result.loans = await getActiveLoansForUser(userId, loanLimit);
+    }
+    
+    // Only include in complete scope
+    if (dataScope === 'complete') {
+      const [borrowers, activities, notifications] = await Promise.all([
+        getRecentBorrowersForUser(userId),
+        getUserActivities(userId, 30), // Last 30 days
+        getUserNotifications(userId)
+      ]);
+      
+      result.borrowers = borrowers;
+      result.activities = activities;
+      result.notifications = notifications;
+    }
+    
+    return result;
+  } catch (error) {
+    LogService.error(`Error in initializeUserDashboard for ${userId}:`, error);
+    
+    throw new Error(`Failed to initialize dashboard: ${error.message}`);
+  }
+}
+```
+
+2. **Context-Aware Initialization**
+   - Create bootstrap functions that adapt to user context
+   - Include user role, permissions, and preferences in determination
+   - Adapt data loading based on device capabilities and network conditions
+   - Support tenant-specific customizations in multi-tenant environments
+   - Enable A/B testing for different initialization strategies
+
+```javascript
+// Context-aware bootstrap function
+async function getBootstrapData(args) {
+  const { 
+    userId, 
+    deviceType, 
+    networkType, 
+    lastLoginTime, 
+    regionId 
+  } = args;
+  
+  // Get user profile and permissions
+  const user = await getUserWithPermissions(userId);
+  
+  // Base data everyone gets
+  const baseData = {
+    user: user,
+    config: getConfigForRegion(regionId),
+    features: getEnabledFeatures(user.role)
+  };
+  
+  // Tailor data based on network conditions
+  if (networkType === 'limited' || deviceType === 'mobile') {
+    // Light version for mobile/limited network
+    return {
+      ...baseData,
+      loans: await getActiveLoansSummary(userId),
+      dataProfile: 'minimal'
+    };
+  }
+  
+  // Tailor data based on user role
+  if (user.role === 'loan_officer') {
+    // Loan officers get full loan details and borrower info
+    const fullData = {
+      ...baseData,
+      loans: await getActiveLoansWithDetails(userId),
+      borrowers: await getActiveBorrowers(userId),
+      activities: await getRecentActivities(userId, 14), // 14 days
+      dataProfile: 'full_officer'
+    };
+    
+    // If they haven't logged in recently, include alerts
+    if (isStaleLogin(lastLoginTime)) {
+      fullData.alerts = await getPendingAlerts(userId);
+    }
+    
+    return fullData;
+  }
+  
+  if (user.role === 'administrator') {
+    // Admins get system health and aggregate data
+    return {
+      ...baseData,
+      systemHealth: await getSystemHealth(),
+      portfolioSummary: await getPortfolioSummary(),
+      userActivity: await getUserActivityStats(),
+      dataProfile: 'admin'
+    };
+  }
+  
+  // Default for other roles
+  return {
+    ...baseData,
+    loans: await getActiveLoans(userId),
+    borrowers: await getActiveBorrowers(userId),
+    dataProfile: 'standard'
+  };
+}
+```
+
+### Error Recovery and Fallbacks
+
+1. **Progressive Fallbacks**
+   - Implement cascading fallback mechanisms
+   - Start with full MCP bootstrap attempt
+   - Fall back to targeted MCP functions for critical data
+   - Resort to direct API calls if MCP layer fails
+   - Store minimal offline data for emergency access
+   - Document fallback paths clearly
+
+```javascript
+// Progressive fallback for application initialization
+async function bootstrapWithFallbacks() {
+  try {
+    // Attempt full MCP bootstrap first
+    dispatch({ type: 'BOOTSTRAP_ATTEMPT', method: 'full_mcp' });
+    const fullData = await mcpClient.executeFunction('initializeUserDashboard', {
+      userId: currentUser.id,
+      dataScope: 'complete'
+    });
+    
+    dispatch({ type: 'BOOTSTRAP_SUCCESS', payload: fullData });
+    return true;
+  } catch (primaryError) {
+    logError('Primary bootstrap failed', primaryError);
+    
+    try {
+      // Fall back to critical data only via MCP
+      dispatch({ type: 'BOOTSTRAP_FALLBACK_ATTEMPT', method: 'critical_mcp' });
+      const criticalData = await mcpClient.executeFunction('initializeUserDashboard', {
+        userId: currentUser.id,
+        dataScope: 'minimal'
+      });
+      
+      dispatch({ 
+        type: 'BOOTSTRAP_PARTIAL_SUCCESS', 
+        payload: criticalData,
+        error: primaryError.message
+      });
+      
+      // Show warning about limited functionality
+      showWarningNotification('Some features may be limited due to initialization issues');
+      return true;
+    } catch (secondaryError) {
+      logError('Secondary bootstrap failed', secondaryError);
+      
+      try {
+        // Last resort: direct API calls
+        dispatch({ type: 'BOOTSTRAP_EMERGENCY_ATTEMPT', method: 'direct_api' });
+        
+        // Make direct API calls to critical endpoints
+        const [userProfile, activeLoans] = await Promise.all([
+          api.getUserProfile(currentUser.id),
+          api.getActiveLoans(currentUser.id)
+        ]);
+        
+        dispatch({ 
+          type: 'BOOTSTRAP_EMERGENCY_SUCCESS', 
+          payload: { user: userProfile, loans: activeLoans },
+          error: 'Using limited emergency data'
+        });
+        
+        // Show error about severely limited functionality
+        showErrorModal('Limited Functionality', 
+          'The application is running in emergency mode with reduced functionality.');
+        return true;
+      } catch (finalError) {
+        // All attempts failed
+        dispatch({ 
+          type: 'BOOTSTRAP_COMPLETE_FAILURE',
+          errors: [primaryError, secondaryError, finalError]
+        });
+        
+        // Show fatal error screen
+        showFatalErrorScreen('Unable to initialize application', finalError);
+        return false;
+      }
+    }
+  }
+}
+```
+
+2. **Retry and Backoff Strategies**
+   - Implement exponential backoff for failed initialization
+   - Set appropriate timeouts for bootstrap operations
+   - Cache partial results between retry attempts
+   - Notify users about retry progress
+   - Track failure patterns for later analysis
+
+```javascript
+// Bootstrap with retry logic
+async function bootstrapWithRetry() {
+  const maxRetries = 3;
+  const baseDelay = 1000; // 1 second
+  
+  let lastError = null;
+  let attempt = 0;
+  
+  while (attempt < maxRetries) {
+    try {
+      // Show retry attempt to user if not first attempt
+      if (attempt > 0) {
+        showRetryNotification(attempt, maxRetries);
+      }
+      
+      // Exponential backoff delay (except for first attempt)
+      if (attempt > 0) {
+        const delayMs = baseDelay * Math.pow(2, attempt - 1);
+        await delay(delayMs);
+      }
+      
+      // Attempt bootstrap
+      dispatch({ type: 'BOOTSTRAP_ATTEMPT', attempt: attempt + 1 });
+      const result = await mcpClient.executeFunction('initializeUserDashboard', {
+        userId: currentUser.id
+      });
+      
+      // Success! Store data and exit retry loop
+      dispatch({ type: 'BOOTSTRAP_SUCCESS', payload: result });
+      return true;
+    } catch (error) {
+      lastError = error;
+      attempt++;
+      
+      // Log each failure
+      logError(`Bootstrap attempt ${attempt} failed`, error);
+      dispatch({ 
+        type: 'BOOTSTRAP_ATTEMPT_FAILED', 
+        attempt, 
+        error: error.message,
+        willRetry: attempt < maxRetries
+      });
+    }
+  }
+  
+  // All retries failed
+  dispatch({ 
+    type: 'BOOTSTRAP_FAILED_ALL_RETRIES', 
+    attempts: maxRetries,
+    finalError: lastError
+  });
+  
+  return false;
+}
+```
+
+### Caching and Persistence
+
+1. **Bootstrap Result Caching**
+   - Cache bootstrap results for faster subsequent loads
+   - Implement time-based invalidation for cached data
+   - Store minimal critical data for offline access
+   - Implement refresh mechanisms for specific data sections
+   - Document caching behavior and limitations
+
+```javascript
+// Cache bootstrap results
+function cacheBootstrapResults(bootstrapData) {
+  // Define TTL for different data types
+  const cacheTTL = {
+    user: 24 * 60 * 60 * 1000, // 24 hours
+    loans: 30 * 60 * 1000,     // 30 minutes
+    borrowers: 30 * 60 * 1000, // 30 minutes
+    activities: 15 * 60 * 1000 // 15 minutes
+  };
+  
+  const timestamp = Date.now();
+  
+  // Store each section with its TTL
+  Object.entries(bootstrapData).forEach(([key, data]) => {
+    if (data && cacheTTL[key]) {
+      const cacheItem = {
+        data,
+        expires: timestamp + cacheTTL[key]
+      };
+      
+      // Store in persistent cache
+      localStorage.setItem(`bootstrap_${key}`, JSON.stringify(cacheItem));
+      
+      // Also keep in memory cache
+      memoryCache[`bootstrap_${key}`] = cacheItem;
+    }
+  });
+  
+  // Store metadata about the cache
+  localStorage.setItem('bootstrap_meta', JSON.stringify({
+    lastBootstrap: timestamp,
+    version: APP_VERSION,
+    userId: bootstrapData.user?.id
+  }));
+}
+
+// Try to load from cache first
+function getBootstrapFromCache() {
+  const now = Date.now();
+  const result = {};
+  let isCacheComplete = true;
+  
+  // Check cache metadata
+  const metaStr = localStorage.getItem('bootstrap_meta');
+  if (!metaStr) return null;
+  
+  const meta = JSON.parse(metaStr);
+  
+  // Version or user mismatch invalidates entire cache
+  if (meta.version !== APP_VERSION || meta.userId !== currentUser.id) {
+    clearBootstrapCache();
+    return null;
+  }
+  
+  // Try to load each section
+  ['user', 'loans', 'borrowers', 'activities'].forEach(key => {
+    const cacheStr = localStorage.getItem(`bootstrap_${key}`);
+    if (cacheStr) {
+      try {
+        const cache = JSON.parse(cacheStr);
+        if (cache.expires > now) {
+          // Still valid
+          result[key] = cache.data;
+        } else {
+          // Expired
+          isCacheComplete = false;
+        }
+      } catch (e) {
+        isCacheComplete = false;
+      }
+    } else {
+      isCacheComplete = false;
+    }
+  });
+  
+  return isCacheComplete ? result : { 
+    ...result, 
+    _partial: true, 
+    _missingKeys: getMissingKeys(result)
+  };
+}
+```
+
+2. **Hybrid Loading Strategy**
+   - Start with cached data for immediate display
+   - Refresh cache with MCP calls in the background
+   - Update UI incrementally as fresh data arrives
+   - Allow users to force a full refresh
+   - Inform users about data freshness
+
+```jsx
+// Hybrid loading component
+function DashboardContainer() {
+  const [data, setData] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isFreshData, setIsFreshData] = useState(false);
+  const [error, setError] = useState(null);
+  
+  // Initial load
+  useEffect(() => {
+    async function loadDashboard() {
+      setIsLoading(true);
+      
+      try {
+        // Try to get cached data first for immediate display
+        const cachedData = getBootstrapFromCache();
+        
+        if (cachedData && !cachedData._partial) {
+          // Complete cache hit
+          setData(cachedData);
+          setIsLoading(false);
+          setIsFreshData(false);
+          
+          // Refresh in background after short delay
+          setTimeout(refreshDataInBackground, 3000);
+        } else if (cachedData && cachedData._partial) {
+          // Partial cache hit - show what we have
+          setData(cachedData);
+          setIsLoading(true); // Keep loading state for missing data
+          setIsFreshData(false);
+          
+          // Immediately refresh missing data
+          refreshMissingData(cachedData._missingKeys);
+        } else {
+          // No usable cache - full load required
+          await performFullBootstrap();
+        }
+      } catch (err) {
+        setError(err);
+        setIsLoading(false);
+      }
+    }
+    
+    loadDashboard();
+  }, []);
+  
+  // Full bootstrap from MCP
+  async function performFullBootstrap() {
+    try {
+      const bootstrapData = await mcpClient.executeFunction('initializeUserDashboard', {
+        userId: currentUser.id
+      });
+      
+      setData(bootstrapData);
+      setIsFreshData(true);
+      cacheBootstrapResults(bootstrapData);
+    } catch (err) {
+      setError(err);
+    } finally {
+      setIsLoading(false);
+    }
+  }
+  
+  // Background refresh to update cache without blocking UI
+  async function refreshDataInBackground() {
+    try {
+      const freshData = await mcpClient.executeFunction('initializeUserDashboard', {
+        userId: currentUser.id
+      });
+      
+      setData(freshData);
+      setIsFreshData(true);
+      cacheBootstrapResults(freshData);
+    } catch (err) {
+      // Log but don't display error for background refresh
+      console.error('Background refresh failed:', err);
+    }
+  }
+  
+  // Selectively refresh only missing data
+  async function refreshMissingData(missingKeys) {
+    try {
+      // Get only missing sections
+      const partialData = await mcpClient.executeFunction('getPartialBootstrapData', {
+        userId: currentUser.id,
+        sections: missingKeys
+      });
+      
+      // Merge with existing data
+      setData(prevData => ({
+        ...prevData,
+        ...partialData,
+        _partial: false, // No longer partial
+        _missingKeys: undefined
+      }));
+      
+      setIsLoading(false);
+      setIsFreshData(true);
+      
+      // Update cache with new data
+      updatePartialCache(partialData);
+    } catch (err) {
+      setError(err);
+      setIsLoading(false);
+    }
+  }
+  
+  // User-triggered manual refresh
+  function handleManualRefresh() {
+    setIsLoading(true);
+    performFullBootstrap();
+  }
+  
+  return (
+    <div className="dashboard-container">
+      {error && <ErrorNotification error={error} onRetry={handleManualRefresh} />}
+      
+      {!data && isLoading && (
+        <FullPageLoader message="Initializing your dashboard..." />
+      )}
+      
+      {data && (
+        <>
+          {isLoading && <RefreshIndicator />}
+          
+          {!isFreshData && (
+            <DataFreshnessIndicator 
+              lastUpdated={data._timestamp} 
+              onRefresh={handleManualRefresh} 
+            />
+          )}
+          
+          <Dashboard data={data} />
+        </>
+      )}
+    </div>
+  );
+}
+```
+
+## Examples
+
+### Example 1: Application Bootstrap with MCP Functions
+
+```jsx
+// src/hooks/useApplicationBootstrap.js
+import { useState, useEffect } from 'react';
+import { mcpClient } from '../services/mcpClient';
+import { useDispatch } from 'react-redux';
+import { getBootstrapCache, setBootstrapCache } from '../utils/cache';
+
+export function useApplicationBootstrap(user) {
+  const [state, setState] = useState({
+    isInitialized: false,
+    isLoading: true,
+    error: null,
+    usedCache: false
+  });
+  
+  const dispatch = useDispatch();
+  
+  useEffect(() => {
+    async function initializeApp() {
+      if (!user?.id) return;
+      
+      setState(prev => ({ ...prev, isLoading: true }));
+      
+      try {
+        // Check for valid cached data first
+        const cachedData = getBootstrapCache(user.id);
+        
+        if (cachedData) {
+          // Immediately populate from cache
+          dispatch({ type: 'BOOTSTRAP_FROM_CACHE', payload: cachedData });
+          setState(prev => ({ 
+            ...prev, 
+            isInitialized: true, 
+            usedCache: true,
+            isLoading: true // Keep loading to refresh in background
+          }));
+          
+          // Refresh in background
+          try {
+            const freshData = await refreshBootstrapData(user.id);
+            dispatch({ type: 'BOOTSTRAP_REFRESH', payload: freshData });
+          } catch (refreshError) {
+            console.warn('Background refresh failed, using cached data', refreshError);
+          } finally {
+            setState(prev => ({ ...prev, isLoading: false }));
+          }
+        } else {
+          // No cache, do full initialization
+          const bootstrapData = await performFullBootstrap(user.id);
+          
+          dispatch({ type: 'BOOTSTRAP_SUCCESS', payload: bootstrapData });
+          setBootstrapCache(user.id, bootstrapData);
+          
+          setState({
+            isInitialized: true,
+            isLoading: false,
+            error: null,
+            usedCache: false
+          });
+        }
+      } catch (error) {
+        console.error('Bootstrap error:', error);
+        setState({
+          isInitialized: false,
+          isLoading: false,
+          error: error.message,
+          usedCache: false
+        });
+        
+        // Dispatch error for global handling
+        dispatch({ type: 'BOOTSTRAP_FAILURE', error });
+      }
+    }
+    
+    initializeApp();
+  }, [user?.id, dispatch]);
+  
+  async function performFullBootstrap(userId) {
+    // Use MCP to load all initial data
+    return mcpClient.executeFunction('initializeUserDashboard', {
+      userId,
+      dataScope: 'complete'
+    });
+  }
+  
+  async function refreshBootstrapData(userId) {
+    return mcpClient.executeFunction('initializeUserDashboard', {
+      userId,
+      dataScope: 'complete',
+      refreshOnly: true
+    });
+  }
+  
+  async function retryInitialization() {
+    if (!user?.id) return;
+    
+    setState(prev => ({ ...prev, isLoading: true, error: null }));
+    
+    try {
+      const bootstrapData = await performFullBootstrap(user.id);
+      
+      dispatch({ type: 'BOOTSTRAP_SUCCESS', payload: bootstrapData });
+      setBootstrapCache(user.id, bootstrapData);
+      
+      setState({
+        isInitialized: true,
+        isLoading: false,
+        error: null,
+        usedCache: false
+      });
+    } catch (error) {
+      setState(prev => ({ ...prev, isLoading: false, error: error.message }));
+    }
+  }
+  
+  return {
+    ...state,
+    retryInitialization
+  };
+}
+```
+
+### Example 2: Server-Side MCP Bootstrap Function Handler
+
+```javascript
+// server/routes/openai.js - MCP function handler
+else if (functionName === 'initializeUserDashboard') {
+  const { userId, dataScope = 'complete', refreshOnly = false } = functionArgs;
+  
+  LogService.mcp(`Initializing dashboard for user ${userId}`, {
+    dataScope,
+    refreshOnly,
+    functionName: 'initializeUserDashboard'
+  });
+  
+  try {
+    // Get user information
+    const user = await dataService.getUserById(userId);
+    
+    if (!user) {
+      throw new Error(`User not found: ${userId}`);
+    }
+    
+    // Begin constructing result
+    const result = {
+      user: {
+        id: user.id,
+        name: `${user.first_name} ${user.last_name}`,
+        role: user.role,
+        email: user.email,
+        preferences: user.preferences || {}
+      },
+      timestamp: new Date().toISOString()
+    };
+    
+    // Get loans and related data
+    const loans = dataService.loadData(dataService.paths.loans);
+    const borrowers = dataService.loadData(dataService.paths.borrowers);
+    const payments = dataService.loadData(dataService.paths.payments);
+    const collateral = dataService.loadData(dataService.paths.collateral);
+    
+    // Filter loans by status for active loans
+    const activeLoans = loans.filter(loan => loan.status === 'Active');
+    
+    // Build enhanced loans with borrower data
+    const enhancedLoans = activeLoans.map(loan => {
+      const borrower = borrowers.find(b => b.borrower_id === loan.borrower_id);
+      const loanPayments = payments.filter(p => p.loan_id === loan.loan_id);
+      const loanCollateral = collateral.filter(c => c.loan_id === loan.loan_id);
+      
+      // Calculate derived values
+      const totalCollateralValue = loanCollateral.reduce((sum, c) => sum + c.value, 0);
+      const loanToValueRatio = loan.loan_amount / totalCollateralValue;
+      const latestPayment = loanPayments.sort((a, b) => 
+        new Date(b.payment_date) - new Date(a.payment_date))[0];
+      
+      return {
+        ...loan,
+        borrower_name: borrower ? `${borrower.first_name} ${borrower.last_name}` : 'Unknown',
+        payment_status: latestPayment?.status || 'No payments',
+        latest_payment_date: latestPayment?.payment_date || null,
+        collateral_value: totalCollateralValue,
+        loan_to_value_ratio: isFinite(loanToValueRatio) ? loanToValueRatio : null,
+        collateral_count: loanCollateral.length
+      };
+    });
+    
+    // Add data to result based on scope
+    result.loans = enhancedLoans;
+    
+    if (dataScope === 'complete') {
+      // Active borrowers
+      const activeBorrowerIds = new Set(activeLoans.map(loan => loan.borrower_id));
+      const activeBorrowers = borrowers.filter(b => activeBorrowerIds.has(b.borrower_id));
+      
+      // Calculate risk metrics for borrowers
+      const borrowersWithRisk = activeBorrowers.map(borrower => {
+        const borrowerLoans = loans.filter(l => l.borrower_id === borrower.borrower_id);
+        const totalLoanAmount = borrowerLoans.reduce((sum, l) => sum + l.loan_amount, 0);
+        const loanToIncomeRatio = borrower.income ? totalLoanAmount / borrower.income : null;
+        
+        // Simple risk calculation
+        let riskLevel = 'low';
+        if (loanToIncomeRatio > 5 || borrower.credit_score < 600) {
+          riskLevel = 'high';
+        } else if (loanToIncomeRatio > 3 || borrower.credit_score < 650) {
+          riskLevel = 'medium';
+        }
+        
+        return {
+          ...borrower,
+          loan_count: borrowerLoans.length,
+          total_loan_amount: totalLoanAmount,
+          loan_to_income_ratio: loanToIncomeRatio,
+          risk_level: riskLevel
+        };
+      });
+      
+      result.borrowers = borrowersWithRisk;
+      
+      // Portfolio summary
+      result.portfolio = {
+        total_loans: activeLoans.length,
+        total_loan_amount: activeLoans.reduce((sum, l) => sum + l.loan_amount, 0),
+        average_interest_rate: activeLoans.reduce((sum, l) => sum + l.interest_rate, 0) / activeLoans.length,
+        borrower_count: activeBorrowerIds.size,
+        high_risk_count: borrowersWithRisk.filter(b => b.risk_level === 'high').length
+      };
+    }
+    
+    LogService.info(`Dashboard initialized for user ${userId} with ${result.loans.length} loans`);
+    
+    functionResult = result;
+  } catch (error) {
+    LogService.error(`Dashboard initialization failed for user ${userId}:`, {
+      message: error.message,
+      stack: error.stack
+    });
+    
+    functionResult = {
+      error: 'Failed to initialize dashboard',
+      details: error.message
+    };
+  }
+}
+```
+
+### Example 3: Application Entry Point with Bootstrap
+
+```jsx
+// src/App.jsx
+import React from 'react';
+import { useApplicationBootstrap } from './hooks/useApplicationBootstrap';
+import { useAuth } from './hooks/useAuth';
+import { LoginPage } from './pages/LoginPage';
+import { Dashboard } from './pages/Dashboard';
+import { LoadingScreen } from './components/LoadingScreen';
+import { ErrorScreen } from './components/ErrorScreen';
+
+export function App() {
+  const { user, isAuthenticated, isAuthLoading } = useAuth();
+  const { 
+    isInitialized, 
+    isLoading: isBootstrapLoading, 
+    error: bootstrapError,
+    retryInitialization,
+    usedCache
+  } = useApplicationBootstrap(user);
+  
+  // Handle authentication loading
+  if (isAuthLoading) {
+    return <LoadingScreen message="Authenticating..." />;
+  }
+  
+  // Handle not authenticated
+  if (!isAuthenticated) {
+    return <LoginPage />;
+  }
+  
+  // Handle bootstrap loading
+  if (!isInitialized && isBootstrapLoading) {
+    return <LoadingScreen message="Initializing your dashboard..." />;
+  }
+  
+  // Handle bootstrap error
+  if (bootstrapError) {
+    return (
+      <ErrorScreen 
+        title="Failed to Initialize Application"
+        message={bootstrapError}
+        actionLabel="Retry"
+        onAction={retryInitialization}
+      />
+    );
+  }
+  
+  // Render main application when initialized
+  return (
+    <>
+      {isBootstrapLoading && <RefreshIndicator />}
+      {usedCache && <CachedDataIndicator />}
+      <Dashboard />
+    </>
+  );
+}
+```
+
+## Enforcement
+
+- Initial application load must use MCP functions instead of direct API calls
+- Bootstrap functions must follow the defined patterns for system prompts
+- Error recovery must implement the fallback strategies as defined
+- Data caching strategies must be implemented for offline and performance concerns
+- Integration tests must verify bootstrap sequence functionality and resilience
