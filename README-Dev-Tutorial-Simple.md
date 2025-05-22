@@ -1,40 +1,29 @@
 # MCP Made Simple
 
-Hi there! This guide explains how our Model Completion Protocol (MCP) works in a way that's easy to understand. Think of MCP as a translator between our app and the AI brain!
+Hi there! This guide explains how our MCP (Model Completion Protocol) system works in simple terms. Think of MCP as a special language that helps different parts of our app talk to each other - especially when we want to use AI to help with tasks.
 
-## 1. Login and Data Loading
+## Example 1: Login and Loading Your Data
 
 ### What Happens When You Log In?
 
-When you open our app and type your username and password, here's what happens behind the scenes:
+Imagine you're entering a building with a security guard. Here's how MCP works when you log in:
 
-1. **You click the login button** - Your username and password travel from your computer to our server (like sending a letter)
-2. **The server checks your password** - Our server makes sure you're really you
-3. **The server uses MCP to get your stuff** - MCP helps collect all your information
-4. **Your information comes back to your screen** - Everything you need appears like magic!
+1. **You enter your username and password** on the login screen.
+2. **Your computer sends this information** to our server using MCP.
+3. **The server checks if your information is correct**. This is like the security guard checking your ID.
+4. **If correct, the server sends back a special ticket** (we call it a "token").
+5. **The server also sends important data** you'll need right away.
 
-### How It Works (Behind the Curtain)
+### How We Set This Up
+
+#### On the Server Side:
 
 ```javascript
-// On your computer (the client)
-function loginButton() {
-  // When you click login, this happens:
-  const username = document.getElementById("username").value;
-  const password = document.getElementById("password").value;
-
-  // Send your login info to the server
-  mcpClient.execute("loginUser", {
-    username: username,
-    password: password,
-  });
-}
-
-// On the server
-const loginUser = {
-  name: "loginUser",
+// This is our login function
+const loginFunction = {
+  name: "login",
   description: "Log in a user and return their data",
   parameters: {
-    // This describes what information is needed
     type: "object",
     properties: {
       username: {
@@ -49,81 +38,86 @@ const loginUser = {
     required: ["username", "password"],
   },
   handler: async (args) => {
-    // Check if password is correct
-    const user = await db.users.findOne({ username: args.username });
-    if (!user || !checkPassword(args.password, user.passwordHash)) {
+    const { username, password } = args;
+
+    // Check if username and password are correct
+    const user = await checkUserCredentials(username, password);
+
+    if (!user) {
       throw new Error("Wrong username or password");
     }
 
-    // Get all the user's information using MCP functions
-    const loans = await mcpService.executeFunction("getUserLoans", {
-      userId: user.id,
-    });
-    const notifications = await mcpService.executeFunction(
-      "getUserNotifications",
-      { userId: user.id }
-    );
+    // Create special ticket (token)
+    const token = createAuthToken(user.id);
 
-    // Send everything back to the user's computer
+    // Get important data user needs right away
+    const userData = await getUserData(user.id);
+    const recentLoans = await getRecentLoans(user.id);
+
+    // Return everything the user needs to get started
     return {
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-      },
-      loans: loans,
-      notifications: notifications,
+      token: token,
+      user: userData,
+      recentLoans: recentLoans,
     };
   },
 };
 ```
 
-### How to Set This Up
-
-1. **Server Setup**: Add your MCP function to the server's list of functions
-2. **Client Setup**: Create a login form and use the MCP client to call the function
-
-## 2. Getting Loan Details with AI
-
-### What Happens When You Ask for Loan Details?
-
-Let's say you want to see details about a loan. Here's what happens:
-
-1. **You click "View Loan Details"** - Your request goes to the AI
-2. **The AI understands what you want** - It figures out you want loan information
-3. **The AI uses MCP to get the loan details** - MCP helps the AI talk to our database
-4. **The loan details appear on your screen** - You see all the information you wanted!
-
-### How It Works (Behind the Curtain)
+#### On Your Computer (Client Side):
 
 ```javascript
-// On your computer (with AI)
-async function askAI(userQuestion) {
-  // Send your question to the AI
-  const response = await fetch("/api/ai", {
-    method: "POST",
-    body: JSON.stringify({ question: userQuestion }),
-  });
+// When you click the login button
+async function handleLogin() {
+  // Get what you typed in the username and password boxes
+  const username = document.getElementById("username").value;
+  const password = document.getElementById("password").value;
 
-  const aiResponse = await response.json();
+  try {
+    // Send to server using MCP
+    const result = await mcpClient.execute("login", {
+      username: username,
+      password: password,
+    });
 
-  // If the AI wants to use an MCP function
-  if (aiResponse.functionCall) {
-    // Use MCP to get loan details
-    const result = await mcpClient.execute(
-      aiResponse.functionCall.name,
-      aiResponse.functionCall.arguments
-    );
+    // Save your special ticket (token)
+    localStorage.setItem("authToken", result.token);
 
-    // Show the result on the screen
-    displayResult(result);
+    // Save user data we got back
+    saveUserData(result.user);
+    displayRecentLoans(result.recentLoans);
+
+    // Go to main page
+    navigateToDashboard();
+  } catch (error) {
+    // Show error message if something went wrong
+    showErrorMessage("Login failed: " + error.message);
   }
 }
+```
 
-// On the server
-const getLoanDetails = {
+## Example 2: Getting Loan Details with AI
+
+Let's say you want to see details about a loan, and you want AI to help explain it in simple terms.
+
+### How It Works:
+
+1. **You click on a loan** in your list.
+2. **Your computer asks the server** for details about that loan using MCP.
+3. **The server sends back the loan information**.
+4. **Your computer then asks the AI** to explain this information in simple terms.
+5. **The AI uses MCP functions** to get any extra information it needs.
+6. **You see the loan details and simple explanation** on your screen.
+
+### How We Set This Up
+
+#### On the Server Side:
+
+```javascript
+// Function to get loan details
+const getLoanDetailsFunction = {
   name: "getLoanDetails",
-  description: "Get details about a specific loan",
+  description: "Get detailed information about a loan",
   parameters: {
     type: "object",
     properties: {
@@ -135,14 +129,16 @@ const getLoanDetails = {
     required: ["loanId"],
   },
   handler: async (args) => {
+    const { loanId } = args;
+
     // Find the loan in our database
-    const loan = await db.loans.findOne({ id: args.loanId });
+    const loan = await findLoanById(loanId);
 
     if (!loan) {
       throw new Error("Loan not found");
     }
 
-    // Return all the loan information
+    // Return all the loan details
     return {
       id: loan.id,
       amount: loan.amount,
@@ -156,86 +152,99 @@ const getLoanDetails = {
 };
 ```
 
-### How to Set This Up
-
-1. **Server Setup**: Add the loan details function to your MCP functions list
-2. **Client Setup**: Add a way for users to ask questions and display answers
-3. **AI Setup**: Configure the AI to use your MCP functions when needed
-
-## 3. Testing AI Functions
-
-### How to Test If Everything Works
-
-Testing is like doing a practice run to make sure everything works before the real game. Here's how we test our MCP functions:
-
-1. **Write a test for each function** - Create small programs that check if functions work
-2. **Run tests automatically** - Set up a system to run all tests when code changes
-3. **Fix problems before users see them** - If tests find issues, fix them right away
-
-### Example Test for Loan Details
+#### On Your Computer (Client Side):
 
 ```javascript
-// test-loan-details.js
-const mcpService = require("../services/mcpService");
-const db = require("../services/dataService");
+// When you click on a loan
+async function showLoanDetails(loanId) {
+  try {
+    // Step 1: Get loan details from server using MCP
+    const loanDetails = await mcpClient.execute("getLoanDetails", {
+      loanId: loanId,
+    });
 
-// This is a test function
-async function testGetLoanDetails() {
-  // 1. SETUP - Create a fake loan for testing
-  const fakeLoan = {
-    id: "test-loan-123",
-    amount: 10000,
-    interestRate: 5.5,
-    term: 36,
-    monthlyPayment: 301.96,
-    startDate: "2023-01-15",
-    status: "active",
-  };
+    // Step 2: Display the loan details on screen
+    displayLoanInfo(loanDetails);
 
-  // Add the fake loan to a test database
-  await db.loans.insertOne(fakeLoan);
+    // Step 3: Ask AI to explain the loan in simple terms
+    const aiExplanation = await askAI(
+      "Please explain this loan in simple terms:",
+      loanDetails,
+      // Give AI access to these MCP functions if it needs more info
+      ["getLoanDetails", "getPaymentSchedule", "calculateRemainingBalance"]
+    );
 
-  // 2. TEST - Call the function we want to test
-  const result = await mcpService.executeFunction("getLoanDetails", {
-    loanId: "test-loan-123",
-  });
-
-  // 3. CHECK - Make sure we got the right information back
-  if (result.id !== "test-loan-123") {
-    console.error("Test failed: Wrong loan ID returned");
-    return false;
+    // Step 4: Show the AI explanation
+    displayAIExplanation(aiExplanation);
+  } catch (error) {
+    showErrorMessage("Couldn't get loan details: " + error.message);
   }
-
-  if (result.amount !== 10000) {
-    console.error("Test failed: Wrong loan amount returned");
-    return false;
-  }
-
-  // Check other fields...
-
-  // 4. CLEANUP - Remove the fake loan from the test database
-  await db.loans.deleteOne({ id: "test-loan-123" });
-
-  console.log("Test passed: getLoanDetails works correctly!");
-  return true;
 }
-
-// Run the test
-testGetLoanDetails();
 ```
 
-### Setting Up Automatic Testing with GitHub
+## Example 3: Testing Our AI Functions
 
-To make tests run automatically when you push code to GitHub:
+We need to make sure our MCP functions work correctly every time we change our code. Here's how we test them:
 
-1. **Create a test script** - Put all your tests in a folder
-2. **Add a GitHub Actions workflow file** - Create a file that tells GitHub when to run tests
+### How Testing Works:
+
+1. **We write special test files** for each MCP function.
+2. **These tests try using the function** with different inputs.
+3. **The tests check if the function gives the right answers**.
+4. **We run these tests automatically** whenever we upload new code.
+
+### Setting Up Tests
+
+#### Step 1: Create a Test File
+
+```javascript
+// File: test-loan-details.js
+
+// Import testing tools
+const { expect } = require("chai");
+const mcpService = require("../services/mcpService");
+
+// Describe our tests
+describe("Loan Details Function", () => {
+  // Test getting a valid loan
+  it("should return loan details when given a valid loan ID", async () => {
+    // Run the function with a test loan ID
+    const result = await mcpService.executeFunction("getLoanDetails", {
+      loanId: "test-loan-123",
+    });
+
+    // Check if we got the right information back
+    expect(result).to.have.property("amount");
+    expect(result).to.have.property("interestRate");
+    expect(result).to.have.property("term");
+    expect(result).to.have.property("monthlyPayment");
+  });
+
+  // Test with a loan that doesn't exist
+  it("should throw an error for non-existent loan ID", async () => {
+    try {
+      // Try to get a loan that doesn't exist
+      await mcpService.executeFunction("getLoanDetails", {
+        loanId: "fake-loan-999",
+      });
+
+      // If we get here, the test failed
+      throw new Error("Expected function to throw an error but it did not");
+    } catch (error) {
+      // Check if we got the right error message
+      expect(error.message).to.include("Loan not found");
+    }
+  });
+});
+```
+
+#### Step 2: Set Up Automatic Testing
+
+We use a special file called `.github/workflows/test.yml` to automatically run tests when we upload new code:
 
 ```yaml
-# .github/workflows/test.yml
 name: Run MCP Tests
 
-# This tells GitHub when to run tests
 on:
   push:
     branches: [main]
@@ -250,9 +259,9 @@ jobs:
       - uses: actions/checkout@v2
 
       - name: Set up Node.js
-        uses: actions/setup-node@v2
+        uses: actions/setup-node@v1
         with:
-          node-version: "14"
+          node-version: "16"
 
       - name: Install dependencies
         run: npm install
@@ -261,12 +270,20 @@ jobs:
         run: npm test
 ```
 
-### How to Run Tests Yourself
+#### Step 3: Run Tests Yourself
 
-If you want to test things before pushing to GitHub:
+To run the tests on your own computer:
 
-1. Open the terminal on your computer
+1. Open a command window
 2. Type `npm test` and press Enter
-3. Watch for any errors and fix them
+3. Watch for green check marks (tests passed) or red X's (tests failed)
 
-That's it! Now you understand how our MCP system helps with logging in, getting loan details with AI, and making sure everything works properly through testing.
+### Why Testing Is Important
+
+Imagine you're building with LEGO. Testing is like making sure each piece fits correctly before you add the next one. This helps us:
+
+- Catch mistakes early
+- Make sure AI functions work correctly
+- Keep our app working well when we add new features
+
+That's it! Now you understand how MCP works with login, getting loan details, and testing. Have fun coding!
