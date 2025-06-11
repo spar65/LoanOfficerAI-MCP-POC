@@ -1,0 +1,17 @@
+[
+  {"payment_id": "P001", "loan_id": "L001", "payment_date": "2024-02-01", "amount": 1000, "status": "On Time"},
+  {"payment_id": "P002", "loan_id": "L001", "payment_date": "2024-03-01", "amount": 1000, "status": "On Time"},
+  {"payment_id": "P003", "loan_id": "L001", "payment_date": "2024-04-01", "amount": 1000, "status": "Late"},
+  {"payment_id": "P004", "loan_id": "L002", "payment_date": "2024-07-15", "amount": 900, "status": "On Time"},
+  {"payment_id": "P005", "loan_id": "L002", "payment_date": "2024-08-15", "amount": 900, "status": "On Time"},
+  {"payment_id": "P006", "loan_id": "L002", "payment_date": "2024-09-15", "amount": 900, "status": "On Time"},
+  {"payment_id": "P007", "loan_id": "L004", "payment_date": "2024-01-20", "amount": 1050, "status": "On Time"},
+  {"payment_id": "P008", "loan_id": "L004", "payment_date": "2024-02-20", "amount": 1050, "status": "On Time"},
+  {"payment_id": "P009", "loan_id": "L004", "payment_date": "2024-03-20", "amount": 1050, "status": "On Time"},
+  {"payment_id": "P010", "loan_id": "L005", "payment_date": "2024-12-05", "amount": 750, "status": "On Time"},
+  {"payment_id": "P011", "loan_id": "L001", "payment_date": "2024-05-01", "amount": 1000, "status": "On Time"},
+  {"payment_id": "P012", "loan_id": "L001", "payment_date": "2024-06-01", "amount": 1000, "status": "Late"},
+  {"payment_id": "P013", "loan_id": "L001", "payment_date": "2024-07-01", "amount": 1000, "status": "On Time"},
+  {"payment_id": "P014", "loan_id": "L001", "payment_date": "2024-08-01", "amount": 1000, "status": "On Time"},
+  {"payment_id": "P015", "loan_id": "L001", "payment_date": "2024-09-01", "amount": 1000, "status": "On Time"}
+]

@@ -1,0 +1,1066 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+description: IMPLEMENT when designing service-to-service communications to leverage MCP functions as a general-purpose transport protocol
+globs: "server/**/*.{js,jsx,ts,tsx}"
+
+# 508: MCP as Service Protocol
+
+## Rule
+
+Use the Model Completion Protocol (MCP) as a unified service communication protocol for both AI and non-AI operations, replacing traditional REST or RPC approaches with a consistent function-based interaction model.
+
+## Context
+
+While MCP was initially designed for AI function calling, its structured approach to defining schemas, handling requests, and processing responses makes it well-suited as a general-purpose service protocol. By using MCP for all service communication, applications can benefit from:
+
+1. **Unified Integration Pattern** - The same protocol handles both AI and non-AI operations
+2. **Reduced Architectural Complexity** - No need to maintain separate REST and MCP infrastructures
+3. **Progressive AI Enhancement** - Non-AI operations can evolve to include AI capabilities without API changes
+4. **Consistent Schema Validation** - Standardized parameter validation across all service operations
+5. **Simplified Client Implementation** - Clients use one consistent pattern for all server communication
+
+This approach represents a paradigm shift in service architecture, where the distinction between AI and traditional operations becomes implementation detail rather than architectural boundary.
+
+## RuleDetails
+
+### Function Definition Patterns
+
+1. **Service-Oriented Function Design**
+   - Group functions by service domain rather than AI capability
+   - Use consistent naming patterns across both AI and non-AI functions
+   - Define comprehensive schemas with proper validation constraints
+   - Include required and optional parameter specifications
+   - Document expected response formats and error handling
+
+```javascript
+// Example MCP function definitions for typical service operations
+const serviceFunctions = [
+  // Traditional "GET" equivalent
+  {
+    name: "getEntityById",
+    description: "Retrieve a specific entity by its ID",
+    parameters: {
+      type: "object",
+      properties: {
+        entityType: {
+          type: "string",
+          description: "The type of entity to retrieve (e.g., loan, borrower, payment)",
+          enum: ["loan", "borrower", "payment", "collateral"]
+        },
+        id: {
+          type: "string",
+          description: "The unique identifier for the entity"
+        },
+        include: {
+          type: "array",
+          description: "Optional related entities to include",
+          items: {
+            type: "string"
+          }
+        }
+      },
+      required: ["entityType", "id"]
+    }
+  },
+  
+  // Traditional "LIST" or "GET collection" equivalent
+  {
+    name: "listEntities",
+    description: "List entities with optional filtering, sorting, and pagination",
+    parameters: {
+      type: "object",
+      properties: {
+        entityType: {
+          type: "string",
+          description: "The type of entity to list",
+          enum: ["loan", "borrower", "payment", "collateral"]
+        },
+        filters: {
+          type: "object",
+          description: "Filtering criteria",
+          additionalProperties: true
+        },
+        sort: {
+          type: "string",
+          description: "Sorting field and direction (e.g., 'createdAt:desc')"
+        },
+        page: {
+          type: "integer",
+          description: "Page number for pagination",
+          default: 1
+        },
+        limit: {
+          type: "integer",
+          description: "Number of items per page",
+          default: 20,
+          maximum: 100
+        }
+      },
+      required: ["entityType"]
+    }
+  },
+  
+  // Traditional "POST" or "CREATE" equivalent
+  {
+    name: "createEntity",
+    description: "Create a new entity",
+    parameters: {
+      type: "object",
+      properties: {
+        entityType: {
+          type: "string",
+          description: "The type of entity to create",
+          enum: ["loan", "borrower", "payment", "collateral"]
+        },
+        data: {
+          type: "object",
+          description: "The entity data to create",
+          additionalProperties: true
+        }
+      },
+      required: ["entityType", "data"]
+    }
+  },
+  
+  // Traditional "PUT/PATCH" or "UPDATE" equivalent
+  {
+    name: "updateEntity",
+    description: "Update an existing entity",
+    parameters: {
+      type: "object",
+      properties: {
+        entityType: {
+          type: "string",
+          description: "The type of entity to update",
+          enum: ["loan", "borrower", "payment", "collateral"]
+        },
+        id: {
+          type: "string",
+          description: "The unique identifier for the entity"
+        },
+        data: {
+          type: "object",
+          description: "The entity data to update",
+          additionalProperties: true
+        },
+        partial: {
+          type: "boolean",
+          description: "Whether this is a partial update (PATCH-like) or full update (PUT-like)",
+          default: true
+        }
+      },
+      required: ["entityType", "id", "data"]
+    }
+  },
+  
+  // Traditional "DELETE" equivalent
+  {
+    name: "deleteEntity",
+    description: "Delete an existing entity",
+    parameters: {
+      type: "object",
+      properties: {
+        entityType: {
+          type: "string",
+          description: "The type of entity to delete",
+          enum: ["loan", "borrower", "payment", "collateral"]
+        },
+        id: {
+          type: "string",
+          description: "The unique identifier for the entity"
+        },
+        soft: {
+          type: "boolean",
+          description: "Whether to perform a soft delete (flag as deleted) or hard delete",
+          default: true
+        }
+      },
+      required: ["entityType", "id"]
+    }
+  }
+];
+```
+
+2. **Response Format Standardization**
+   - Define consistent response structures for all operations
+   - Include standard metadata fields in all responses
+   - Use consistent error formats across all functions
+   - Support pagination metadata where applicable
+   - Include operation timestamps and request IDs
+
+```javascript
+// Example standardized response format for MCP service operations
+function createSuccessResponse(data, meta = {}) {
+  return {
+    success: true,
+    data,
+    meta: {
+      timestamp: new Date().toISOString(),
+      requestId: getRequestId(),
+      ...meta
+    }
+  };
+}
+
+function createPaginatedResponse(items, totalCount, page, limit) {
+  return createSuccessResponse(items, {
+    pagination: {
+      total: totalCount,
+      page,
+      limit,
+      pages: Math.ceil(totalCount / limit)
+    }
+  });
+}
+
+function createErrorResponse(error, code = 'OPERATION_FAILED') {
+  return {
+    success: false,
+    error: {
+      code,
+      message: error.message || 'Operation failed',
+      details: process.env.NODE_ENV === 'production' ? undefined : error.stack
+    },
+    meta: {
+      timestamp: new Date().toISOString(),
+      requestId: getRequestId()
+    }
+  };
+}
+```
+
+### Handler Implementation
+
+1. **Domain-Based Handler Organization**
+   - Group function handlers by domain rather than operation type
+   - Implement handlers with consistent patterns for both AI and non-AI use cases
+   - Ensure proper authentication and authorization in all handlers
+   - Support cross-cutting concerns like logging, validation, and error handling
+   - Maintain separation of concerns between function handlers and business logic
+
+```javascript
+// Example domain-specific handler with multiple operation types
+function createLoanOperationsHandler() {
+  return {
+    // Get loan by ID
+    async getEntityById(args) {
+      const { id, include = [] } = args;
+      
+      if (args.entityType !== 'loan') {
+        throw new Error('Invalid entity type for loan handler');
+      }
+      
+      try {
+        // Check if loan exists
+        const loan = await LoanService.findById(id);
+        
+        if (!loan) {
+          return createErrorResponse(
+            new Error(`Loan with ID ${id} not found`),
+            'ENTITY_NOT_FOUND'
+          );
+        }
+        
+        // Handle includes (related data)
+        let result = { ...loan };
+        if (include.includes('borrower')) {
+          result.borrower = await BorrowerService.findById(loan.borrower_id);
+        }
+        if (include.includes('payments')) {
+          result.payments = await PaymentService.findByLoanId(id);
+        }
+        if (include.includes('collateral')) {
+          result.collateral = await CollateralService.findByLoanId(id);
+        }
+        
+        return createSuccessResponse(result);
+      } catch (error) {
+        LogService.error(`Error getting loan ${id}:`, error);
+        return createErrorResponse(error);
+      }
+    },
+    
+    // List loans with filtering
+    async listEntities(args) {
+      const { filters = {}, sort = 'created_at:desc', page = 1, limit = 20 } = args;
+      
+      if (args.entityType !== 'loan') {
+        throw new Error('Invalid entity type for loan handler');
+      }
+      
+      try {
+        const { items, total } = await LoanService.findAll({
+          filters,
+          sort,
+          page,
+          limit
+        });
+        
+        return createPaginatedResponse(items, total, page, limit);
+      } catch (error) {
+        LogService.error('Error listing loans:', error);
+        return createErrorResponse(error);
+      }
+    },
+    
+    // Create loan
+    async createEntity(args) {
+      const { data } = args;
+      
+      if (args.entityType !== 'loan') {
+        throw new Error('Invalid entity type for loan handler');
+      }
+      
+      try {
+        // Validate loan data
+        const validationResult = validateLoanData(data);
+        if (!validationResult.isValid) {
+          return createErrorResponse(
+            new Error(`Invalid loan data: ${validationResult.message}`),
+            'VALIDATION_ERROR'
+          );
+        }
+        
+        // Create the loan
+        const loan = await LoanService.create(data);
+        
+        // Log the creation
+        LogService.info(`Loan created with ID ${loan.id}`, {
+          loan_id: loan.id,
+          borrower_id: loan.borrower_id,
+          amount: loan.amount
+        });
+        
+        return createSuccessResponse(loan);
+      } catch (error) {
+        LogService.error('Error creating loan:', error);
+        return createErrorResponse(error);
+      }
+    }
+    
+    // Additional handlers for update, delete, etc.
+  };
+}
+```
+
+2. **Function Routing Framework**
+   - Implement a consistent routing mechanism for all MCP functions
+   - Support versioning in the function routing layer
+   - Map functions to appropriate domain handlers
+   - Ensure proper authorization before dispatching to handlers
+   - Implement request validation before handler execution
+
+```javascript
+// Example MCP function router
+class McpFunctionRouter {
+  constructor() {
+    this.handlers = new Map();
+  }
+  
+  // Register a domain handler with its supported functions
+  registerHandler(domainName, handlerObject) {
+    Object.entries(handlerObject).forEach(([functionName, handlerFn]) => {
+      this.handlers.set(`${domainName}.${functionName}`, handlerFn);
+    });
+  }
+  
+  // Get a handler for a specific function
+  getHandler(functionName) {
+    // Check for domain-prefixed handler first
+    if (functionName.includes('.')) {
+      return this.handlers.get(functionName);
+    }
+    
+    // Fall back to direct function name lookup
+    return this.handlers.get(functionName);
+  }
+  
+  // Execute a function with arguments
+  async executeFunction(functionName, args, context) {
+    const handler = this.getHandler(functionName);
+    
+    if (!handler) {
+      throw new Error(`Unknown function: ${functionName}`);
+    }
+    
+    // Log function execution
+    LogService.debug(`Executing MCP function: ${functionName}`, {
+      args: JSON.stringify(args),
+      user: context.user?.id || 'anonymous'
+    });
+    
+    try {
+      // Execute the handler with args and context
+      const result = await handler(args, context);
+      
+      // Log success with minimal result info (avoid logging full payload)
+      LogService.debug(`MCP function ${functionName} executed successfully`, {
+        success: result.success,
+        resultType: result.data ? typeof result.data : 'undefined',
+        error: result.error ? result.error.code : undefined
+      });
+      
+      return result;
+    } catch (error) {
+      // Log unhandled errors
+      LogService.error(`Unhandled error in MCP function ${functionName}:`, error);
+      
+      // Return standard error response
+      return createErrorResponse(error, 'UNHANDLED_ERROR');
+    }
+  }
+}
+```
+
+### Client Integration
+
+1. **Unified Client Implementation**
+   - Create a consistent client interface for all service operations
+   - Abstract the transport mechanism behind a simple function call API
+   - Support both RPC-style and promise-based patterns
+   - Handle authentication and token refresh transparently
+   - Implement consistent error handling and retry logic
+
+```javascript
+// Example unified MCP client
+class McpClient {
+  constructor(config) {
+    this.baseUrl = config.baseUrl || '/api/mcp';
+    this.defaultTimeout = config.timeout || 30000;
+    this.authProvider = config.authProvider;
+  }
+  
+  // Core method to execute any MCP function
+  async execute(functionName, args = {}, options = {}) {
+    const timeout = options.timeout || this.defaultTimeout;
+    const abortController = new AbortController();
+    const timeoutId = setTimeout(() => abortController.abort(), timeout);
+    
+    try {
+      // Get auth token if available
+      const token = this.authProvider ? await this.authProvider.getToken() : null;
+      
+      // Prepare headers
+      const headers = {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(options.headers || {})
+      };
+      
+      // Make request
+      const response = await fetch(this.baseUrl, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          function: functionName,
+          arguments: args,
+          requestId: options.requestId || generateRequestId(),
+          timestamp: new Date().toISOString()
+        }),
+        signal: abortController.signal
+      });
+      
+      // Clear timeout
+      clearTimeout(timeoutId);
+      
+      // Handle non-OK responses
+      if (!response.ok) {
+        const errorBody = await response.json().catch(() => ({}));
+        throw new McpClientError(
+          errorBody.error?.message || `Request failed with status ${response.status}`,
+          response.status,
+          errorBody.error
+        );
+      }
+      
+      // Parse and return response
+      const result = await response.json();
+      
+      if (!result.success && result.error) {
+        throw new McpClientError(
+          result.error.message, 
+          result.error.code, 
+          result.error
+        );
+      }
+      
+      return result.data;
+    } catch (error) {
+      // Handle aborted requests
+      if (error.name === 'AbortError') {
+        throw new McpClientError('Request timed out', 'TIMEOUT');
+      }
+      
+      // Rethrow client errors
+      if (error instanceof McpClientError) {
+        throw error;
+      }
+      
+      // Wrap other errors
+      throw new McpClientError(error.message, 'CLIENT_ERROR', { originalError: error });
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }
+  
+  // Convenience methods for common operations
+  async getEntity(entityType, id, include = []) {
+    return this.execute('getEntityById', { entityType, id, include });
+  }
+  
+  async listEntities(entityType, options = {}) {
+    return this.execute('listEntities', { 
+      entityType, 
+      ...options 
+    });
+  }
+  
+  async createEntity(entityType, data) {
+    return this.execute('createEntity', { entityType, data });
+  }
+  
+  async updateEntity(entityType, id, data, partial = true) {
+    return this.execute('updateEntity', { entityType, id, data, partial });
+  }
+  
+  async deleteEntity(entityType, id, soft = true) {
+    return this.execute('deleteEntity', { entityType, id, soft });
+  }
+}
+
+// Custom error class for client errors
+class McpClientError extends Error {
+  constructor(message, code, details) {
+    super(message);
+    this.name = 'McpClientError';
+    this.code = code;
+    this.details = details;
+  }
+}
+```
+
+2. **Progressive Enhancement with AI**
+   - Design functions to start with basic data operations
+   - Add AI-powered enhancements incrementally
+   - Maintain backward compatibility when adding AI features
+   - Separate core business logic from AI augmentation
+   - Document AI vs. non-AI behavior for each function
+
+```javascript
+// Example of progressive enhancement from data retrieval to AI analysis
+async function handleGetBorrowerDefaultRisk(args, context) {
+  const { borrowerId, useAI = true } = args;
+  
+  try {
+    // First, get the basic borrower data (non-AI operation)
+    const borrower = await BorrowerService.findById(borrowerId);
+    
+    if (!borrower) {
+      return createErrorResponse(
+        new Error(`Borrower with ID ${borrowerId} not found`),
+        'ENTITY_NOT_FOUND'
+      );
+    }
+    
+    // Get the loan data (non-AI operation)
+    const loans = await LoanService.findByBorrowerId(borrowerId);
+    const payments = await PaymentService.findByBorrowerId(borrowerId);
+    
+    // Calculate basic risk metrics (non-AI operation)
+    const basicRiskMetrics = calculateBasicRiskMetrics(borrower, loans, payments);
+    
+    // If AI is not requested or unavailable, return basic metrics
+    if (!useAI || !config.aiEnabled) {
+      return createSuccessResponse({
+        borrower_id: borrowerId,
+        risk_score: basicRiskMetrics.riskScore,
+        risk_level: basicRiskMetrics.riskLevel,
+        factors: basicRiskMetrics.factors,
+        ai_enhanced: false
+      });
+    }
+    
+    // Enhance with AI if requested and available
+    try {
+      const aiRiskAssessment = await AiService.assessDefaultRisk({
+        borrower,
+        loans,
+        payments,
+        basicMetrics: basicRiskMetrics
+      });
+      
+      return createSuccessResponse({
+        borrower_id: borrowerId,
+        risk_score: aiRiskAssessment.riskScore,
+        risk_level: aiRiskAssessment.riskLevel,
+        factors: aiRiskAssessment.factors,
+        recommendations: aiRiskAssessment.recommendations,
+        explanation: aiRiskAssessment.explanation,
+        ai_enhanced: true
+      });
+    } catch (aiError) {
+      // AI enhancement failed, fall back to basic metrics
+      LogService.warn(`AI risk assessment failed for borrower ${borrowerId}:`, aiError);
+      
+      return createSuccessResponse({
+        borrower_id: borrowerId,
+        risk_score: basicRiskMetrics.riskScore,
+        risk_level: basicRiskMetrics.riskLevel,
+        factors: basicRiskMetrics.factors,
+        ai_enhanced: false,
+        ai_error: 'Risk assessment could not be AI-enhanced due to an error'
+      });
+    }
+  } catch (error) {
+    LogService.error(`Error in borrower risk assessment for ${borrowerId}:`, error);
+    return createErrorResponse(error);
+  }
+}
+```
+
+### Migration from REST/RPC
+
+1. **Phased Migration Strategy**
+   - Start with high-value endpoints for initial conversion
+   - Implement parallel endpoints during transition (both REST and MCP)
+   - Create adapters to bridge REST and MCP during migration
+   - Define clear deprecation timelines for REST endpoints
+   - Document migration paths for API consumers
+
+```javascript
+// Example adapter for bridging REST and MCP
+function createRestToMcpAdapter(app, mcpRouter) {
+  // GET endpoint adapter
+  app.get('/api/loans/:id', async (req, res) => {
+    try {
+      // Translate REST request to MCP function call
+      const result = await mcpRouter.executeFunction('getEntityById', {
+        entityType: 'loan',
+        id: req.params.id,
+        include: req.query.include ? req.query.include.split(',') : []
+      }, {
+        user: req.user
+      });
+      
+      // Map MCP response to REST response
+      if (!result.success) {
+        const statusCode = result.error.code === 'ENTITY_NOT_FOUND' ? 404 : 500;
+        return res.status(statusCode).json({ error: result.error });
+      }
+      
+      res.json(result.data);
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+  
+  // LIST endpoint adapter
+  app.get('/api/loans', async (req, res) => {
+    try {
+      // Translate query parameters to filters
+      const filters = {};
+      Object.entries(req.query).forEach(([key, value]) => {
+        if (!['page', 'limit', 'sort', 'include'].includes(key)) {
+          filters[key] = value;
+        }
+      });
+      
+      // Execute MCP function
+      const result = await mcpRouter.executeFunction('listEntities', {
+        entityType: 'loan',
+        filters,
+        page: parseInt(req.query.page) || 1,
+        limit: parseInt(req.query.limit) || 20,
+        sort: req.query.sort || 'created_at:desc'
+      }, {
+        user: req.user
+      });
+      
+      // Map response
+      if (!result.success) {
+        return res.status(500).json({ error: result.error });
+      }
+      
+      // Format for REST convention
+      res.json({
+        items: result.data,
+        pagination: result.meta.pagination
+      });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+  
+  // POST endpoint adapter
+  app.post('/api/loans', async (req, res) => {
+    try {
+      const result = await mcpRouter.executeFunction('createEntity', {
+        entityType: 'loan',
+        data: req.body
+      }, {
+        user: req.user
+      });
+      
+      if (!result.success) {
+        const statusCode = result.error.code === 'VALIDATION_ERROR' ? 400 : 500;
+        return res.status(statusCode).json({ error: result.error });
+      }
+      
+      res.status(201).json(result.data);
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+  
+  // Implement other REST methods (PUT, PATCH, DELETE) in similar fashion
+}
+```
+
+2. **Client Migration Guidance**
+   - Provide clear documentation for migrating from REST to MCP
+   - Offer client libraries that support both REST and MCP
+   - Support feature detection to gracefully handle capability differences
+   - Implement graceful degradation for older clients
+   - Provide tools to validate and test client migrations
+
+### Performance Considerations
+
+1. **Optimizing for Non-AI Use Cases**
+   - Implement batching for multiple operations
+   - Support partial responses to minimize payload size
+   - Use compression for response data
+   - Implement efficient caching strategies
+   - Support both polling and push-based updates
+
+```javascript
+// Example batched MCP function
+async function executeBatch(args, context) {
+  const { operations, continueOnError = false } = args;
+  
+  const results = [];
+  let hasError = false;
+  
+  for (const op of operations) {
+    try {
+      const result = await mcpRouter.executeFunction(op.function, op.arguments, context);
+      results.push({
+        id: op.id,
+        success: result.success,
+        data: result.data,
+        error: result.error
+      });
+      
+      // Stop on first error if continueOnError is false
+      if (!result.success && !continueOnError) {
+        hasError = true;
+        break;
+      }
+    } catch (error) {
+      results.push({
+        id: op.id,
+        success: false,
+        error: {
+          message: error.message,
+          code: 'OPERATION_FAILED'
+        }
+      });
+      
+      if (!continueOnError) {
+        hasError = true;
+        break;
+      }
+    }
+  }
+  
+  return createSuccessResponse(results, {
+    batchComplete: !hasError || continueOnError,
+    operationCount: operations.length,
+    completedCount: results.length
+  });
+}
+```
+
+## Examples
+
+### Example 1: CRUD Operations with MCP
+
+```javascript
+// Server-side - MCP function handler for loan operations
+const loanHandler = {
+  async getEntityById(args, context) {
+    const { id } = args;
+    
+    // Authentication check
+    if (!context.user) {
+      return createErrorResponse(new Error('Authentication required'), 'UNAUTHORIZED');
+    }
+    
+    try {
+      // Get loan data
+      const loan = await db.loans.findOne({ loan_id: id });
+      
+      if (!loan) {
+        return createErrorResponse(new Error(`Loan ${id} not found`), 'NOT_FOUND');
+      }
+      
+      // Authorization check - only authorized users can access a loan
+      if (!await hasAccess(context.user, 'loan', id, 'read')) {
+        return createErrorResponse(new Error('Access denied'), 'FORBIDDEN');
+      }
+      
+      return createSuccessResponse(loan);
+    } catch (error) {
+      return createErrorResponse(error);
+    }
+  },
+  
+  async createEntity(args, context) {
+    const { data } = args;
+    
+    // Authentication & authorization check
+    if (!context.user) {
+      return createErrorResponse(new Error('Authentication required'), 'UNAUTHORIZED');
+    }
+    
+    if (!hasRole(context.user, 'loan_officer')) {
+      return createErrorResponse(new Error('Only loan officers can create loans'), 'FORBIDDEN');
+    }
+    
+    try {
+      // Validate loan data
+      const errors = validateLoan(data);
+      if (errors.length > 0) {
+        return createErrorResponse(
+          new Error(`Invalid loan data: ${errors.join(', ')}`),
+          'VALIDATION_ERROR'
+        );
+      }
+      
+      // Create loan with audit trail
+      const loan = await db.loans.create({
+        ...data,
+        created_by: context.user.id,
+        created_at: new Date()
+      });
+      
+      // Log the creation
+      logger.info(`Loan ${loan.loan_id} created by ${context.user.id}`);
+      
+      return createSuccessResponse(loan);
+    } catch (error) {
+      return createErrorResponse(error);
+    }
+  }
+};
+
+// Client-side - Using MCP client for loan operations
+async function createNewLoan() {
+  const loanData = {
+    borrower_id: 'B001',
+    amount: 250000,
+    interest_rate: 4.5,
+    term_months: 60,
+    purpose: 'Equipment purchase',
+    start_date: '2023-05-15'
+  };
+  
+  try {
+    // Using MCP for data operation
+    const newLoan = await mcpClient.execute('createEntity', {
+      entityType: 'loan',
+      data: loanData
+    });
+    
+    console.log('Loan created successfully:', newLoan);
+    return newLoan;
+  } catch (error) {
+    console.error('Failed to create loan:', error);
+    throw error;
+  }
+}
+
+async function getLoanDetails(loanId) {
+  try {
+    // Using MCP for data retrieval
+    const loan = await mcpClient.execute('getEntityById', {
+      entityType: 'loan',
+      id: loanId,
+      include: ['borrower', 'payments']
+    });
+    
+    return loan;
+  } catch (error) {
+    console.error(`Failed to get loan ${loanId}:`, error);
+    throw error;
+  }
+}
+```
+
+### Example 2: Transitioning from REST API to MCP
+
+```javascript
+// Before: Traditional REST API client
+class LoanApiClient {
+  constructor(baseUrl) {
+    this.baseUrl = baseUrl;
+  }
+  
+  async getLoans(filters = {}) {
+    const queryParams = new URLSearchParams(filters);
+    const response = await fetch(`${this.baseUrl}/loans?${queryParams}`);
+    
+    if (!response.ok) {
+      throw new Error(`Failed to get loans: ${response.statusText}`);
+    }
+    
+    return response.json();
+  }
+  
+  async getLoan(id) {
+    const response = await fetch(`${this.baseUrl}/loans/${id}`);
+    
+    if (!response.ok) {
+      throw new Error(`Failed to get loan ${id}: ${response.statusText}`);
+    }
+    
+    return response.json();
+  }
+  
+  async createLoan(data) {
+    const response = await fetch(`${this.baseUrl}/loans`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Failed to create loan: ${response.statusText}`);
+    }
+    
+    return response.json();
+  }
+  
+  // Other methods for update, delete, etc.
+}
+
+// After: Transitioning to MCP with backward compatibility
+class EnhancedLoanClient {
+  constructor(config) {
+    this.config = config;
+    this.useMcp = config.useMcp !== false;
+    
+    // Create underlying clients
+    if (this.useMcp) {
+      this.mcpClient = new McpClient({
+        baseUrl: config.mcpUrl || '/api/mcp',
+        authProvider: config.authProvider
+      });
+    }
+    
+    // Keep REST client for fallback or if MCP is disabled
+    this.restClient = new LoanApiClient(config.restUrl || '/api');
+  }
+  
+  async getLoans(filters = {}) {
+    if (this.useMcp) {
+      try {
+        return await this.mcpClient.execute('listEntities', {
+          entityType: 'loan',
+          filters,
+          page: filters.page,
+          limit: filters.limit,
+          sort: filters.sort
+        });
+      } catch (error) {
+        // Log error and fall back to REST
+        console.warn('MCP getLoans failed, falling back to REST:', error);
+      }
+    }
+    
+    // Use REST API as fallback
+    return this.restClient.getLoans(filters);
+  }
+  
+  async getLoan(id, options = {}) {
+    if (this.useMcp) {
+      try {
+        return await this.mcpClient.execute('getEntityById', {
+          entityType: 'loan',
+          id,
+          include: options.include || []
+        });
+      } catch (error) {
+        console.warn(`MCP getLoan failed for ${id}, falling back to REST:`, error);
+      }
+    }
+    
+    // Use REST API as fallback
+    return this.restClient.getLoan(id);
+  }
+  
+  async createLoan(data) {
+    if (this.useMcp) {
+      try {
+        return await this.mcpClient.execute('createEntity', {
+          entityType: 'loan',
+          data
+        });
+      } catch (error) {
+        console.warn('MCP createLoan failed, falling back to REST:', error);
+      }
+    }
+    
+    // Use REST API as fallback
+    return this.restClient.createLoan(data);
+  }
+  
+  // Progressive enhancement example - AI-powered risk assessment
+  // (Only available via MCP)
+  async assessLoanRisk(loanId, options = {}) {
+    if (!this.useMcp) {
+      throw new Error('Risk assessment requires MCP support');
+    }
+    
+    return this.mcpClient.execute('assessLoanRisk', {
+      loanId,
+      useAI: options.useAI !== false,
+      factors: options.factors || 'all'
+    });
+  }
+}
+```
+
+## Enforcement
+
+1. **Migration Planning**
+   - Identify all existing REST endpoints and create MCP function equivalents
+   - Document mapping between REST endpoints and MCP functions
+   - Establish metrics to track migration progress
+   - Set clear deprecation schedules for REST endpoints
+
+2. **Code Reviews**
+   - Review MCP function definitions for completeness and consistency
+   - Ensure all function handlers follow the standardized pattern
+   - Verify proper error handling and validation
+   - Check response formats for consistency
+
+3. **Testing Requirements**
+   - Write comparative tests between REST and MCP implementations
+   - Implement performance benchmarks for MCP vs REST
+   - Create integration tests covering all MCP functions
+   - Test error conditions and edge cases
+
+4. **Documentation**
+   - Document all available MCP functions in a central registry
+   - Create migration guides for API consumers
+   - Document performance characteristics and limitations
+   - Provide code examples for common operations
+
+## Implementation Guide
+
+For detailed examples and implementation patterns, see the [MCP as Service Protocol guide](mdc:examples/mcp/02-mcp-service-protocol.md).
+
+For a comprehensive overview of all MCP implementation approaches, start with the [MCP Implementation Guide](mdc:examples/mcp/01-mcp-implementation-guide.md).

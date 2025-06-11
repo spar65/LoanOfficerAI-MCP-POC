@@ -1,0 +1,186 @@
+{
+  "timestamp": "2025-05-29T21:11:29.394Z",
+  "summary": {
+    "total": 14,
+    "passed": 14,
+    "failed": 0,
+    "passRate": "100.0"
+  },
+  "categories": {
+    "BASIC_LOAN_INFORMATION": {
+      "total": 5,
+      "passed": 5,
+      "failed": 0,
+      "details": [
+        {
+          "test": "Active Loans",
+          "passed": true,
+          "reason": "Contains most expected concepts (2/3)",
+          "response": {
+            "role": "assistant",
+            "content": "Here are the details of active loans:\n\n1. **Loan ID:** L001\n   - **Borrower:** John Doe\n   - **Loan Amount:** $50,000\n   - **Interest Rate:** 3.5%\n   - **Term Length:** 60 months\n   - **Start Date:** January 1, 2024\n   - **End Date:** January 1, 2029\n   - **Loan Type:** Farm Equipment\n   - **Borrower Details:**\n     - **Address:** 123 Farm Rd, Smalltown, USA\n     - **Phone:** 555-1234\n     - **Email:** john@example.com\n     - **Credit Score:** 750\n     - **Income:** $100,000\n     - **Farm Size:** 500 acres\n     - **Farm Type:** Crop\n\n2. **Loan ID:** L002\n   - **Borrower:** Jane Smith\n   - **Loan Amount:** $30,000\n   - **Interest Rate:** 4%\n   - **Term Length:** 36 months\n   - **Start Date:** June 15, 2024\n   - **End Date:** June 15, 2027\n   - **Loan Type:** Crop Production\n   - **Borrower Details:**\n     - **Address:** 456 Barn Ave, Smalltown, USA\n     - **Phone:** 555-5678\n     - **Email:** jane@example.com\n     - **Credit Score:** 720\n     - **Income:** $80,000\n     - **Farm Size:** 300 acres\n     - **Farm Type:** Livestock\n\n3. **Loan ID:** L005\n   - **Borrower:** Charlie Davis\n   - **Loan Amount:** $25,000\n   - **Interest Rate:** 3.2%\n   - **Term Length:** 36 months\n   - **Start Date:** November 5, 2024\n   - **End Date:** November 5, 2028\n   - **Loan Type:** Operating Expenses\n   - **Borrower Details:**\n     - **Address:** 202 Tractor Ln, Smalltown, USA\n     - **Phone:** 555-7890\n     - **Email:** charlie@example.com\n     - **Credit Score:** 700\n     - **Income:** $75,000\n     - **Farm Size:** 250 acres\n     - **Farm Type:** Livestock\n\n4. **Loan ID:** L007\n   - **Borrower:** Frank Garcia\n   - **Loan Amount:** $15,000\n   - **Interest Rate:** 2.8%\n   - **Term Length:** 12 months\n   - **Start Date:** September 10, 2024\n   - **End Date:** September 10, 2025\n   - **Loan Type:** Agricultural Supplies\n   - **Borrower Details:**\n     - **Address:** 404 Harvest St, Smalltown, USA\n     - **Phone:** 555-5432\n     - **Email:** frank@example.com\n     - **Credit Score:** 760\n     - **Income:** $65,000\n     - **Farm Size:** 100 acres\n     - **Farm Type:** Mixed\n\n5. **Loan ID:** L009\n   - **Borrower:** Henry Ivy\n   - **Loan Amount:** $28,000\n   - **Interest Rate:** 3.6%\n   - **Term Length:** 36 months\n   - **Start Date:** December 1, 2024\n   - **End Date:** December 1, 2028\n   - **Loan Type:** Irrigation System\n   - **Borrower Details:**\n     - **Address:** 606 Silo Ln, Smalltown, USA\n     - **Phone:** 555-7654\n     - **Email:** henry@example.com\n     - **Credit Score:** 730\n     - **Income:** $78,000\n     - **Farm Size:** 280 acres\n     - **Farm Type:** Crop\n\nIf you need more details or have specific questions about these loans, feel free to ask!",
+            "refusal": null,
+            "annotations": []
+          }
+        },
+        {
+          "test": "Loan Details",
+          "passed": true,
+          "reason": "Contains most expected concepts (2/3)",
+          "response": {
+            "role": "assistant",
+            "content": "Here are the details for loan **L001**:\n\n### Loan Details\n- **Loan ID:** L001\n- **Borrower:** John Doe\n- **Loan Amount:** $50,000\n- **Interest Rate:** 3.5%\n- **Term Length:** 60 months\n- **Start Date:** January 1, 2024\n- **End Date:** January 1, 2029\n- **Status:** Active\n- **Loan Type:** Farm Equipment\n\n### Borrower Details\n- **Name:** John Doe\n- **Address:** 123 Farm Rd, Smalltown, USA\n- **Phone:** 555-1234\n- **Email:** john@example.com\n- **Credit Score:** 750\n- **Income:** $100,000\n- **Farm Details:** \n  - **Size:** 500 acres\n  - **Type:** Crop\n\n### Payments\n- **Payment 1:** February 1, 2024 - $1,000 (On Time)\n- **Payment 2:** March 1, 2024 - $1,000 (On Time)\n- **Payment 3:** April 1, 2024 - $1,000 (Late)\n- **Payment 11:** May 1, 2024 - $1,000 (On Time)\n- **Payment 12:** June 1, 2024 - $1,000 (Late)\n- **Payment 13:** July 1, 2024 - $1,000 (On Time)\n- **Payment 14:** August 1, 2024 - $1,000 (On Time)\n- **Payment 15:** September 1, 2024 - $1,000 (On Time)\n\n### Collateral\n- **Collateral Description:** 100 acres of farmland\n- **Value:** $75,000\n\nIf you need more details or have additional questions, feel free to ask!",
+            "refusal": null,
+            "annotations": []
+          }
+        },
+        {
+          "test": "Loan Status",
+          "passed": true,
+          "reason": "Contains expected concepts",
+          "response": {
+            "role": "assistant",
+            "content": "The status of loan L002 is Active.",
+            "refusal": null,
+            "annotations": []
+          }
+        },
+        {
+          "test": "Borrower Loans",
+          "passed": true,
+          "reason": "Contains expected concepts",
+          "response": {
+            "role": "assistant",
+            "content": "There are no loans found for borrower B001.",
+            "refusal": null,
+            "annotations": []
+          }
+        },
+        {
+          "test": "Portfolio Summary",
+          "passed": true,
+          "reason": "Contains expected concepts",
+          "response": {
+            "role": "assistant",
+            "content": "Here's a summary of your loan portfolio:\n\n- **Total Loans:** 10\n- **Active Loans:** 5\n- **Total Loan Amount:** $320,000\n- **Delinquency Rate:** 10%\n\nThis provides an overview of your current lending activities, highlighting both the volume and financial aspects, as well as the proportion of loans that are currently delinquent.",
+            "refusal": null,
+            "annotations": []
+          }
+        }
+      ]
+    },
+    "RISK_ASSESSMENT": {
+      "total": 4,
+      "passed": 4,
+      "failed": 0,
+      "details": [
+        {
+          "test": "Default Risk",
+          "passed": true,
+          "reason": "Contains expected concepts",
+          "response": {
+            "role": "assistant",
+            "content": "The default risk for borrower B003, Alice Johnson, is assessed with a risk score of 45, which corresponds to a medium risk level over a 3-month time horizon. The recommendations indicate that standard monitoring procedures are sufficient for managing this risk.",
+            "refusal": null,
+            "annotations": []
+          }
+        },
+        {
+          "test": "Non-Accrual Risk",
+          "passed": true,
+          "reason": "Contains most expected concepts (2/3)",
+          "response": {
+            "role": "assistant",
+            "content": "Based on the analysis for borrower B001 (John Doe), there is a 30% probability that the borrower may become non-accrual. The borrower is currently flagged as \"Monitoring Advised\" due to consecutive late payments, although there has only been 1 incident so far. The recovery probability is relatively high at 90%, which is a positive sign. It may be wise to continue monitoring the borrower's payment behavior closely to prevent any further issues.",
+            "refusal": null,
+            "annotations": []
+          }
+        },
+        {
+          "test": "High-Risk Farmers",
+          "passed": true,
+          "reason": "Contains expected concepts",
+          "response": {
+            "role": "assistant",
+            "content": "Currently, there are no farmers identified at high risk of default. Among the analyzed borrowers, most are categorized as having low risk, with one being at medium risk. If you need further insights or recommendations, please let me know!",
+            "refusal": null,
+            "annotations": []
+          }
+        },
+        {
+          "test": "Collateral Sufficiency",
+          "passed": true,
+          "reason": "Contains expected concepts",
+          "response": {
+            "role": "assistant",
+            "content": "Yes, the collateral for loan L001 is sufficient. The loan has a 67.0% loan-to-value ratio, which is below the industry standard threshold of 80.0%, indicating adequate collateral coverage. The collateral consists of 100 acres of farmland valued at $75,000, against a current loan balance of $50,000, providing a reasonable equity margin. Market conditions are stable and support this assessment.",
+            "refusal": null,
+            "annotations": []
+          }
+        }
+      ]
+    },
+    "PREDICTIVE_ANALYTICS": {
+      "total": 5,
+      "passed": 5,
+      "failed": 0,
+      "details": [
+        {
+          "test": "Equipment Costs",
+          "passed": true,
+          "reason": "Contains expected concepts",
+          "response": {
+            "role": "assistant",
+            "content": "For borrower B001, the expected equipment maintenance costs for next year are as follows:\n\n- **Total Annual Maintenance Cost:** $7,400\n- **Immediate Major Repairs Cost:** $0\n\n### Equipment Details:\n1. **Equipment 1:**\n   - Annual Maintenance Cost: $2,400\n   - Major Repairs Needed: No\n\n2. **Equipment 2:**\n   - Annual Maintenance Cost: $5,000\n   - Major Repairs Needed: No\n\n**Maintenance Recommendations:**\n- Schedule regular preventive maintenance to avoid unexpected repairs.\n\nThis encompasses the costs and recommendations for maintaining both pieces of equipment for the upcoming year.",
+            "refusal": null,
+            "annotations": []
+          }
+        },
+        {
+          "test": "Crop Yield Risk",
+          "passed": true,
+          "reason": "Contains expected concepts",
+          "response": {
+            "role": "assistant",
+            "content": "For the current season, borrower B002 (Jane Smith) has a low crop yield risk. Here's a detailed breakdown:\n\n- **Farm Type**: Livestock\n- **Total Acres**: 300\n- **Crops**: Hay\n  - **Acres**: 150\n  - **Expected Yield**: 4.5 tons per acre\n  - **Break-Even Yield**: 2.22 tons per acre\n  - **Yield Risk Score**: 0.26\n  - **Probability of Yield Below Break-Even**: 5%\n  - **Risk Level**: Low\n  - **Estimated Profit Per Acre**: $410\n\n**Overall Risk Level**: Low  \n**Overall Break-Even Risk**: 5%\n\n**Recommendations**:\n- Consider diversifying crops to further reduce overall yield risk.\n- Closely monitor spring planting conditions and adjust plans as needed.\n\nThese steps can help manage risks and optimize potential profit during this season.",
+            "refusal": null,
+            "annotations": []
+          }
+        },
+        {
+          "test": "Market Impact",
+          "passed": true,
+          "reason": "Contains expected concepts",
+          "response": {
+            "role": "assistant",
+            "content": "The market prices will significantly affect borrower B003 (Alice Johnson) who is involved in crop farming. Here's a detailed analysis of the impact:\n\n### Commodity Impacts:\n\n1. **Corn**:\n   - **Current Price**: $5.60\n   - **Price Trend**: -10% decline\n   - **Projected Price**: $5.04\n   - **Current Value**: $58,800\n   - **Projected Value**: $52,920\n   - **Financial Impact**: -$5,880\n   - **Income Impact**: -8.3%\n   - **Downside Risks**:\n     - 10% further decline: -$4,998\n     - 20% further decline: -$9,996\n   - **Market Volatility**: 0.22 (High)\n   - **Price Risk Level**: High\n\n2. **Soybeans**:\n   - **Current Price**: $13.20\n   - **Price Trend**: 5% increase\n   - **Projected Price**: $13.86\n   - **Current Value**: $32,670\n   - **Projected Value**: $34,304\n   - **Financial Impact**: +$1,634\n   - **Income Impact**: +2.2%\n   - **Downside Risks**:\n     - 10% decline: -$2,614\n     - 20% decline: -$5,227\n   - **Market Volatility**: 0.19 (Medium)\n   - **Price Risk Level**: Medium\n\n### Overall Financial Impact:\n- **Projected Income Change**: -$4,246\n- **Projected Income Change Percent**: -7.1%\n- **Worst Case Impact**: -$15,223 (25.4% income decline)\n- **Market Risk Level**: Medium\n\n### Recommendations:\n- **Corn**: Consider implementing price hedging strategies due to high price volatility.\n- Develop a contingency plan for potential market price drops to safeguard farm income.\n- Given current market trends, which indicate a potential negative impact on income, consider diversifying production to mitigate risks.\n\nAlice should stay informed about market trends and be proactive in managing price risks through strategic planning and possibly exploring alternative income sources or crop diversification.",
+            "refusal": null,
+            "annotations": []
+          }
+        },
+        {
+          "test": "Refinancing Options",
+          "passed": true,
+          "reason": "Contains expected concepts",
+          "response": {
+            "role": "assistant",
+            "content": "Here are the refinancing options available for loan L001:\n\n1. **Lower Rate Refinance (Option ID: REFI-1):**\n   - **New Rate:** 3%\n   - **New Term:** 42 months\n   - **Monthly Payment:** $1,255.56\n   - **Monthly Payment Savings:** -$345.97 (increase in payment)\n   - **Total Interest Savings:** -$14,530.68 (increase in interest over the term)\n\n2. **Shorter Term Refinance (Option ID: REFI-2):**\n   - **New Rate:** 3.25%\n   - **New Term:** 33 months\n   - **Monthly Payment:** $1,585.92\n   - **Monthly Payment Increase:** $676.33\n   - **Total Interest Savings:** -$14,132.62 (increase in interest over the term)\n\nRefinancing is recommended, though these options suggest an increase in both payments and total interest cost over the terms provided. Please consider these details carefully and assess whether refinancing aligns with your financial goals and capabilities.",
+            "refusal": null,
+            "annotations": []
+          }
+        },
+        {
+          "test": "Payment Patterns",
+          "passed": true,
+          "reason": "Contains expected concepts",
+          "response": {
+            "role": "assistant",
+            "content": "Over the last year, borrower B001 (John Doe) made a total of four payments. Here's a summary of the payment patterns:\n\n- 25% of the payments were late, with 1 out of 4 payments not being on time.\n- The seasonality score, which indicates how much payments are affected by particular times of the year, is 0.75.\n- The consistency score, reflecting how regularly payments are made, is also 0.75.\n\nIf you have any more questions or need further analysis, feel free to ask!",
+            "refusal": null,
+            "annotations": []
+          }
+        }
+      ]
+    }
+  }
+}

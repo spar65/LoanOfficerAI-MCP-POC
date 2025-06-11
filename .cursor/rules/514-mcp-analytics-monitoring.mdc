@@ -1,0 +1,244 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+description: IMPLEMENT when adding analytics, monitoring, and observability to MCP-based applications
+globs: "**/*.{js,jsx,ts,tsx}"
+
+# 514: MCP Analytics and Monitoring
+
+## Rule
+
+When implementing MCP-based applications, include comprehensive analytics, monitoring, and observability capabilities to track performance, usage patterns, and errors while providing actionable insights into application health and user behavior.
+
+## Context
+
+MCP functions provide a structured approach to application behavior, making them ideal candidates for systematic analytics and monitoring. By instrumenting MCP functions with appropriate telemetry, teams can gain insights into:
+
+1. **Performance Metrics** - Execution times, throughput, and resource utilization
+2. **Error Patterns** - Common failure modes and their frequency
+3. **Usage Analytics** - Which functions are used most frequently and by whom
+4. **Business Insights** - Domain-specific insights derived from function parameters and results
+5. **System Health** - Overall availability and responsiveness of the application
+
+## RuleDetails
+
+### Instrumentation Patterns
+
+1. **MCP Function Telemetry**
+   - Record execution timing for all MCP functions
+   - Track success and failure rates
+   - Monitor resource utilization during execution
+   - Capture operation volume and patterns
+   - Record important business events
+
+2. **Client-Side Analytics**
+   - Track user interactions with MCP-powered interfaces
+   - Measure client-side performance metrics
+   - Capture user journeys and conversion flows
+   - Monitor client-side errors
+   - Implement feature usage tracking
+
+3. **Error Tracking and Alerting**
+   - Implement structured error logging
+   - Set up anomaly detection for error rates
+   - Configure alerts for critical errors
+   - Create error dashboards for visualization
+   - Establish error categorization
+
+## Examples
+
+### Example 1: Implementing MCP Function Telemetry
+
+```javascript
+// Middleware for MCP function monitoring
+function monitoringMiddleware(next) {
+  return async (context) => {
+    const startTime = performance.now();
+    const { functionName, args } = context;
+    
+    try {
+      // Execute the function
+      const result = await next(context);
+      
+      // Record success metrics
+      const duration = performance.now() - startTime;
+      telemetryService.recordSuccess({
+        functionName,
+        duration,
+        argsSize: JSON.stringify(args).length,
+        resultSize: JSON.stringify(result).length
+      });
+      
+      return result;
+    } catch (error) {
+      // Record error metrics
+      const duration = performance.now() - startTime;
+      telemetryService.recordError({
+        functionName,
+        duration,
+        errorType: error.name,
+        errorMessage: error.message
+      });
+      
+      throw error;
+    }
+  };
+}
+```
+
+### Example 2: Analytics Dashboard Integration
+
+```javascript
+// MCP usage analytics dashboard
+function McpAnalyticsDashboard() {
+  const [metrics, setMetrics] = useState({});
+  const [timeRange, setTimeRange] = useState('24h');
+  
+  useEffect(() => {
+    async function fetchMetrics() {
+      const data = await analyticsService.getMcpMetrics(timeRange);
+      setMetrics(data);
+    }
+    
+    fetchMetrics();
+    const intervalId = setInterval(fetchMetrics, 60000);
+    
+    return () => clearInterval(intervalId);
+  }, [timeRange]);
+  
+  return (
+    <div className="analytics-dashboard">
+      <h2>MCP Function Analytics</h2>
+      
+      <div className="time-range-selector">
+        <select value={timeRange} onChange={e => setTimeRange(e.target.value)}>
+          <option value="1h">Last Hour</option>
+          <option value="24h">Last 24 Hours</option>
+          <option value="7d">Last 7 Days</option>
+          <option value="30d">Last 30 Days</option>
+        </select>
+      </div>
+      
+      <div className="metrics-overview">
+        <MetricCard
+          title="Total Executions"
+          value={metrics.totalExecutions}
+          change={metrics.executionChange}
+        />
+        <MetricCard
+          title="Success Rate"
+          value={`${metrics.successRate}%`}
+          change={metrics.successRateChange}
+        />
+        <MetricCard
+          title="Avg Response Time"
+          value={`${metrics.avgResponseTime}ms`}
+          change={metrics.responseTimeChange}
+        />
+        <MetricCard
+          title="Error Rate"
+          value={`${metrics.errorRate}%`}
+          change={metrics.errorRateChange}
+          inverted
+        />
+      </div>
+      
+      <div className="charts-section">
+        <div className="chart">
+          <h3>Function Execution Volume</h3>
+          <TimeSeriesChart
+            data={metrics.executionVolume}
+            xKey="timestamp"
+            yKey="count"
+            color="#4CAF50"
+          />
+        </div>
+        
+        <div className="chart">
+          <h3>Response Time Distribution</h3>
+          <HistogramChart
+            data={metrics.responseTimeDistribution}
+            xKey="bucket"
+            yKey="count"
+            color="#2196F3"
+          />
+        </div>
+        
+        <div className="chart">
+          <h3>Top Functions by Usage</h3>
+          <BarChart
+            data={metrics.topFunctions}
+            xKey="functionName"
+            yKey="count"
+            color="#FF9800"
+          />
+        </div>
+        
+        <div className="chart">
+          <h3>Error Types</h3>
+          <PieChart
+            data={metrics.errorTypes}
+            valueKey="count"
+            labelKey="type"
+            colors={['#F44336', '#E91E63', '#9C27B0', '#673AB7', '#3F51B5']}
+          />
+        </div>
+      </div>
+      
+      <div className="function-details">
+        <h3>Function Details</h3>
+        <table className="metrics-table">
+          <thead>
+            <tr>
+              <th>Function</th>
+              <th>Calls</th>
+              <th>Avg Time</th>
+              <th>P95 Time</th>
+              <th>Error Rate</th>
+              <th>Last Called</th>
+            </tr>
+          </thead>
+          <tbody>
+            {metrics.functionDetails?.map(func => (
+              <tr key={func.name}>
+                <td>{func.name}</td>
+                <td>{func.calls}</td>
+                <td>{func.avgTime}ms</td>
+                <td>{func.p95Time}ms</td>
+                <td>{func.errorRate}%</td>
+                <td>{formatTimeAgo(func.lastCalled)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+```
+
+## Enforcement
+
+1. **Instrumentation Requirements**
+   - Require telemetry for all MCP functions
+   - Define standard metrics to be captured
+   - Implement standard middleware for telemetry
+   - Create baseline dashboards for monitoring
+   - Document alerting thresholds
+
+2. **Performance Benchmarks**
+   - Set performance expectations for MCP functions
+   - Define SLAs for critical operations
+   - Establish load testing procedures
+   - Configure alerts for performance degradation
+   - Review performance trends regularly
+
+## Implementation Guide
+
+Analytics and monitoring patterns are covered across multiple guides with logging examples:
+- [MCP Implementation Guide](mdc:examples/mcp/01-mcp-implementation-guide.md)
+- [MCP as Service Protocol guide](mdc:examples/mcp/02-mcp-service-protocol.md)
+- [MCP Composition Patterns guide](mdc:examples/mcp/03-mcp-composition-patterns.md)
+- [MCP Real-Time Systems guide](mdc:examples/mcp/04-mcp-real-time-systems.md)

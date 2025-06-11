@@ -1,0 +1,109 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+description: Apply ALWAYS when handling user data or implementing features that must adhere to regulatory requirements
+globs: "**/*"
+
+# Regulatory Compliance Guidelines
+
+These guidelines outline the requirements for maintaining compliance with various regulatory frameworks. Adherence to these guidelines is mandatory for all projects handling sensitive data or operating in regulated industries.
+
+## General Compliance Principles
+
+- **Documentation**: Maintain comprehensive documentation of all compliance measures
+- **Regular Auditing**: Conduct periodic audits of compliance controls
+- **Training Requirements**: Ensure all team members receive compliance training
+- **Risk Assessment**: Perform regular risk assessments for compliance gaps
+- **Remediation Plans**: Have documented plans for addressing compliance issues
+
+## Data Privacy Compliance
+
+### GDPR Compliance
+- **Lawful Basis**: Establish and document lawful basis for all data processing
+- **Consent Management**: Implement proper consent collection and management
+- **Data Subject Rights**: Support all data subject rights (access, deletion, portability)
+- **Privacy Notices**: Maintain clear and comprehensive privacy notices
+- **Data Processing Records**: Maintain records of all data processing activities
+- **DPIAs**: Conduct Data Protection Impact Assessments for high-risk processing
+
+### CCPA/CPRA Compliance
+- **Consumer Rights**: Support consumer rights to access, delete, and opt-out
+- **Privacy Policy**: Maintain California-specific privacy disclosures
+- **Do Not Sell/Share**: Implement "Do Not Sell/Share My Personal Information" functionality
+- **Data Mapping**: Maintain inventory of personal information and processing activities
+
+### HIPAA Compliance (If Applicable)
+- **PHI Safeguards**: Implement administrative, physical, and technical safeguards
+- **Business Associate Agreements**: Maintain proper BAAs with all service providers
+- **Minimum Necessary**: Apply minimum necessary principle for PHI access
+- **Breach Notification**: Have procedures for breach notification and remediation
+
+## Financial Compliance
+
+### PCI DSS (For Payment Processing)
+- **Cardholder Data**: Minimize storage of cardholder data
+- **Encryption**: Encrypt transmission of cardholder data
+- **Access Controls**: Restrict access to cardholder data on need-to-know basis
+- **Network Security**: Maintain secure network for payment processing
+- **Vulnerability Management**: Regular testing and scanning of systems
+
+### SOX Compliance (If Applicable)
+- **Financial Controls**: Implement controls for financial reporting
+- **Audit Trails**: Maintain audit trails for financial transactions
+- **Access Controls**: Restrict access to financial systems
+- **Change Management**: Document all changes to financial systems
+
+## Industry-Specific Compliance
+
+### FINRA/SEC (Financial Services)
+- **Record Keeping**: Maintain required records and communications
+- **Customer Identity**: Implement KYC and AML procedures
+- **Supervisory Controls**: Establish supervision and compliance monitoring
+
+### FedRAMP (Government)
+- **Security Controls**: Implement required security controls
+- **Documentation**: Maintain required system security documentation
+- **Continuous Monitoring**: Establish continuous monitoring procedures
+
+## Technical Implementation Requirements
+
+- **Data Encryption**: Encrypt all regulated data in transit and at rest
+- **Access Controls**: Implement role-based access control for regulated systems
+- **Audit Logging**: Maintain comprehensive audit logs for compliance-related activities
+- **Data Residence**: Store data in compliance with data residency requirements
+- **Data Retention**: Implement proper data retention and deletion policies
+- **Security Monitoring**: Monitor systems for security events and anomalies
+
+## Vendor Management
+
+- **Vendor Assessment**: Assess vendors for compliance with relevant regulations
+- **Contractual Requirements**: Include compliance requirements in vendor contracts
+- **Ongoing Monitoring**: Regularly review vendor compliance status
+- **Service Level Agreements**: Establish SLAs for compliance-related services
+
+## Incident Response for Compliance
+
+- **Breach Notification**: Procedures for regulatory breach notification
+- **Documentation**: Document all incidents and response actions
+- **Communication Plans**: Establish communication protocols for compliance incidents
+- **Remediation**: Define remediation procedures for compliance incidents
+
+## Compliance Documentation
+
+- **Policies and Procedures**: Maintain current policies and procedures
+- **Evidence Collection**: Processes for collecting compliance evidence
+- **Regulatory Updates**: Process for monitoring and implementing regulatory changes
+- **Compliance Calendar**: Maintain calendar of compliance activities and deadlines
+
+## References
+
+- GDPR (General Data Protection Regulation)
+- CCPA/CPRA (California Consumer Privacy Act/California Privacy Rights Act)
+- HIPAA (Health Insurance Portability and Accountability Act)
+- PCI DSS (Payment Card Industry Data Security Standard)
+- SOX (Sarbanes-Oxley Act)
+- FINRA/SEC regulations
+- FedRAMP standards
+- ISO 27001

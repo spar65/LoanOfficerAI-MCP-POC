@@ -1,0 +1,105 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Code Documentation Standards
+
+## Context
+- Clear documentation is essential for maintainability and knowledge transfer
+- Documentation must be consistent across the codebase
+- Self-documenting code reduces the need for extensive comments
+- Different components require different levels of documentation
+- Documentation should be useful rather than redundant
+- Documentation practices impact onboarding time for new developers
+
+## Requirements
+
+### General Documentation Principles
+- **REQUIRED**: All code files must have a brief description at the top explaining their purpose
+- **REQUIRED**: Complex logic must be documented with comments explaining the "why", not just the "what"
+- Write self-documenting code with clear variable/function names to reduce comment needs
+- Update documentation when code changes to prevent outdated information
+- Use standard formats for documentation based on language conventions
+- Keep documentation concise and to the point, avoiding verbosity
+
+### Component Documentation
+- **REQUIRED**: Document component props with type definitions and descriptions
+- Document component behavior, including state management and side effects
+- Include examples of component usage for complex components
+- Document any performance considerations or optimization techniques
+- Document accessibility features and considerations
+- Link to relevant design documentation or specifications
+
+### API Documentation
+- **REQUIRED**: Document all API endpoints with request/response formats
+- Document error responses and status codes
+- Include authentication requirements and rate limiting information
+- Document request payload validation rules
+- Provide examples of successful requests and responses
+- Document versioning approach for APIs
+
+### Code Comments
+- Use comments to explain complex algorithms or business logic
+- Avoid commenting obvious code
+- Use TODO comments for temporary solutions that need improvement
+- Format multi-line comments consistently
+- Remove commented-out code before committing
+- Use JSDoc or similar standards for function documentation
+
+## Documentation Standards by Type
+
+| Code Element | Documentation Requirements | Format |
+|--------------|---------------------------|--------|
+| File Header | Purpose, author, creation date | Use JSDoc/TSDoc format for the file description |
+| Function/Method | Purpose, parameters, return values, exceptions | Use @param, @returns, and @throws tags |
+| Class/Component | Purpose, usage, lifecycle | Include @example tags for usage examples |
+| Interface/Type | Purpose, properties | Document each property with inline comments |
+| Complex Logic | Explanation of approach, algorithms | Use short, focused comments explaining the "why" |
+| Constants | Purpose, valid values | Document the meaning and acceptable ranges |
+
+### Language-Specific Formats
+
+- **TypeScript/JavaScript**: Use JSDoc format for function documentation
+- **React Components**: Document props using TypeScript interface or PropTypes
+- **CSS/SCSS**: Document complex selectors and media queries
+- **API Endpoints**: Use OpenAPI/Swagger format for REST API documentation
+- **GraphQL**: Use schema descriptions and directive documentation
+
+## Dependencies
+- Related rules: [105-typescript-linter-standards.mdc](mdc:departments/engineering/coding-standards/105-typescript-linter-standards.mdc), [104-stable-interfaces.mdc](mdc:departments/engineering/coding-standards/104-stable-interfaces.mdc)
+- Required tools: ESLint with documentation plugins, TypeScript
+
+## Testing Guidelines
+- Review documentation during code reviews
+- Validate that all required documentation elements are present
+- Ensure documentation accurately reflects current implementation
+- Test code examples provided in documentation
+- Verify documentation follows language-specific standards
+
+## Implementation Checklist
+
+- [ ] File Headers: Add descriptive headers to all code files
+- [ ] Component Props: Document all component props with types and descriptions
+- [ ] Function Documentation: Add JSDoc comments to complex functions
+- [ ] API Documentation: Document all API endpoints with request/response formats
+- [ ] Clean Comments: Remove obsolete comments and commented-out code
+- [ ] Self-Documenting Code: Use clear variable and function names
+- [ ] Accessibility Documentation: Document accessibility features and considerations
+- [ ] Documentation Review: Include documentation review in the PR process
+
+## Additional Resources
+
+- Refer to [examples/coding-standards/DocumentationStandardsGuide.md](mdc:examples/coding-standards/DocumentationStandardsGuide.md) for comprehensive examples and templates
+- See [examples/coding-standards/DocumentationESLintConfig.json](mdc:examples/coding-standards/DocumentationESLintConfig.json) for recommended ESLint rules
+- Review [examples/coding-standards/DocumentationExample.tsx](mdc:examples/coding-standards/DocumentationExample.tsx) for a practical implementation example
+
+## Documentation Review Checklist
+
+During code reviews, ensure the following aspects of documentation are addressed:
+
+1. **Completeness**: All required elements are documented
+2. **Accuracy**: Documentation matches current implementation
+3. **Clarity**: Documentation is clear and understandable
+4. **Format**: Documentation follows standard formats
+5. **Maintenance**: Documentation is easy to maintain

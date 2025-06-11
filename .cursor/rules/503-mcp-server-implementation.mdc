@@ -1,0 +1,315 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+description: IMPLEMENT when creating MCP server components to ensure secure, reliable, and maintainable function handlers
+globs: "server/**/*.js"
+
+# 503: MCP Server-Side Implementation Standards
+
+## Rule
+
+When implementing Model Completion Protocol (MCP) server components, follow standardized patterns for API endpoints, error handling, and response formatting to ensure security, reliability, and maintainability.
+
+## Context
+
+The Model Completion Protocol (MCP) enables large language models to call functions in response to natural language requests. In a server-based architecture, the server must:
+1. Define function schemas to inform the LLM of available capabilities
+2. Handle function calls from the LLM
+3. Invoke appropriate backend services and APIs
+4. Format and return responses to the LLM
+5. Handle errors gracefully at all levels
+
+Consistent implementation patterns ensure a robust MCP system that is reliable, maintainable, and securable.
+
+## RuleDetails
+
+### Function Schema Definition
+
+1. **Schema Standardization**
+   - Define all function schemas in a centralized `mcpFunctions` array
+   - Use descriptive names in camelCase (e.g., `evaluateCollateralSufficiency`)
+   - Include comprehensive descriptions that explain the function purpose
+   - Document all parameters with clear descriptions and types
+   - Mark required parameters explicitly
+
+2. **Parameter Design**
+   - Use explicit entity IDs as parameters (e.g., `loanId` instead of free-form text)
+   - Provide enums for constrained choice parameters
+   - Default optional parameters when possible
+   - Keep parameter structure shallow (avoid nested objects)
+   - Use consistent naming conventions across functions
+
+```javascript
+{
+  name: "evaluateCollateralSufficiency",
+  description: "Evaluate collateral sufficiency for a specific loan",
+  parameters: {
+    type: "object",
+    properties: {
+      loanId: {
+        type: "string",
+        description: "The ID of the loan (e.g., L001)"
+      },
+      marketConditions: {
+        type: "string",
+        enum: ["declining", "stable", "improving"],
+        description: "The market conditions to consider in evaluation"
+      }
+    },
+    required: ["loanId"]
+  }
+}
+```
+
+### Function Handler Implementation
+
+1. **Handler Pattern**
+   - Use a consistent pattern for all function handlers
+   - Extract and validate parameters explicitly
+   - Log function calls with relevant parameters
+   - Verify entity existence before main operation
+   - Use structured error handling
+   - Return consistent response formats
+
+2. **Entity Validation**
+   - Always verify entity existence before performing operations
+   - Return specific, informative errors for missing entities
+   - Include entity details in error responses
+   - Log validation failures with context
+
+3. **Error Handling**
+   - Implement try/catch blocks for all API calls
+   - Return structured error objects with consistent format
+   - Include error type, message, and context
+   - Log errors with stack traces in development
+   - Sanitize error details in production responses
+
+4. **Response Enhancement**
+   - Enhance responses with context and interpretative data
+   - Include summary fields for complex numerical data
+   - Add industry standards or thresholds for context
+   - Provide response metadata (e.g., timestamp, response time)
+
+```javascript
+// MCP Function Handler Pattern
+else if (functionName === 'functionName') {
+  const { entityId, paramOne = 'defaultValue' } = functionArgs;
+  
+  LogService.mcp(`Processing ${functionName}`, {
+    parameters: functionArgs,
+    endpoint: `/api/endpoint/${entityId}`
+  });
+  
+  try {
+    // Entity validation
+    const entityCheck = await callInternalApi(`/api/entity/${entityId}`);
+    
+    if (entityCheck.error) {
+      LogService.warn(`Entity check failed: ${entityCheck.error}`);
+      functionResult = {
+        error: 'Entity not found',
+        entity_id: entityId,
+        details: `Unable to verify entity with ID ${entityId}`
+      };
+    } else {
+      // Main operation
+      const result = await callInternalApi(`/api/endpoint/${entityId}`);
+      
+      // Response enhancement
+      result.summary = generateSummary(result);
+      result.context = { industry_standard: standardValue };
+      
+      functionResult = result;
+    }
+  } catch (error) {
+    LogService.error(`Error processing ${functionName}:`, error);
+    functionResult = {
+      error: 'Processing error',
+      details: error.message
+    };
+  }
+}
+```
+
+### API Endpoint Design
+
+1. **Endpoint Patterns**
+   - Use RESTful conventions for all MCP-supporting endpoints
+   - Follow the pattern `/api/category/operation/:entity_id`
+   - Keep routes organized by domain (e.g., risk, analytics)
+   - Document endpoint behavior in code
+   - Support query parameters for filtering and options
+
+2. **Middleware Integration**
+   - Apply authentication middleware consistently
+   - Implement specific MCP-related middleware for common operations
+   - Track and log MCP-related requests separately
+   - Apply rate limiting and throttling as appropriate
+   - Use tenant isolation middleware for multi-tenant systems
+
+3. **Response Structure**
+   - Return consistently structured JSON responses
+   - Include request status and metadata
+   - Format error responses consistently
+   - Return appropriate HTTP status codes
+   - Document response structure in API documentation
+
+### Logging and Monitoring
+
+1. **Comprehensive Logging**
+   - Use structured logging for all MCP operations
+   - Log entry and exit points of function handlers
+   - Include correlation IDs to track requests
+   - Use appropriate log levels (debug, info, warn, error)
+   - Include context in log messages
+
+2. **Performance Monitoring**
+   - Track latency of MCP function calls
+   - Monitor call frequency by function
+   - Log resource usage for intensive operations
+   - Track error rates by function
+   - Implement alerts for critical failures
+
+## Examples
+
+### Example 1: Good Function Schema Definition
+
+```javascript
+{
+  name: "getBorrowerDefaultRisk",
+  description: "Get default risk assessment for a specific borrower",
+  parameters: {
+    type: "object",
+    properties: {
+      borrowerId: {
+        type: "string",
+        description: "The ID of the borrower (e.g., B001)"
+      },
+      timeHorizon: {
+        type: "string",
+        enum: ["short_term", "medium_term", "long_term"],
+        description: "The time horizon for risk assessment"
+      }
+    },
+    required: ["borrowerId"]
+  }
+}
+```
+
+### Example 2: Good Function Handler Implementation
+
+```javascript
+else if (functionName === 'getBorrowerDefaultRisk') {
+  const { borrowerId, timeHorizon = 'medium_term' } = functionArgs;
+  
+  LogService.mcp(`Processing default risk assessment for borrower: ${borrowerId}`, {
+    timeHorizon,
+    endpoint: `/api/risk/default/${borrowerId}?time_horizon=${timeHorizon}`
+  });
+  
+  try {
+    // Verify borrower exists
+    const borrowerCheck = await callInternalApi(`/api/borrowers/${borrowerId}`);
+    
+    if (borrowerCheck.error) {
+      LogService.warn(`Borrower not found: ${borrowerId}`);
+      functionResult = {
+        error: 'Borrower not found',
+        borrower_id: borrowerId,
+        details: 'Unable to assess risk for non-existent borrower'
+      };
+    } else {
+      // Get risk assessment
+      const riskResult = await callInternalApi(
+        `/api/risk/default/${borrowerId}?time_horizon=${timeHorizon}`
+      );
+      
+      if (riskResult.error) {
+        throw new Error(riskResult.error);
+      }
+      
+      // Enhance response with context
+      riskResult.summary = `This borrower has a ${riskResult.risk_level} risk of default ` +
+                         `over a ${timeHorizon} time horizon with a risk score of ${riskResult.risk_score}/100.`;
+      
+      // Industry context
+      riskResult.industry_context = {
+        low_threshold: 40,
+        medium_threshold: 70,
+        high_threshold: 90
+      };
+      
+      functionResult = riskResult;
+    }
+  } catch (error) {
+    LogService.error(`Error assessing borrower default risk:`, {
+      borrowerId,
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+    
+    functionResult = {
+      error: 'Risk assessment failed',
+      borrower_id: borrowerId,
+      details: error.message
+    };
+  }
+}
+```
+
+### Example 3: Good MCP-Supporting API Endpoint
+
+```javascript
+// Get default risk assessment for borrower
+router.get('/default/:borrower_id', (req, res) => {
+  const borrowerId = req.params.borrower_id;
+  const timeHorizon = req.query.time_horizon || 'medium_term';
+  
+  LogService.info(`Assessing default risk for borrower ${borrowerId} with time horizon: ${timeHorizon}`);
+  
+  try {
+    // Load data
+    const borrowers = dataService.loadData(dataService.paths.borrowers);
+    const loans = dataService.loadData(dataService.paths.loans);
+    const payments = dataService.loadData(dataService.paths.payments);
+    
+    // Find the borrower
+    const borrower = borrowers.find(b => b.borrower_id === borrowerId);
+    if (!borrower) {
+      LogService.warn(`Borrower not found with ID: ${borrowerId}`);
+      return res.status(404).json({ error: 'Borrower not found' });
+    }
+    
+    // Calculate risk (implementation details...)
+    
+    const result = {
+      borrower_id: borrowerId,
+      borrower_name: `${borrower.first_name} ${borrower.last_name}`,
+      risk_score: riskScore,
+      risk_level: getRiskLevel(riskScore),
+      time_horizon: timeHorizon,
+      risk_factors: riskFactors,
+      recommendations: recommendations
+    };
+    
+    LogService.info(`Risk assessment completed for borrower ${borrowerId}: Score ${riskScore}`);
+    res.json(result);
+  } catch (error) {
+    LogService.error(`Error in risk assessment:`, error);
+    res.status(500).json({ 
+      error: 'Risk assessment failed',
+      details: error.message
+    });
+  }
+});
+```
+
+## Enforcement
+
+- Code reviews must verify adherence to standard MCP implementation patterns
+- Linting rules should enforce error handling and response structure
+- Log analysis should track MCP function performance and error rates
+- Documentation must be updated when MCP functions are modified
+- Test coverage should include all MCP function handlers

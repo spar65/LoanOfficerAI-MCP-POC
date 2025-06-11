@@ -1,0 +1,38 @@
+[
+  {
+    "equipment_id": "E001",
+    "borrower_id": "B001",
+    "type": "Tractor",
+    "purchase_date": "2019-06-01",
+    "condition": "Good",
+    "maintenance_records": [
+      {
+        "date": "2024-01-15",
+        "type": "Oil Change",
+        "cost": 150.0
+      }
+    ]
+  },
+  {
+    "equipment_id": "E002",
+    "borrower_id": "B002",
+    "type": "Combine",
+    "purchase_date": "2017-03-20",
+    "condition": "Fair",
+    "maintenance_records": []
+  },
+  {
+    "equipment_id": "E003",
+    "borrower_id": "B003",
+    "type": "Irrigation System",
+    "purchase_date": "2020-11-10",
+    "condition": "Good",
+    "maintenance_records": [
+      {
+        "date": "2024-02-10",
+        "type": "Pump Repair",
+        "cost": 850.0
+      }
+    ]
+  }
+] 

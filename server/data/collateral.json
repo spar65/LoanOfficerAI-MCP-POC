@@ -1,0 +1,50 @@
+[
+  {
+    "collateral_id": "C001",
+    "loan_id": "L001",
+    "description": "100 acres of farmland",
+    "value": 75000.0
+  },
+  {
+    "collateral_id": "C002",
+    "loan_id": "L002",
+    "description": "Tractor and equipment",
+    "value": 35000.0
+  },
+  {
+    "collateral_id": "C003",
+    "loan_id": "L004",
+    "description": "200 acres of farmland",
+    "value": 60000.0
+  },
+  {
+    "collateral_id": "C004",
+    "loan_id": "L005",
+    "description": "Irrigation system",
+    "value": 30000.0
+  },
+  {
+    "collateral_id": "C005",
+    "loan_id": "L006",
+    "description": "150 acres of farmland",
+    "value": 50000.0
+  },
+  {
+    "collateral_id": "C006",
+    "loan_id": "L008",
+    "description": "250 acres of farmland",
+    "value": 70000.0
+  },
+  {
+    "collateral_id": "C007",
+    "loan_id": "L009",
+    "description": "Grain storage facility",
+    "value": 32000.0
+  },
+  {
+    "collateral_id": "C008",
+    "loan_id": "L010",
+    "description": "120 acres of farmland",
+    "value": 45000.0
+  }
+]

@@ -1,0 +1,473 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+description: IMPLEMENT when integrating MCP functions in client applications to ensure consistent user experience and robust error handling
+globs: "client/src/**/*.{js,jsx,ts,tsx}"
+
+# 504: MCP Client-Side Integration Standards
+
+## Rule
+
+When integrating Model Completion Protocol (MCP) functions into client applications, follow standardized patterns for function calling, response handling, error management, and user experience to ensure consistent behavior and optimal user interaction.
+
+## Context
+
+The Model Completion Protocol (MCP) enables the client application to:
+1. Submit natural language queries to the LLM
+2. Handle function calls returned by the LLM
+3. Present function results in a clear, accessible manner
+4. Manage loading states and error conditions
+5. Enable progressive enhancement for slower connections
+
+Implementing consistent client-side patterns ensures that MCP interactions are intuitive, reliable, and provide a high-quality user experience across all parts of the application.
+
+## RuleDetails
+
+### MCP Client Configuration
+
+1. **Client Setup**
+   - Implement a central MCP client service/class
+   - Configure the client with all necessary authentication
+   - Define default parameters and timeouts
+   - Include robust error handling
+   - Support retries for transient failures
+
+```javascript
+// Example MCP client setup
+class McpClient {
+  constructor(options = {}) {
+    this.baseUrl = options.baseUrl || '/api/openai';
+    this.timeout = options.timeout || 30000;
+    this.maxRetries = options.maxRetries || 2;
+    this.authToken = options.authToken;
+  }
+  
+  async chat(messages, options = {}) {
+    // Implementation details...
+  }
+  
+  // Function-specific methods
+  async evaluateCollateralSufficiency(loanId, marketConditions = 'stable') {
+    // Implementation details...
+  }
+}
+```
+
+2. **Function-Specific Methods**
+   - Create typed methods for each MCP function
+   - Validate parameters before sending
+   - Transform parameters to the expected format
+   - Document parameter requirements and return types
+   - Include examples in documentation comments
+
+```typescript
+/**
+ * Get default risk assessment for a borrower
+ * @param borrowerId The borrower ID (e.g., "B001")
+ * @param timeHorizon The risk assessment timeframe (default: "medium_term")
+ * @returns Risk assessment data including score and recommendations
+ * 
+ * @example
+ * const risk = await mcpClient.getBorrowerDefaultRisk("B001", "long_term");
+ * console.log(`Risk level: ${risk.risk_level}, Score: ${risk.risk_score}`);
+ */
+async getBorrowerDefaultRisk(
+  borrowerId: string, 
+  timeHorizon: "short_term" | "medium_term" | "long_term" = "medium_term"
+): Promise<RiskAssessment> {
+  // Implementation...
+}
+```
+
+### UI Integration Patterns
+
+1. **Query Input Components**
+   - Create reusable components for natural language input
+   - Implement context-aware suggestions
+   - Track query history for reference
+   - Enable query refinement
+   - Support voice input where appropriate
+
+2. **Result Presentation**
+   - Implement specialized components for each result type
+   - Create adaptive layouts for different device sizes
+   - Include data visualization for complex results
+   - Support progressive disclosure for detailed information
+   - Enable sharing and exporting of results
+
+3. **Loading States**
+   - Show appropriate loading indicators
+   - Implement progressive loading for partial results
+   - Display estimated time for long-running operations
+   - Allow cancellation of requests
+   - Preserve context during loading
+
+```jsx
+// Example usage in a React component
+function LoanCollateralAnalysis({ loanId }) {
+  const { data, error, isLoading } = useMcpFunction(
+    'evaluateCollateralSufficiency',
+    { loanId, marketConditions: 'stable' }
+  );
+  
+  if (isLoading) {
+    return <LoadingIndicator operation="Analyzing collateral sufficiency" />;
+  }
+  
+  if (error) {
+    return <ErrorDisplay error={error} retry={() => refetch()} />;
+  }
+  
+  return (
+    <CollateralSufficiencyResult 
+      data={data} 
+      showDetails={true}
+    />
+  );
+}
+```
+
+### Error Handling and Fallbacks
+
+1. **Client-Side Validation**
+   - Validate all inputs before submission
+   - Provide immediate feedback for invalid inputs
+   - Suggest corrections for common errors
+   - Maintain state during validation
+   - Log validation failures for UX improvement
+
+2. **Error Classification**
+   - Categorize errors by type (network, auth, validation, server)
+   - Provide appropriate messaging for each error type
+   - Implement specific recovery actions by error type
+   - Track error frequency for problematic endpoints
+   - Limit error information to what's actionable
+
+3. **Graceful Degradation**
+   - Implement fallbacks for failed MCP operations
+   - Enable offline mode where possible
+   - Cache previous results for quick access
+   - Provide alternative workflows for critical functions
+   - Maintain partial functionality during outages
+
+```jsx
+// Error handling example
+function useMcpFunction(functionName, params) {
+  const [state, setState] = useState({
+    data: null,
+    error: null,
+    isLoading: true,
+    hasAttemptedFallback: false
+  });
+  
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setState(prev => ({ ...prev, isLoading: true }));
+        const result = await mcpClient[functionName](mdc:...Object.values(params));
+        setState({ data: result, error: null, isLoading: false, hasAttemptedFallback: false });
+      } catch (error) {
+        console.error(`MCP function ${functionName} failed:`, error);
+        
+        // Try fallback if available
+        if (!state.hasAttemptedFallback && fallbackHandlers[functionName]) {
+          try {
+            const fallbackData = await fallbackHandlers[functionName](mdc:params);
+            setState({ 
+              data: fallbackData, 
+              error: null, 
+              isLoading: false, 
+              hasAttemptedFallback: true 
+            });
+            return;
+          } catch (fallbackError) {
+            console.error('Fallback also failed:', fallbackError);
+          }
+        }
+        
+        setState({ 
+          data: null, 
+          error: formatErrorForDisplay(error), 
+          isLoading: false,
+          hasAttemptedFallback: state.hasAttemptedFallback
+        });
+      }
+    };
+    
+    fetchData();
+  }, [functionName, JSON.stringify(params)]);
+  
+  return state;
+}
+```
+
+### Performance Optimization
+
+1. **Request Management**
+   - Debounce rapid request sequences
+   - Batch related requests when possible
+   - Cancel superseded requests
+   - Implement request priority
+   - Track request timing metrics
+
+2. **Caching Strategy**
+   - Cache results with appropriate TTL
+   - Implement cache invalidation on updates
+   - Use stale-while-revalidate patterns
+   - Support offline-first operations
+   - Pre-fetch predictable requests
+
+3. **State Management**
+   - Use appropriate state management patterns
+   - Normalize complex nested data
+   - Implement optimistic updates
+   - Track loading/error states explicitly
+   - Support undo operations where applicable
+
+## Examples
+
+### Example 1: Good MCP Client Implementation
+
+```typescript
+// src/services/mcpClient.ts
+import axios from 'axios';
+
+export interface McpClientOptions {
+  baseUrl?: string;
+  timeout?: number;
+  authToken?: string;
+}
+
+export interface RiskAssessment {
+  borrower_id: string;
+  risk_score: number;
+  risk_level: 'low' | 'medium' | 'high';
+  risk_factors: string[];
+  recommendations: string[];
+}
+
+export class McpClient {
+  private baseUrl: string;
+  private timeout: number;
+  private authToken?: string;
+  
+  constructor(options: McpClientOptions = {}) {
+    this.baseUrl = options.baseUrl || '/api/openai';
+    this.timeout = options.timeout || 30000;
+    this.authToken = options.authToken;
+  }
+  
+  private async callFunction(functionName: string, functionArgs: Record<string, any>) {
+    const messages = [
+      { role: 'user', content: `Call the ${functionName} function with these args: ${JSON.stringify(functionArgs)}` }
+    ];
+    
+    try {
+      const response = await axios.post(
+        this.baseUrl + '/chat',
+        { messages, function_call: { name: functionName } },
+        {
+          headers: this.authToken ? { Authorization: `Bearer ${this.authToken}` } : {},
+          timeout: this.timeout
+        }
+      );
+      
+      return response.data.content ? JSON.parse(response.data.content) : response.data;
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        const status = error.response?.status;
+        const message = error.response?.data?.error || error.message;
+        
+        throw new Error(`MCP function ${functionName} failed (${status}): ${message}`);
+      }
+      throw error;
+    }
+  }
+  
+  /**
+   * Get default risk assessment for a borrower
+   * @param borrowerId The borrower ID (e.g., "B001")
+   * @param timeHorizon The risk assessment timeframe
+   * @returns Risk assessment data
+   */
+  async getBorrowerDefaultRisk(
+    borrowerId: string, 
+    timeHorizon: "short_term" | "medium_term" | "long_term" = "medium_term"
+  ): Promise<RiskAssessment> {
+    return this.callFunction('getBorrowerDefaultRisk', { borrowerId, timeHorizon });
+  }
+  
+  /**
+   * Evaluate collateral sufficiency for a loan
+   * @param loanId The loan ID to evaluate
+   * @param marketConditions Market conditions to consider
+   * @returns Collateral sufficiency evaluation
+   */
+  async evaluateCollateralSufficiency(
+    loanId: string,
+    marketConditions: "declining" | "stable" | "improving" = "stable"
+  ) {
+    return this.callFunction('evaluateCollateralSufficiency', { loanId, marketConditions });
+  }
+}
+
+// Create a singleton instance
+export const mcpClient = new McpClient();
+```
+
+### Example 2: Good React Hook Implementation
+
+```jsx
+// src/hooks/useMcpFunction.js
+import { useState, useEffect } from 'react';
+import { mcpClient } from '../services/mcpClient';
+
+export function useMcpFunction(functionName, params, options = {}) {
+  const [state, setState] = useState({
+    data: null,
+    error: null,
+    isLoading: false,
+    isSuccess: false
+  });
+  
+  const execute = async (overrideParams) => {
+    const executeParams = overrideParams || params;
+    
+    setState(prev => ({ ...prev, isLoading: true, error: null }));
+    
+    try {
+      // Get the function from the client
+      const func = mcpClient[functionName];
+      
+      if (!func) {
+        throw new Error(`MCP function ${functionName} not implemented`);
+      }
+      
+      // Call the function with the parameters
+      const result = await func(...Object.values(executeParams));
+      
+      setState({
+        data: result,
+        error: null,
+        isLoading: false,
+        isSuccess: true
+      });
+      
+      return result;
+    } catch (error) {
+      setState({
+        data: null,
+        error,
+        isLoading: false,
+        isSuccess: false
+      });
+      
+      if (options.throwError) {
+        throw error;
+      }
+    }
+  };
+  
+  // Auto-execute if enabled (default)
+  useEffect(() => {
+    if (options.manual !== true) {
+      execute();
+    }
+  }, [functionName, JSON.stringify(params)]);
+  
+  return {
+    ...state,
+    execute,
+    refetch: () => execute(),
+  };
+}
+```
+
+### Example 3: Good Component Implementation
+
+```jsx
+// src/components/LoanRiskAssessment.jsx
+import React from 'react';
+import { useMcpFunction } from '../hooks/useMcpFunction';
+import { RiskScoreDisplay, LoadingSpinner, ErrorAlert } from '../components/ui';
+
+export function LoanRiskAssessment({ loanId, timeHorizon = 'medium_term' }) {
+  const { 
+    data: riskData, 
+    error, 
+    isLoading, 
+    refetch 
+  } = useMcpFunction('getBorrowerDefaultRisk', { loanId, timeHorizon });
+  
+  if (isLoading) {
+    return (
+      <div className="risk-assessment-loading">
+        <LoadingSpinner size="medium" />
+        <p>Analyzing risk factors for loan {loanId}...</p>
+      </div>
+    );
+  }
+  
+  if (error) {
+    return (
+      <ErrorAlert 
+        title="Unable to retrieve risk assessment"
+        message={error.message}
+        retryLabel="Try Again"
+        onRetry={refetch}
+      />
+    );
+  }
+  
+  if (!riskData) {
+    return null;
+  }
+  
+  return (
+    <div className="risk-assessment-container">
+      <h3>Risk Assessment</h3>
+      <RiskScoreDisplay 
+        score={riskData.risk_score} 
+        level={riskData.risk_level}
+        thresholds={{
+          low: 40,
+          medium: 70,
+          high: 90
+        }}
+      />
+      
+      {riskData.risk_factors.length > 0 && (
+        <div className="risk-factors">
+          <h4>Risk Factors</h4>
+          <ul>
+            {riskData.risk_factors.map((factor, index) => (
+              <li key={index}>{factor}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+      
+      {riskData.recommendations.length > 0 && (
+        <div className="recommendations">
+          <h4>Recommendations</h4>
+          <ul>
+            {riskData.recommendations.map((rec, index) => (
+              <li key={index}>{rec}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+## Enforcement
+
+- Code reviews must verify adherence to MCP client integration patterns
+- Component library must include standardized MCP result display components
+- Error handling must follow the prescribed patterns
+- Documentation must be updated when MCP functions are added or modified
+- Accessibility testing must include MCP interaction flows

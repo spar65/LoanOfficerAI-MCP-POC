@@ -1,0 +1,147 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Context
+
+Consistent deployment infrastructure is a foundational element of any successful software project. Proper deployment practices ensure that code changes are reliably, predictably, and safely moved from development to production environments. While this rule leans toward Git/GitHub workflows, the principles remain applicable across various deployment mechanisms.
+
+# Requirements
+
+## 1. Version Control Integration
+
+1. **Git-Based Workflow Required**
+   - All deployments MUST originate from a versioned code repository
+   - Branch protection rules MUST be enforced on main/production branches
+   - Deployments MUST be traceable to specific commits or tags
+
+2. **Deployment Sources**
+   - Production deployments MUST only come from protected branches (e.g., `main`, `master`)
+   - Feature deployments MAY come from feature branches for testing purposes
+   - Pre-production deployments SHOULD come from a staging branch
+
+## 2. CI/CD Pipeline Structure
+
+1. **Deployment Pipeline Phases**
+   - Build: Compile code, resolve dependencies, and create deployment artifacts
+   - Test: Run automated tests (unit, integration, etc.)
+   - Stage: Deploy to non-production environment for verification
+   - Deploy: Promote to production after approval
+   - Verify: Post-deployment health checks and monitoring
+
+2. **Pipeline Configuration**
+   - Pipeline definitions MUST be versioned alongside application code
+   - Pipelines MUST fail fast on critical errors
+   - Pipelines MUST include automated testing as gates to production
+   - Manual approval gates SHOULD be required for production deployments
+
+## 3. Environment Management
+
+1. **Environment Hierarchy**
+   - Development: For active development and initial testing
+   - Testing/QA: For formal quality assurance
+   - Staging: Production-like environment for final verification
+   - Production: Live customer-facing environment
+
+2. **Environment Configuration**
+   - Environment configurations MUST be externalized from application code
+   - Environment-specific variables MUST be stored securely
+   - Production credentials MUST be restricted to production deployments
+   - Environment parity SHOULD be maintained to minimize "works on my machine" issues
+
+## 4. Deployment Artifacts
+
+1. **Artifact Requirements**
+   - Deployment artifacts MUST be immutable once created
+   - Artifacts MUST be versioned and trackable to source commit
+   - Artifacts SHOULD be scanned for vulnerabilities before deployment
+   - The same artifact SHOULD progress through all environments
+
+2. **Artifact Storage**
+   - Artifacts MUST be stored in a secure, accessible repository
+   - Artifact repositories MUST implement access controls
+   - Artifact retention policies MUST be defined and enforced
+
+## 5. Rollback Strategy
+
+1. **Rollback Capabilities**
+   - All deployments MUST have defined rollback procedures
+   - Rollbacks SHOULD be testable in non-production environments
+   - Database migrations MUST account for potential rollbacks
+
+2. **Rollback Triggers**
+   - Automated health checks MAY trigger automatic rollbacks
+   - Specific error thresholds SHOULD be defined to trigger rollback evaluation
+   - Post-deployment monitoring MUST be in place to detect issues quickly
+
+## 6. Deployment Frequency & Strategy
+
+1. **Deployment Patterns**
+   - Critical systems SHOULD implement blue/green or canary deployments
+   - High-change systems SHOULD support frequent, small deployments
+   - Maintenance windows SHOULD be defined for systems requiring downtime
+
+2. **Frequency Considerations**
+   - Deployment processes SHOULD support the business need for change frequency
+   - High-risk deployments SHOULD occur during low-traffic periods
+   - Deployment schedules SHOULD be communicated to all stakeholders
+
+## 7. Deployment Documentation
+
+1. **Required Documentation**
+   - Each project MUST maintain a deployment runbook
+   - Deployment processes MUST be documented with step-by-step instructions
+   - All manual steps MUST be thoroughly documented
+   - Troubleshooting guides SHOULD be maintained and updated after incidents
+
+2. **Deployment History**
+   - Deployment logs MUST be preserved and accessible
+   - A deployment registry SHOULD track all deployments across environments
+   - Post-deployment reports SHOULD be generated for significant releases
+
+## 8. GitHub-Specific Integration
+
+1. **GitHub Actions/Workflows**
+   - GitHub Actions SHOULD be used for CI/CD where appropriate
+   - Workflows SHOULD be modularized with reusable components
+   - Secrets MUST be managed using GitHub Secrets or similar secure storage
+
+2. **Pull Request Integration**
+   - Pull requests MUST include pre-merge checks before deployment
+   - Deployment preview environments SHOULD be created for pull requests
+   - Branch naming conventions SHOULD align with deployment targets
+
+# Forbidden Patterns
+
+1. **Direct Production Access**
+   - ❌ Manual changes directly in production environments
+   - ❌ SSH access to production servers for deployment
+   - ❌ Deployment without version control traceability
+
+2. **Security Anti-Patterns**
+   - ❌ Storing credentials in source code
+   - ❌ Using the same credentials across environments
+   - ❌ Deploying without security scanning
+
+3. **Deployment Process**
+   - ❌ Deploying without automated testing
+   - ❌ Deployment procedures that cannot be rolled back
+   - ❌ Deploying without adequate monitoring in place
+
+# Examples and References
+
+- [Deployment Pipeline Example](mdc:examples/operations/DeploymentPipelineTemplate.md)
+- [Environment Configuration Guide](mdc:examples/operations/EnvironmentConfigurationStrategy.md)
+- [Rollback Procedure Template](mdc:examples/operations/RollbackProcedureTemplate.md)
+- [GitHub Workflow Examples](mdc:examples/operations/GitHubWorkflowExamples.md)
+
+# Impact
+
+Adopting standardized deployment infrastructure:
+
+- Reduces deployment errors and downtime
+- Increases confidence in the deployment process
+- Improves traceability and auditability of changes
+- Enables faster recovery from issues
+- Supports more frequent deployments with less risk

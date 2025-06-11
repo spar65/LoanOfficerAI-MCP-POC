@@ -1,0 +1,1179 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+description: IMPLEMENT when integrating multiple systems using MCP as a central integration bus or message broker
+globs: "server/**/*.{js,jsx,ts,tsx}"
+
+# 513: MCP as Integration Bus
+
+## Rule
+
+When integrating multiple systems or services, leverage the Model Completion Protocol (MCP) as a centralized integration bus that standardizes communication patterns, manages message routing, and ensures consistent data transformation across diverse systems.
+
+## Context
+
+Enterprise systems often require integration across diverse technologies, platforms, and data models. Traditional integration approaches like point-to-point connections or custom adapters lead to brittle architectures and high maintenance costs. Using MCP as an integration bus provides:
+
+1. **Standardized Interfaces** - Consistent function-based interaction model across all systems
+2. **Centralized Routing** - Single point of control for message flow between systems
+3. **Schema Enforcement** - Strict validation of messages between disparate systems
+4. **Transformation Logic** - Standardized approach to data mapping and transformation
+5. **Observability** - Centralized monitoring and troubleshooting of integration flows
+
+## RuleDetails
+
+### Integration Bus Architecture
+
+1. **MCP as Central Hub**
+   - Position MCP as the integration hub for all system interactions
+   - Implement consistent serialization and deserialization of messages
+   - Standardize error handling and retry strategies
+   - Support both synchronous and asynchronous communication patterns
+   - Enable transparent version management across systems
+
+```javascript
+// MCP Integration Bus implementation
+class McpIntegrationBus {
+  constructor(options = {}) {
+    this.adapters = new Map();
+    this.transformers = new Map();
+    this.interceptors = [];
+    this.errorHandlers = [];
+    this.logger = options.logger || console;
+  }
+  
+  // Register a system adapter
+  registerAdapter(systemName, adapter) {
+    this.adapters.set(systemName, adapter);
+    return this;
+  }
+  
+  // Register a data transformer between systems
+  registerTransformer(sourceSystem, targetSystem, transformer) {
+    const key = `${sourceSystem}:${targetSystem}`;
+    this.transformers.set(key, transformer);
+    return this;
+  }
+  
+  // Add message interceptor
+  addInterceptor(interceptor) {
+    this.interceptors.push(interceptor);
+    return this;
+  }
+  
+  // Add error handler
+  addErrorHandler(handler) {
+    this.errorHandlers.push(handler);
+    return this;
+  }
+  
+  // Send a message to a target system
+  async send(targetSystem, operation, data, options = {}) {
+    try {
+      // Get the adapter for the target system
+      const adapter = this.adapters.get(targetSystem);
+      if (!adapter) {
+        throw new Error(`No adapter registered for system "${targetSystem}"`);
+      }
+      
+      // Apply interceptors (pre-processing)
+      let processedData = data;
+      for (const interceptor of this.interceptors) {
+        processedData = await interceptor.before({
+          targetSystem,
+          operation,
+          data: processedData,
+          options
+        });
+      }
+      
+      // Apply transformation if source system specified
+      if (options.sourceSystem) {
+        const transformerKey = `${options.sourceSystem}:${targetSystem}`;
+        const transformer = this.transformers.get(transformerKey);
+        
+        if (transformer) {
+          processedData = await transformer(processedData, {
+            sourceSystem: options.sourceSystem,
+            targetSystem,
+            operation
+          });
+        }
+      }
+      
+      // Send to target system
+      const result = await adapter.execute(operation, processedData, options);
+      
+      // Apply interceptors (post-processing)
+      let processedResult = result;
+      for (const interceptor of this.interceptors) {
+        if (interceptor.after) {
+          processedResult = await interceptor.after({
+            targetSystem,
+            operation,
+            data: processedData,
+            result: processedResult,
+            options
+          });
+        }
+      }
+      
+      return processedResult;
+    } catch (error) {
+      // Handle error through registered handlers
+      let handled = false;
+      for (const handler of this.errorHandlers) {
+        handled = await handler({
+          error,
+          targetSystem,
+          operation,
+          data,
+          options
+        });
+        
+        if (handled) break;
+      }
+      
+      if (!handled) {
+        throw error;
+      }
+    }
+  }
+  
+  // Request-response pattern between systems
+  async request(sourceSystem, targetSystem, operation, data, options = {}) {
+    return this.send(targetSystem, operation, data, {
+      ...options,
+      sourceSystem
+    });
+  }
+  
+  // Broadcast to multiple target systems
+  async broadcast(targetSystems, operation, data, options = {}) {
+    const results = {};
+    const errors = {};
+    
+    await Promise.all(
+      targetSystems.map(async (targetSystem) => {
+        try {
+          results[targetSystem] = await this.send(
+            targetSystem,
+            operation,
+            data,
+            options
+          );
+        } catch (error) {
+          errors[targetSystem] = error;
+        }
+      })
+    );
+    
+    return {
+      results,
+      errors,
+      isPartialSuccess: Object.keys(results).length > 0,
+      isCompleteSuccess: Object.keys(errors).length === 0
+    };
+  }
+}
+```
+
+### System Adapters
+
+1. **MCP Function Adapters**
+   - Implement consistent adapter pattern for each connected system
+   - Convert system-specific operations to MCP function calls
+   - Handle system-specific authentication and connection management
+   - Provide system-specific error handling and retries
+   - Support connection pooling and resource management
+
+```javascript
+// Abstract system adapter interface
+class SystemAdapter {
+  async execute(operation, data, options = {}) {
+    throw new Error("Method 'execute' must be implemented by subclass");
+  }
+  
+  async healthCheck() {
+    throw new Error("Method 'healthCheck' must be implemented by subclass");
+  }
+}
+
+// REST API system adapter
+class RestApiAdapter extends SystemAdapter {
+  constructor(options = {}) {
+    super();
+    this.baseUrl = options.baseUrl;
+    this.defaultHeaders = options.headers || {};
+    this.timeout = options.timeout || 30000;
+    this.retryConfig = options.retry || { maxRetries: 3, delay: 1000 };
+    this.operationMap = options.operationMap || {};
+  }
+  
+  async execute(operation, data, options = {}) {
+    const endpoint = this.getEndpoint(operation);
+    const method = this.getMethod(operation);
+    
+    const headers = {
+      ...this.defaultHeaders,
+      ...(options.headers || {})
+    };
+    
+    // Add authorization if available
+    if (options.auth) {
+      headers['Authorization'] = options.auth;
+    }
+    
+    const retries = options.retries || this.retryConfig.maxRetries;
+    let lastError = null;
+    
+    // Implement retry logic
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      try {
+        const response = await fetch(`${this.baseUrl}${endpoint}`, {
+          method,
+          headers,
+          body: method !== 'GET' ? JSON.stringify(data) : undefined,
+          timeout: options.timeout || this.timeout
+        });
+        
+        if (!response.ok) {
+          const errorBody = await response.text();
+          throw new Error(
+            `API error: ${response.status} ${response.statusText} - ${errorBody}`
+          );
+        }
+        
+        const result = await response.json();
+        return result;
+      } catch (error) {
+        lastError = error;
+        
+        // Don't retry on last attempt
+        if (attempt === retries) break;
+        
+        // Wait before retry
+        const delay = this.calculateRetryDelay(attempt);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+    
+    throw lastError;
+  }
+  
+  getEndpoint(operation) {
+    if (this.operationMap[operation]?.endpoint) {
+      return this.operationMap[operation].endpoint;
+    }
+    
+    // Default endpoint conversion
+    return `/${operation.replace(/([A-Z])/g, '-$1').toLowerCase()}`;
+  }
+  
+  getMethod(operation) {
+    if (this.operationMap[operation]?.method) {
+      return this.operationMap[operation].method;
+    }
+    
+    // Default method mapping based on operation name
+    if (operation.startsWith('get') || operation.startsWith('find') || 
+        operation.startsWith('search') || operation.startsWith('list')) {
+      return 'GET';
+    } else if (operation.startsWith('create') || operation.startsWith('add')) {
+      return 'POST';
+    } else if (operation.startsWith('update') || operation.startsWith('edit')) {
+      return 'PUT';
+    } else if (operation.startsWith('delete') || operation.startsWith('remove')) {
+      return 'DELETE';
+    } else if (operation.startsWith('patch')) {
+      return 'PATCH';
+    }
+    
+    return 'POST';
+  }
+  
+  calculateRetryDelay(attempt) {
+    // Exponential backoff with jitter
+    const baseDelay = this.retryConfig.delay;
+    const maxDelay = baseDelay * Math.pow(2, attempt);
+    const jitteredDelay = maxDelay * (0.5 + Math.random() * 0.5);
+    return Math.min(jitteredDelay, 30000); // Cap at 30 seconds
+  }
+  
+  async healthCheck() {
+    try {
+      const healthEndpoint = this.operationMap.healthCheck?.endpoint || '/health';
+      const response = await fetch(`${this.baseUrl}${healthEndpoint}`, {
+        method: 'GET',
+        headers: this.defaultHeaders,
+        timeout: 5000
+      });
+      
+      return {
+        status: response.ok ? 'healthy' : 'unhealthy',
+        statusCode: response.status,
+        message: response.ok ? 'OK' : `Error: ${response.status} ${response.statusText}`
+      };
+    } catch (error) {
+      return {
+        status: 'unhealthy',
+        message: error.message
+      };
+    }
+  }
+}
+
+// Database adapter (example with MySQL)
+class MySqlAdapter extends SystemAdapter {
+  constructor(options = {}) {
+    super();
+    this.pool = mysql.createPool({
+      host: options.host,
+      user: options.user,
+      password: options.password,
+      database: options.database,
+      connectionLimit: options.connectionLimit || 10
+    });
+    
+    this.queryMap = options.queryMap || {};
+  }
+  
+  async execute(operation, data, options = {}) {
+    const queryConfig = this.queryMap[operation];
+    
+    if (!queryConfig) {
+      throw new Error(`No query mapping for operation "${operation}"`);
+    }
+    
+    const { query, paramsMapper } = queryConfig;
+    
+    // Map data to params
+    const params = paramsMapper ? paramsMapper(data) : data;
+    
+    try {
+      const [results] = await this.pool.execute(query, params);
+      return results;
+    } catch (error) {
+      throw new Error(`Database error executing "${operation}": ${error.message}`);
+    }
+  }
+  
+  async healthCheck() {
+    try {
+      await this.pool.execute('SELECT 1');
+      return {
+        status: 'healthy',
+        message: 'Database connection successful'
+      };
+    } catch (error) {
+      return {
+        status: 'unhealthy',
+        message: `Database connection failed: ${error.message}`
+      };
+    }
+  }
+}
+```
+
+### Data Transformation
+
+1. **Data Transformation Pipeline**
+   - Implement a structured approach to data transformation
+   - Support schema-based validation during transformation
+   - Define reusable transformation components
+   - Enable complex mapping between different data models
+   - Maintain transformation history for debugging
+
+```javascript
+// Data transformer factory
+class TransformerFactory {
+  constructor() {
+    this.transformers = new Map();
+  }
+  
+  // Register a named transformer
+  register(name, transformer) {
+    this.transformers.set(name, transformer);
+    return this;
+  }
+  
+  // Create a transformer pipeline
+  createPipeline(transformerNames) {
+    const transformers = transformerNames.map(name => {
+      const transformer = this.transformers.get(name);
+      if (!transformer) {
+        throw new Error(`Transformer "${name}" not found`);
+      }
+      return transformer;
+    });
+    
+    // Return a function that applies all transformers in sequence
+    return async (data, context) => {
+      let result = data;
+      const transformationSteps = [];
+      
+      for (let i = 0; i < transformers.length; i++) {
+        const transformer = transformers[i];
+        const stepName = transformerNames[i];
+        
+        try {
+          const before = JSON.parse(JSON.stringify(result));
+          result = await transformer(result, context);
+          const after = JSON.parse(JSON.stringify(result));
+          
+          transformationSteps.push({
+            step: stepName,
+            success: true,
+            before,
+            after
+          });
+        } catch (error) {
+          transformationSteps.push({
+            step: stepName,
+            success: false,
+            error: error.message
+          });
+          
+          throw new TransformationError(
+            `Error in transformation step "${stepName}": ${error.message}`,
+            {
+              failedStep: stepName,
+              transformationSteps,
+              originalData: data
+            }
+          );
+        }
+      }
+      
+      // Add transformation history if context has debug flag
+      if (context?.debug) {
+        result._transformationSteps = transformationSteps;
+      }
+      
+      return result;
+    };
+  }
+}
+
+// Example: Creating system-specific transformers
+const transformerFactory = new TransformerFactory();
+
+// Register reusable transformers
+transformerFactory
+  .register('dateFormatISO', data => {
+    // Deep clone to avoid modifying original
+    const result = JSON.parse(JSON.stringify(data));
+    
+    // Walk object tree and format all date strings
+    const formatDates = (obj) => {
+      if (!obj || typeof obj !== 'object') return;
+      
+      Object.entries(obj).forEach(([key, value]) => {
+        if (value instanceof Date) {
+          obj[key] = value.toISOString();
+        } else if (typeof value === 'string' && 
+                  /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+          // Format YYYY-MM-DD to ISO string
+          obj[key] = new Date(`${value}T00:00:00Z`).toISOString();
+        } else if (typeof value === 'object') {
+          formatDates(value);
+        }
+      });
+    };
+    
+    formatDates(result);
+    return result;
+  })
+  .register('flattenCustomerAddress', data => {
+    if (!data || !data.customer || !data.customer.address) {
+      return data;
+    }
+    
+    const result = JSON.parse(JSON.stringify(data));
+    
+    // Flatten customer address
+    result.customerAddress = result.customer.address.street;
+    result.customerCity = result.customer.address.city;
+    result.customerState = result.customer.address.state;
+    result.customerZip = result.customer.address.zip;
+    
+    // Remove nested structure if needed
+    delete result.customer.address;
+    
+    return result;
+  });
+
+// Create a transformer pipeline
+const crmToLoanSystemTransformer = transformerFactory.createPipeline([
+  'dateFormatISO',
+  'flattenCustomerAddress'
+]);
+```
+
+### Message Routing
+
+1. **Dynamic Message Routing**
+   - Implement content-based routing rules
+   - Support conditional message flows
+   - Enable dynamic endpoint resolution
+   - Implement message filtering capabilities
+   - Support load balancing between multiple instances
+
+```javascript
+// Message router for integration bus
+class MessageRouter {
+  constructor() {
+    this.routes = new Map();
+    this.defaultRoutes = new Map();
+  }
+  
+  // Add a route rule
+  addRoute(operationType, routeRule) {
+    if (!this.routes.has(operationType)) {
+      this.routes.set(operationType, []);
+    }
+    
+    this.routes.get(operationType).push(routeRule);
+    return this;
+  }
+  
+  // Set default target for an operation
+  setDefaultRoute(operationType, targetSystem) {
+    this.defaultRoutes.set(operationType, targetSystem);
+    return this;
+  }
+  
+  // Route a message based on content and operation
+  async route(operation, message, context = {}) {
+    // Get routes for this operation
+    const routes = this.routes.get(operation) || [];
+    
+    // Find matching route
+    for (const route of routes) {
+      if (await route.condition(message, context)) {
+        return {
+          targetSystem: await route.resolveTarget(message, context),
+          transformation: route.transformation
+        };
+      }
+    }
+    
+    // Use default if available
+    if (this.defaultRoutes.has(operation)) {
+      return {
+        targetSystem: this.defaultRoutes.get(operation),
+        transformation: null
+      };
+    }
+    
+    throw new Error(`No route found for operation "${operation}"`);
+  }
+}
+
+// Example: Configure message routing
+const router = new MessageRouter();
+
+router
+  // Route loan applications based on loan amount
+  .addRoute('submitLoanApplication', {
+    condition: async (message) => message.loanAmount > 500000,
+    resolveTarget: async () => 'premium-loan-system',
+    transformation: 'premiumLoanTransformer'
+  })
+  .addRoute('submitLoanApplication', {
+    condition: async (message) => message.loanAmount <= 500000,
+    resolveTarget: async () => 'standard-loan-system',
+    transformation: 'standardLoanTransformer'
+  })
+  
+  // Route customer information updates based on customer type
+  .addRoute('updateCustomerInfo', {
+    condition: async (message) => message.customerType === 'business',
+    resolveTarget: async () => 'business-crm',
+    transformation: 'businessCustomerTransformer'
+  })
+  .addRoute('updateCustomerInfo', {
+    condition: async (message) => message.customerType === 'individual',
+    resolveTarget: async () => 'consumer-crm',
+    transformation: 'individualCustomerTransformer'
+  })
+  
+  // Dynamic routing based on external factors like load balancing
+  .addRoute('processPayment', {
+    condition: async () => true, // Match all
+    resolveTarget: async (message) => {
+      // Choose payment processor based on current load
+      const processors = await getAvailablePaymentProcessors();
+      const selectedProcessor = processors
+        .sort((a, b) => a.currentLoad - b.currentLoad)[0];
+      
+      return selectedProcessor.name;
+    },
+    transformation: 'standardPaymentTransformer'
+  });
+```
+
+### Event-Driven Integration
+
+1. **Event Streams and Pub/Sub**
+   - Implement publish-subscribe patterns using MCP functions
+   - Support event-driven architectures across systems
+   - Enable event sourcing for critical business events
+   - Manage event delivery and retry semantics
+   - Implement event filtering and routing
+
+```javascript
+// Event bus implementation using MCP
+class McpEventBus {
+  constructor(mcpClient) {
+    this.mcpClient = mcpClient;
+    this.subscribers = new Map();
+    this.eventStore = [];
+    this.maxEventStoreSize = 1000;
+    this.eventIdCounter = 0;
+  }
+  
+  // Subscribe to events
+  subscribe(eventType, handler, options = {}) {
+    if (!this.subscribers.has(eventType)) {
+      this.subscribers.set(eventType, []);
+    }
+    
+    const subscription = {
+      id: `sub_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      handler,
+      filter: options.filter || (() => true),
+      maxRetries: options.maxRetries || 3
+    };
+    
+    this.subscribers.get(eventType).push(subscription);
+    
+    return subscription.id;
+  }
+  
+  // Unsubscribe from events
+  unsubscribe(subscriptionId) {
+    for (const [eventType, subscribers] of this.subscribers.entries()) {
+      const index = subscribers.findIndex(sub => sub.id === subscriptionId);
+      if (index >= 0) {
+        subscribers.splice(index, 1);
+        return true;
+      }
+    }
+    
+    return false;
+  }
+  
+  // Publish an event
+  async publish(eventType, payload, options = {}) {
+    const eventId = `evt_${++this.eventIdCounter}`;
+    const timestamp = new Date().toISOString();
+    
+    const event = {
+      id: eventId,
+      type: eventType,
+      timestamp,
+      source: options.source || 'system',
+      payload
+    };
+    
+    // Store event if event sourcing is enabled
+    if (options.storeEvent) {
+      this.storeEvent(event);
+    }
+    
+    // Get subscribers for this event type
+    const subscribers = this.subscribers.get(eventType) || [];
+    
+    // Dispatch to subscribers
+    const deliveryPromises = subscribers
+      .filter(sub => sub.filter(payload))
+      .map(subscriber => this.deliverToSubscriber(event, subscriber));
+    
+    const results = await Promise.allSettled(deliveryPromises);
+    
+    return {
+      eventId,
+      delivered: results.filter(r => r.status === 'fulfilled').length,
+      failed: results.filter(r => r.status === 'rejected').length,
+      total: results.length
+    };
+  }
+  
+  // Store event in event store
+  storeEvent(event) {
+    // Add to event store with LRU behavior
+    this.eventStore.push(event);
+    
+    // Trim if too large
+    if (this.eventStore.length > this.maxEventStoreSize) {
+      this.eventStore.shift();
+    }
+  }
+  
+  // Deliver event to a subscriber with retry logic
+  async deliverToSubscriber(event, subscriber) {
+    let attempt = 0;
+    let lastError = null;
+    
+    while (attempt <= subscriber.maxRetries) {
+      try {
+        await subscriber.handler(event);
+        return true;
+      } catch (error) {
+        lastError = error;
+        attempt++;
+        
+        // Only wait if we're going to retry
+        if (attempt <= subscriber.maxRetries) {
+          const delay = Math.pow(2, attempt) * 100; // Exponential backoff
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      }
+    }
+    
+    // If we get here, all retries failed
+    console.error(`Failed to deliver event ${event.id} after ${subscriber.maxRetries} retries:`, lastError);
+    throw lastError;
+  }
+  
+  // Get recent events (for debugging/auditing)
+  getRecentEvents(limit = 100) {
+    return this.eventStore.slice(-limit);
+  }
+}
+```
+
+## Examples
+
+### Example 1: Loan Application Integration Flow
+
+```javascript
+// Set up MCP integration bus
+const integrationBus = new McpIntegrationBus({
+  logger: LogService
+});
+
+// Register system adapters
+integrationBus
+  .registerAdapter('crm-system', new RestApiAdapter({
+    baseUrl: 'https://crm.example.com/api',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-API-Version': '2.0'
+    },
+    operationMap: {
+      getCustomer: { endpoint: '/customers/{id}', method: 'GET' },
+      updateCustomer: { endpoint: '/customers/{id}', method: 'PUT' }
+    }
+  }))
+  .registerAdapter('loan-system', new RestApiAdapter({
+    baseUrl: 'https://loans.example.com/api',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    operationMap: {
+      submitApplication: { endpoint: '/applications', method: 'POST' },
+      getApplication: { endpoint: '/applications/{id}', method: 'GET' }
+    }
+  }))
+  .registerAdapter('document-system', new RestApiAdapter({
+    baseUrl: 'https://docs.example.com/api',
+    timeout: 60000 // Longer timeout for document processing
+  }))
+  .registerAdapter('notification-system', new RestApiAdapter({
+    baseUrl: 'https://notify.example.com/api'
+  }));
+
+// Register data transformers between systems
+integrationBus
+  .registerTransformer('crm-system', 'loan-system', async (data) => {
+    // Transform customer data to loan application format
+    return {
+      applicant: {
+        id: data.id,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        email: data.email,
+        phone: data.phoneNumber,
+        taxId: data.ssn,
+        dateOfBirth: data.birthDate
+      },
+      address: {
+        street: data.address.line1,
+        street2: data.address.line2,
+        city: data.address.city,
+        state: data.address.state,
+        zipCode: data.address.postalCode,
+        country: data.address.country || 'US'
+      },
+      employmentInfo: {
+        employerName: data.employment?.employer,
+        position: data.employment?.jobTitle,
+        yearsEmployed: data.employment?.yearsAtJob,
+        monthlyIncome: data.financials?.monthlyIncome
+      }
+    };
+  })
+  .registerTransformer('loan-system', 'notification-system', async (data) => {
+    // Transform loan application to notification format
+    return {
+      recipient: {
+        email: data.applicant.email,
+        phone: data.applicant.phone
+      },
+      template: 'loan_application_status',
+      data: {
+        applicationId: data.id,
+        status: data.status,
+        applicantName: `${data.applicant.firstName} ${data.applicant.lastName}`,
+        submissionDate: new Date(data.submittedAt).toLocaleDateString(),
+        nextSteps: data.nextSteps || []
+      }
+    };
+  });
+
+// Add message interceptors
+integrationBus.addInterceptor({
+  before: async (ctx) => {
+    // Log all incoming messages
+    LogService.info(`Integration message: ${ctx.targetSystem}.${ctx.operation}`, {
+      sourceSystem: ctx.options.sourceSystem,
+      targetSystem: ctx.targetSystem,
+      operation: ctx.operation,
+      messageId: crypto.randomUUID()
+    });
+    
+    return ctx.data;
+  },
+  after: async (ctx) => {
+    // Log successful responses
+    LogService.info(`Integration response: ${ctx.targetSystem}.${ctx.operation}`, {
+      status: 'success',
+      targetSystem: ctx.targetSystem,
+      operation: ctx.operation,
+      duration: Date.now() - ctx.startTime
+    });
+    
+    return ctx.result;
+  }
+});
+
+// Add error handlers
+integrationBus.addErrorHandler(async (ctx) => {
+  const { error, targetSystem, operation } = ctx;
+  
+  // Log error details
+  LogService.error(`Integration error: ${targetSystem}.${operation}`, {
+    targetSystem,
+    operation,
+    error: error.message,
+    stack: error.stack
+  });
+  
+  // Special handling for specific errors
+  if (error.message.includes('auth')) {
+    // Handle authentication errors
+    LogService.warn('Authentication error with integration target', {
+      targetSystem,
+      operation
+    });
+    
+    // Trigger auth refresh if possible
+    if (ctx.options.refreshAuth) {
+      try {
+        await refreshAuthForSystem(targetSystem);
+        return false; // Not handled, allow retry with fresh auth
+      } catch (refreshError) {
+        LogService.error('Failed to refresh authentication', {
+          targetSystem,
+          error: refreshError.message
+        });
+      }
+    }
+  }
+  
+  // Return false to propagate error, true to mark as handled
+  return false;
+});
+
+// Example: Loan application integration flow
+async function processLoanApplication(customerId, loanDetails) {
+  try {
+    // Step 1: Get customer data from CRM
+    const customerData = await integrationBus.send(
+      'crm-system',
+      'getCustomer',
+      { id: customerId }
+    );
+    
+    // Step 2: Transform and send to loan system
+    const loanApplication = await integrationBus.request(
+      'crm-system',
+      'loan-system',
+      'submitApplication',
+      {
+        ...customerData,
+        loanDetails
+      }
+    );
+    
+    // Step 3: Send notification about application
+    await integrationBus.request(
+      'loan-system',
+      'notification-system',
+      'sendNotification',
+      loanApplication
+    );
+    
+    // Step 4: Request document upload if application was successful
+    if (loanApplication.status === 'approved' || 
+        loanApplication.status === 'pending_documents') {
+      
+      await integrationBus.send(
+        'document-system',
+        'requestDocuments',
+        {
+          applicantId: customerId,
+          applicationId: loanApplication.id,
+          requiredDocuments: loanApplication.requiredDocuments || [
+            'income_verification',
+            'identity_proof',
+            'address_proof'
+          ]
+        }
+      );
+    }
+    
+    return {
+      applicationId: loanApplication.id,
+      status: loanApplication.status,
+      nextSteps: loanApplication.nextSteps
+    };
+  } catch (error) {
+    LogService.error('Loan application integration flow failed', {
+      customerId,
+      error: error.message
+    });
+    throw new Error(`Failed to process loan application: ${error.message}`);
+  }
+}
+```
+
+### Example 2: Event-Driven Integration Flow
+
+```javascript
+// Set up MCP event bus
+const eventBus = new McpEventBus(mcpClient);
+
+// Configure event subscribers
+eventBus.subscribe('customer.updated', async (event) => {
+  const { payload } = event;
+  
+  // When customer data changes, update related systems
+  try {
+    // Update loan system with new customer info
+    await integrationBus.send(
+      'loan-system',
+      'updateCustomerInfo',
+      {
+        customerId: payload.id,
+        customerName: `${payload.firstName} ${payload.lastName}`,
+        email: payload.email,
+        phone: payload.phoneNumber,
+        address: payload.address
+      }
+    );
+    
+    // Update notification preferences
+    await integrationBus.send(
+      'notification-system',
+      'updateContactPreferences',
+      {
+        userId: payload.id,
+        email: payload.email,
+        phone: payload.phoneNumber,
+        preferences: payload.communicationPreferences || {}
+      }
+    );
+    
+    LogService.info('Customer data synchronized across systems', {
+      customerId: payload.id,
+      eventId: event.id
+    });
+  } catch (error) {
+    LogService.error('Failed to synchronize customer data', {
+      customerId: payload.id,
+      eventId: event.id,
+      error: error.message
+    });
+  }
+});
+
+// Handle loan status updates
+eventBus.subscribe('loan.status_changed', async (event) => {
+  const { payload } = event;
+  
+  // Send appropriate notifications based on new status
+  try {
+    let template, additionalData = {};
+    
+    switch (payload.newStatus) {
+      case 'approved':
+        template = 'loan_approved';
+        additionalData = {
+          approvedAmount: payload.approvedAmount,
+          terms: payload.terms,
+          nextSteps: payload.nextSteps
+        };
+        break;
+        
+      case 'rejected':
+        template = 'loan_rejected';
+        additionalData = {
+          reason: payload.rejectionReason,
+          alternativeOptions: payload.alternativeOptions
+        };
+        break;
+        
+      case 'pending_review':
+        template = 'loan_pending_review';
+        additionalData = {
+          estimatedCompletionTime: payload.estimatedCompletionTime
+        };
+        break;
+        
+      case 'funded':
+        template = 'loan_funded';
+        additionalData = {
+          fundedAmount: payload.fundedAmount,
+          fundingDate: payload.fundingDate,
+          accountInfo: payload.accountInfo
+        };
+        break;
+        
+      default:
+        template = 'loan_status_update';
+    }
+    
+    // Get customer data
+    const customerData = await integrationBus.send(
+      'crm-system',
+      'getCustomer',
+      { id: payload.customerId }
+    );
+    
+    // Send notification
+    await integrationBus.send(
+      'notification-system',
+      'sendNotification',
+      {
+        recipient: {
+          email: customerData.email,
+          phone: customerData.phoneNumber
+        },
+        template,
+        data: {
+          customerName: `${customerData.firstName} ${customerData.lastName}`,
+          loanId: payload.loanId,
+          loanType: payload.loanType,
+          newStatus: payload.newStatus,
+          statusChangeDate: new Date(payload.timestamp).toLocaleDateString(),
+          ...additionalData
+        }
+      }
+    );
+    
+    // Update CRM with loan status
+    await integrationBus.send(
+      'crm-system',
+      'updateCustomerLoanStatus',
+      {
+        customerId: payload.customerId,
+        loanId: payload.loanId,
+        status: payload.newStatus,
+        statusDate: payload.timestamp
+      }
+    );
+    
+    LogService.info('Loan status change processed', {
+      loanId: payload.loanId,
+      customerId: payload.customerId,
+      newStatus: payload.newStatus,
+      eventId: event.id
+    });
+  } catch (error) {
+    LogService.error('Failed to process loan status change', {
+      loanId: payload.loanId,
+      customerId: payload.customerId,
+      newStatus: payload.newStatus,
+      eventId: event.id,
+      error: error.message
+    });
+  }
+});
+
+// Example: Publish events
+async function updateCustomerAndNotify(customerData) {
+  try {
+    // Update customer in CRM
+    const updatedCustomer = await integrationBus.send(
+      'crm-system',
+      'updateCustomer',
+      customerData
+    );
+    
+    // Publish event about the update
+    await eventBus.publish('customer.updated', updatedCustomer, {
+      source: 'customer-portal',
+      storeEvent: true
+    });
+    
+    return {
+      success: true,
+      customerId: updatedCustomer.id
+    };
+  } catch (error) {
+    LogService.error('Failed to update customer', {
+      customerId: customerData.id,
+      error: error.message
+    });
+    
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+```
+
+## Enforcement
+
+1. **Integration Standards**
+   - Require standardized adapter implementations for all systems
+   - Define clear data transformation guidelines
+   - Implement consistent error handling across integration points
+   - Establish naming conventions for operations
+   - Document integration flows with sequence diagrams
+
+2. **Testing Requirements**
+   - Require integration tests for all system connections
+   - Test error handling and retry scenarios
+   - Implement circuit breaker patterns for unreliable systems
+   - Validate data transformations with schema testing
+   - Use mock adapters for development and testing
+
+3. **Monitoring and Management**
+   - Implement health checks for all integrated systems
+   - Monitor message throughput and latency
+   - Track transformation errors and system availability
+   - Create dashboards showing integration status
+   - Implement alerting for integration failures
+
+## Implementation Guide
+
+While there is no dedicated guide for integration bus patterns yet, you can find related concepts in the [MCP Composition Patterns guide](mdc:examples/mcp/03-mcp-composition-patterns.md).
+
+For a comprehensive overview of all MCP implementation approaches, start with the [MCP Implementation Guide](mdc:examples/mcp/01-mcp-implementation-guide.md).

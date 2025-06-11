@@ -1,0 +1,143 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+description: Apply ALWAYS when working with environment variables and configuration to ensure sensitive information is protected
+globs: "**/*"
+
+# Environment Variable Protection
+
+This document outlines the critical requirements for handling environment variables and other configuration data to prevent the exposure of sensitive information.
+
+## Core Requirements
+
+- **REQUIRED**: Never expose sensitive environment variables in client-side code
+- **REQUIRED**: Never share screenshots or recordings showing environment variables
+- **REQUIRED**: Clearly distinguish between client-side and server-side environment variables
+- **REQUIRED**: Use naming conventions to identify client-safe variables (e.g., `NEXT_PUBLIC_` prefix in Next.js)
+- **REQUIRED**: Implement sanitization in logging to prevent accidental exposure of secrets
+
+## Environment Variable Management
+
+### Client vs. Server Variables
+
+- Keep all sensitive variables restricted to server-side code only
+- Only use deliberately prefixed variables (e.g., `NEXT_PUBLIC_`, `VITE_`, `REACT_APP_`) in client-side code
+- Never access sensitive variables like API keys, database credentials, or tokens in client-side components
+- Verify during code review that no sensitive variables are exposed to clients
+
+### Secret Management Best Practices
+
+- Use secret management services in production environments (AWS Secrets Manager, HashiCorp Vault, etc.)
+- Rotate secrets regularly according to security policy
+- Implement principle of least privilege for secret access
+- Never hardcode credentials, even in private repositories
+- Use different secrets for different environments (dev, staging, production)
+
+## Implementation Examples
+
+### Correct Usage (React/Next.js)
+
+```typescript
+// GOOD: Only using approved client-side variables
+// In a client-side component
+const ApiComponent = () => {
+  const publicApiEndpoint = process.env.NEXT_PUBLIC_API_ENDPOINT; // Safe to expose
+  
+  return <div>API Endpoint: {publicApiEndpoint}</div>;
+};
+
+// GOOD: Keeping sensitive variables server-side
+// In a server-side API route or Server Component
+export async function getServerSideProps() {
+  const apiKey = process.env.API_SECRET_KEY; // Safely used server-side only
+  const data = await fetchWithAuth(apiKey);
+  
+  return { props: { data } }; // Only the resulting data is sent to client
+}
+```
+
+### Incorrect Usage (React/Next.js)
+
+```typescript
+// BAD: Exposing sensitive credentials in client-side code
+// In a client-side component
+const ApiComponent = () => {
+  const apiKey = process.env.API_SECRET_KEY; // This will be exposed in the client bundle!
+  
+  return <div>Using API: {apiKey}</div>;
+};
+```
+
+### Correct Usage (Node.js/Express)
+
+```javascript
+// GOOD: Loading environment variables with validation
+require('dotenv').config();
+
+// Validate required environment variables at startup
+function validateEnv() {
+  const required = ['DATABASE_URL', 'JWT_SECRET', 'API_KEY'];
+  
+  for (const variable of required) {
+    if (!process.env[variable]) {
+      throw new Error(`Missing required environment variable: ${variable}`);
+    }
+  }
+}
+
+validateEnv();
+
+// Using variables in a protected server context
+app.get('/api/data', authenticateRequest, async (req, res) => {
+  const apiKey = process.env.API_KEY; // Safely server-side only
+  // use apiKey to make authorized API requests
+});
+```
+
+### Secure Logging
+
+```javascript
+// GOOD: Sanitizing sensitive data in logs
+const logger = require('./logger');
+
+function logApiRequest(req) {
+  const sanitizedHeaders = { ...req.headers };
+  
+  // Remove sensitive headers
+  delete sanitizedHeaders.authorization;
+  delete sanitizedHeaders.cookie;
+  
+  // Safe to log
+  logger.info('API Request', { 
+    path: req.path, 
+    method: req.method,
+    headers: sanitizedHeaders
+  });
+}
+```
+
+## Configuration Files
+
+### .env File Security
+
+- Never commit `.env` files to source control
+- Add `.env` files to `.gitignore`
+- Provide `.env.example` files with placeholder values
+- Document required environment variables in README files
+- Implement validation for required environment variables at application startup
+
+### CI/CD Pipeline Security
+
+- Store environment variables in secure CI/CD pipeline settings (GitHub Secrets, CircleCI Environment Variables, etc.)
+- Never print environment variables in CI/CD logs
+- Use secrets masks/redaction in CI/CD providers
+- Isolate environment variable access to only necessary build steps
+
+## Auditing & Compliance
+
+- Regularly audit code for accidental exposure of environment variables
+- Implement automated scanning for secret detection in code repositories
+- Follow compliance requirements for handling secrets and credentials
+- Document all environment variables and their purpose for security reviews

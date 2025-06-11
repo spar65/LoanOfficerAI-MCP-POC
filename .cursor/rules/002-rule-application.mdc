@@ -1,0 +1,246 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+description: Apply ALWAYS when determining which rules must be followed for a specific task or project
+globs: "**/*"
+
+# Rule Application Guidelines
+
+This document provides guidance on when and how to apply cursor rules based on their priority levels and the specific context of your work.
+
+## Rule Priority System
+
+All rules in the enterprise cursor rules system are categorized by priority to indicate their importance:
+
+### P0 (Required)
+- **Definition**: Must be followed for all code changes without exception
+- **Enforcement**: Violations are not acceptable without explicit team approval and documentation
+- **Auditing**: P0 rules are subject to regular compliance audits
+- **Examples**: Security protocols, multi-tenancy isolation, data access controls
+
+### P1 (Important)
+- **Definition**: Should be followed for most code changes, strongly recommended
+- **Enforcement**: Temporary exceptions are allowed with proper documentation in PRs
+- **Auditing**: Compliance is regularly reviewed in code reviews
+- **Examples**: UI component architecture, performance metrics, CSS organization
+
+### P2 (Nice to Have)
+- **Definition**: Recommended practices to follow when time permits
+- **Enforcement**: Encouraged but optional depending on project constraints
+- **Auditing**: Not strictly enforced, but encouraged through knowledge sharing
+- **Examples**: Animation standards, UX enhancements, additional optimizations
+
+## Rule Application by Project Phase
+
+### Project Kickoff & Planning
+- **Required**: All P0 rules relevant to the domain
+- **Recommended**: Identify P1 rules that will be followed
+- **Optional**: Note any P2 rules that align with project goals
+
+### Active Development
+- **Required**: All P0 rules must be followed with no exceptions
+- **Recommended**: Most P1 rules should be followed unless documented otherwise
+- **Optional**: P2 rules should be applied when they don't impact delivery timelines
+
+### Maintenance & Enhancement
+- **Required**: All P0 rules must be enforced, updating non-compliant code when touched
+- **Recommended**: Bring code closer to P1 compliance with each update
+- **Optional**: Consider implementing P2 rules during refactoring efforts
+
+## Rule Application by Project Type
+
+### Critical Systems
+- **Required**: All P0 and P1 rules relevant to the domain
+- **Recommended**: Most P2 rules should also be followed
+- **Exemptions**: Require executive approval and risk assessment
+
+### Standard Applications
+- **Required**: All P0 rules must be followed
+- **Recommended**: Most P1 rules should be followed
+- **Optional**: P2 rules at team discretion
+
+### Prototypes & Experiments
+- **Required**: Security-related P0 rules must still be followed
+- **Recommended**: Other P0 rules should be followed when possible
+- **Optional**: P1 and P2 rules at developer discretion, but documented
+
+## Rule Annotations in Code
+
+Annotate code with rule references to clearly document which rules have been applied:
+
+```typescript
+/**
+ * @rule core/001-security "Security principles for auth flows"
+ * @rule departments/engineering/security/014-third-party-auth "Third-party auth implementation"
+ */
+function authenticateUser(): void {
+  // Implementation follows security rules
+}
+```
+
+For temporary exceptions:
+
+```typescript
+/**
+ * @rule-exception technologies/languages/javascript/054-accessibility-requirements
+ * @reason "Temporary implementation for prototype"
+ * @deadline 2023-12-31
+ * @approval "Jane Doe, VP Engineering"
+ */
+```
+
+## Rule Conflict Resolution
+
+When rules appear to conflict:
+
+1. **Higher priority wins**: P0 rules take precedence over P1 and P2
+2. **More specific wins**: Domain-specific rules override general rules
+3. **Security wins**: Security-related rules take precedence over convenience
+4. **Escalate**: When conflicts can't be resolved, escalate to architecture team
+
+## Documentation of Exceptions
+
+When a rule must be exempted:
+
+1. **Document reason**: Clearly state why the rule cannot be followed
+2. **Risk assessment**: Document any risks associated with the exemption
+3. **Approval**: Get appropriate approval based on rule priority
+4. **Timeframe**: Specify how long the exemption will be in effect
+5. **Remediation plan**: If temporary, include plan to become compliant
+
+## Example Decision Process
+
+When faced with a development task:
+
+1. **Identify applicable rules** from the Rules Registry
+2. **Prioritize implementation** based on rule priority
+3. **Document any exceptions** for P1 or P0 rules you cannot follow
+4. **Get appropriate approvals** for exceptions
+5. **Apply the rules** in your implementation
+6. **Reference applied rules** in PR descriptions
+
+## Measuring Compliance
+
+Compliance with rules is measured through:
+
+1. **Code reviews**: Check for adherence to applicable rules
+2. **Automated scanning**: Where possible, automated checks verify compliance
+3. **Documentation audit**: Review of exception documentation
+4. **Impact assessment**: Evaluate the business impact of rule adherence or exception
+
+## Implementation Examples
+
+### Good: Feature Implementation with Rule Application
+
+```markdown
+// File: feature-planning.md
+/**
+ * # Feature Plan: User Authentication
+ * 
+ * ## Applicable Rules
+ * 
+ * ### P0 (Required)
+ * - core/001-security: Security Principles
+ * - departments/engineering/security/014-third-party-auth: Third-party Auth
+ * - departments/engineering/security/046-session-validation: Session Validation
+ * 
+ * ### P1 (Important)
+ * - departments/engineering/security/047-security-design-system: Security Design System 
+ * - departments/engineering/operations/131-error-handling: Error Handling
+ * 
+ * ### P2 (Nice to Have)
+ * - departments/product/045-ux-enhancements: UX Enhancements
+ */
+```
+
+```typescript
+// File: auth-service.ts
+/**
+ * Authentication Service
+ * @rule core/001-security "Following security compliance standards"
+ * @rule departments/engineering/security/014-third-party-auth "Implementing third-party auth securely"
+ * @rule departments/engineering/security/046-session-validation "Ensuring proper session validation"
+ */
+export class AuthService {
+  // Implementation follows security rules
+}
+```
+
+### Bad: Implementation Without Rule Consideration
+
+```typescript
+// No rule planning or documentation
+// Inconsistent implementation that may violate rules
+export class AuthService {
+  // Ad-hoc implementation without rule guidance
+}
+```
+
+## Integration with Other Rules
+
+- Supports [core/000-core-guidelines.mdc](mdc:core/000-core-guidelines.mdc) as a meta-rule
+- Enhances [templates/001-cursor-rules-template.mdc](mdc:templates/001-cursor-rules-template.mdc) with application guidance
+- Provides framework for applying [departments/engineering/operations/150-technical-debt-prevention.mdc](mdc:departments/engineering/operations/150-technical-debt-prevention.mdc)
+
+## Tools for Rule Application
+
+### VSCode Snippets
+Create snippets for rule annotations:
+
+```json
+"Rule Reference": {
+  "prefix": "rule",
+  "body": ["@rule ${1:rule-path} \"${2:rule-description}\""],
+  "description": "Add a rule reference"
+},
+"Rule Exception": {
+  "prefix": "rule-exception",
+  "body": [
+    "@rule-exception ${1:rule-path}",
+    "@reason \"${2:reason for exception}\"",
+    "@deadline ${3:YYYY-MM-DD}",
+    "@approval \"${4:approver name and role}\""
+  ],
+  "description": "Document a rule exception"
+}
+```
+
+### Pre-commit Hooks
+Add pre-commit checks to verify P0 rule compliance:
+
+```bash
+#!/bin/bash
+# Example pre-commit hook for rule validation
+files=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '\.(js|ts|tsx)$')
+if [ -n "$files" ]; then
+  for file in $files; do
+    # Check for security rule compliance in modified files
+    if grep -q "security-sensitive" "$file" && ! grep -q "@rule core/001-security" "$file"; then
+      echo "ERROR: $file handles security-sensitive data but doesn't reference security rules"
+      exit 1
+    fi
+  done
+fi
+```
+
+### Automated Documentation
+Generate documentation of applied rules per file/module using tools like:
+
+```bash
+#!/bin/bash
+# Example script to generate rule compliance documentation
+echo "# Rule Compliance Report" > rule-report.md
+echo "Generated on $(date)" >> rule-report.md
+echo "" >> rule-report.md
+
+find src -type f -name "*.ts" | while read file; do
+  rules=$(grep -o "@rule [^ ]* \"[^\"]*\"" "$file" | sed 's/@rule /- /')
+  if [ -n "$rules" ]; then
+    echo "## $file" >> rule-report.md
+    echo "$rules" >> rule-report.md
+    echo "" >> rule-report.md
+  fi
+done
+```

@@ -1,0 +1,304 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Technical Stack Selection and Integration
+
+## Context and Purpose
+
+The selection, evaluation, and integration of technical components is one of the most critical decisions in software development. It impacts maintainability, performance, security, and the ability to meet business goals.
+
+This rule establishes a framework for evaluating, selecting, recommending, and integrating technology stack components to ensure they align with enterprise objectives, technical requirements, and long-term maintainability needs.
+
+## Requirements
+
+### 1. Technology Evaluation Framework
+
+- **Technology Assessment Matrix**: All proposed technology components must be evaluated using a standardized assessment matrix
+- **Evaluation Criteria**: Technology evaluations must include:
+  - Technical fit (capabilities, limitations, performance characteristics)
+  - Enterprise alignment (compliance with architecture principles)
+  - Maturity and community support
+  - Security profile and vulnerability history
+  - Maintenance requirements
+  - Learning curve and team expertise
+  - Licensing and cost implications
+  - Integration capabilities with existing systems
+
+- **Alternatives Analysis**: At least two alternatives must be considered for each technology selection
+- **Pilot Projects**: New major technologies must undergo pilot implementation before full adoption
+
+### 2. Core Technology Standards
+
+- **Standardized Stack Components**: Primary technologies must come from the approved technology catalog
+- **Exceptions Process**: Deviations from approved technologies require formal justification and approval
+- **Technology Lifecycle Governance**: All technologies must be classified by maturity stage and have a defined roadmap
+- **Version Standardization**: Specific versions must be standardized across the enterprise for core components
+
+### 3. Integration Requirements
+
+- **Integration Patterns**: Standard integration patterns must be implemented for connecting components
+- **API Standards**: All component integrations must follow the established API standards
+- **Observability**: Cross-component observability must be maintained through consistent logging, metrics, and tracing
+- **Testing Strategy**: Integration testing must cover all component boundaries and interactions
+- **Documentation**: Integration points must be fully documented including data flow, error handling, and security controls
+
+### 4. Technology Adoption Process
+
+- **Proof of Concept**: New technologies require a formal PoC with defined success criteria
+- **Migration Strategy**: Adoption of new technologies must include migration plans for existing systems
+- **Skills Development**: Team training must be planned before wide adoption of new technologies
+- **Phased Rollout**: Major technology transitions must follow a phased approach with validation gates
+
+### 5. Continuous Technology Evaluation
+
+- **Technology Radar**: Maintain a categorized view of technologies as adopt, trial, assess, and hold
+- **Regular Reviews**: Conduct periodic assessments of technology stack components
+- **Deprecation Process**: Establish clear procedures for deprecating and replacing technology components
+- **Technical Debt Tracking**: Track technical debt related to technology choices
+
+## Examples
+
+### Good Examples
+
+```typescript
+// GOOD EXAMPLE: Standardized technology integration with clear boundaries
+// auth-service.ts - Authentication service with well-defined integration points
+
+// 1. Clear interface definition for integration
+export interface AuthenticationService {
+  authenticate(credentials: UserCredentials): Promise<AuthResult>;
+  validateToken(token: string): Promise<ValidationResult>;
+  refreshToken(token: string): Promise<TokenResponse>;
+}
+
+// 2. Implementation with appropriate error handling and logging
+export class KeycloakAuthService implements AuthenticationService {
+  private readonly keycloak: KeycloakClient;
+  private readonly logger: Logger;
+  
+  constructor(config: KeycloakConfig, logger: Logger) {
+    this.keycloak = new KeycloakClient(config);
+    this.logger = logger;
+  }
+  
+  async authenticate(credentials: UserCredentials): Promise<AuthResult> {
+    try {
+      this.logger.info('Authentication attempt', { username: credentials.username });
+      const result = await this.keycloak.authenticate(credentials);
+      
+      this.logger.info('Authentication successful', { username: credentials.username });
+      return {
+        success: true,
+        token: result.access_token,
+        refreshToken: result.refresh_token,
+        expiresIn: result.expires_in,
+        userData: this.mapUserData(result.user_info)
+      };
+    } catch (error) {
+      this.logger.error('Authentication failed', { 
+        username: credentials.username,
+        error: error.message,
+        errorCode: error.code
+      });
+      
+      return {
+        success: false,
+        error: this.mapErrorToStandardFormat(error)
+      };
+    }
+  }
+  
+  // Additional methods implementing the interface...
+}
+
+// 3. Standardized factories for service creation
+export const createAuthService = (config: AppConfig): AuthenticationService => {
+  // Feature flag for new auth provider transition
+  if (config.features.useNewAuthProvider) {
+    return new Auth0Service(config.auth0Config, config.logger);
+  }
+  
+  return new KeycloakAuthService(config.keycloakConfig, config.logger);
+};
+```
+
+```python
+# GOOD EXAMPLE: Database technology integration with clear separation
+# database.py - Database access layer with technology-specific implementations
+
+from abc import ABC, abstractmethod
+from typing import List, Optional, Dict, Any
+import logging
+
+# 1. Abstract interface for database operations
+class DatabaseProvider(ABC):
+    @abstractmethod
+    def get_connection(self):
+        pass
+        
+    @abstractmethod
+    async def execute_query(self, query: str, params: Optional[Dict[str, Any]] = None):
+        pass
+        
+    @abstractmethod
+    async def execute_transaction(self, queries: List[Dict]):
+        pass
+
+# 2. PostgreSQL implementation
+class PostgresProvider(DatabaseProvider):
+    def __init__(self, connection_config, metrics_client=None):
+        self.config = connection_config
+        self.metrics = metrics_client
+        self.logger = logging.getLogger("database.postgres")
+        self.pool = None
+        
+    async def initialize(self):
+        """Initialize connection pool with optimized settings"""
+        try:
+            self.pool = await asyncpg.create_pool(
+                host=self.config.host,
+                port=self.config.port,
+                user=self.config.user,
+                password=self.config.password,
+                database=self.config.database,
+                min_size=self.config.min_connections,
+                max_size=self.config.max_connections,
+                timeout=self.config.connection_timeout
+            )
+            self.logger.info("PostgreSQL connection pool initialized")
+            
+            if self.metrics:
+                self.metrics.gauge("db.connections.pool_size", self.config.max_connections)
+        except Exception as e:
+            self.logger.error(f"Failed to initialize PostgreSQL connection pool: {str(e)}")
+            raise DatabaseInitializationError(f"PostgreSQL initialization failed: {str(e)}")
+    
+    # Implementation of other abstract methods...
+
+# 3. Factory function for creating the right provider
+def get_database_provider(app_config):
+    """Create appropriate database provider based on configuration"""
+    db_type = app_config.database.type.lower()
+    
+    if db_type == "postgres":
+        return PostgresProvider(app_config.database.postgres_config, app_config.metrics_client)
+    elif db_type == "mysql":
+        return MySQLProvider(app_config.database.mysql_config, app_config.metrics_client)
+    elif db_type == "mongodb":
+        return MongoDBProvider(app_config.database.mongodb_config, app_config.metrics_client)
+    else:
+        raise ValueError(f"Unsupported database type: {db_type}")
+```
+
+### Bad Examples
+
+```javascript
+// BAD EXAMPLE: Tightly coupled technology choice with no abstraction
+// Direct MongoDB implementation with no clear integration boundaries
+
+const db = require('mongodb').MongoClient.connect('mongodb://localhost:27017/myapp');
+
+// Problems:
+// 1. Hardcoded connection string
+// 2. No abstraction to allow switching databases
+// 3. No error handling or connection management
+// 4. Difficult to mock for testing
+
+async function getUsers() {
+  return db.collection('users').find().toArray();
+}
+
+async function saveUser(user) {
+  return db.collection('users').insertOne(user);
+}
+
+module.exports = {
+  getUsers,
+  saveUser
+};
+```
+
+```java
+// BAD EXAMPLE: Monolithic integration with multiple technologies
+// Single class handling multiple technology integrations
+
+public class SystemManager {
+    // Problems:
+    // 1. Too many responsibilities
+    // 2. Direct integration with multiple technologies
+    // 3. No abstraction layers
+    // 4. Difficult to maintain or modify
+    
+    private Connection dbConnection;
+    private RestTemplate apiClient;
+    private RedisTemplate redisClient;
+    private KafkaTemplate kafkaTemplate;
+    
+    public SystemManager() {
+        // Direct initialization of multiple technologies
+        try {
+            Class.forName("org.postgresql.Driver");
+            this.dbConnection = DriverManager.getConnection(
+                "jdbc:postgresql://localhost:5432/mydb", "user", "password");
+            
+            this.apiClient = new RestTemplate();
+            
+            RedisStandaloneConfiguration redisConfig = new RedisStandaloneConfiguration();
+            redisConfig.setHostName("localhost");
+            redisConfig.setPort(6379);
+            this.redisClient = new RedisTemplate<>();
+            
+            Map<String, Object> kafkaProps = new HashMap<>();
+            kafkaProps.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
+            // More Kafka configuration...
+            this.kafkaTemplate = new KafkaTemplate<>(new DefaultKafkaProducerFactory<>(kafkaProps));
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+    
+    // Methods using all these different technologies...
+}
+```
+
+## Implementation
+
+### 1. Technology Selection Process
+
+- **Establish Technology Evaluation Committee**: Form a cross-functional team for technology assessment
+- **Create Assessment Templates**: Develop standardized templates for technology evaluation
+- **Define Scoring Mechanism**: Implement a weighted scoring approach for each evaluation criteria
+- **Build Knowledge Base**: Maintain documentation on technology evaluations and decisions
+
+### 2. Technology Integration Patterns
+
+- **Dependency Injection**: Use DI frameworks to allow technology components to be swapped
+- **Adapter Pattern**: Implement adapters for all external technology integrations
+- **Service Layer**: Define service interfaces that abstract underlying technology implementations
+- **Feature Flags**: Use feature flags to control technology transitions and migrations
+- **Circuit Breakers**: Implement circuit breakers for communication between technology components
+
+### 3. Governance and Compliance
+
+- **Technology Catalog**: Maintain an official catalog of approved and experimental technologies
+- **Version Standards**: Define and enforce version standards for key technology components
+- **Security Reviews**: Conduct security assessments for all new technology adoptions
+- **License Compliance**: Verify license compliance before technology adoption
+
+### 4. Operational Excellence
+
+- **Technology-Specific Monitoring**: Implement specialized monitoring for each technology component
+- **Documentation Standards**: Maintain current documentation on all technology components
+- **Expertise Development**: Create centers of excellence for core technologies
+- **Operational Runbooks**: Establish operational procedures for each technology component
+
+## See Also
+
+- [mdc:technologies/frameworks/042-ui-component-architecture.mdc](mdc:UI Component Architecture)
+- [mdc:technologies/frameworks/110-integration-dependencies.mdc](mdc:Integration Dependencies)
+- [mdc:departments/engineering/coding-standards/104-stable-interfaces.mdc](mdc:Stable Interfaces)
+- [mdc:examples/architecture/TechnologyEvaluationMatrix.md](mdc:Technology Evaluation Matrix)
+- [mdc:examples/architecture/TechnologyMigrationGuide.md](mdc:Technology Migration Guide)
+- [mdc:examples/architecture/TechnologyRadarExample.md](mdc:Technology Radar Example)

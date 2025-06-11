@@ -1,0 +1,598 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+___
+description: Apply when implementing or modifying any authentication-related features using Clerk
+globs: "**/auth/**/*.{js,ts,jsx,tsx}, **/components/auth/*.{js,ts,jsx,tsx}, **/pages/api/auth/**/*.{js,ts}, **/middleware.{js,ts}, **/pages/_app.{js,ts,jsx,tsx}, **/app/layout.{js,ts,jsx,tsx}"
+___
+
+# Clerk Authentication Implementation Standards
+
+## Context
+- Apply when implementing or modifying any authentication-related features using Clerk
+- This rule builds upon the general third-party auth standards in [014-third-party-auth.mdc](mdc:014-third-party-auth.mdc)
+- Framework compatibility is critical for successful integration
+- Authentication must precede payment/subscription systems in implementation order
+- User identity is foundational to subscription-based feature access control
+
+## Requirements
+
+### Pre-Implementation Verification
+- **REQUIRED**: Verify Clerk SDK compatibility with your Next.js/React version before beginning implementation
+- **REQUIRED**: Create a compatibility matrix of all dependent libraries and versions
+- Create a proof-of-concept for critical functionality before full implementation
+- If framework upgrades are needed, create a comprehensive testing plan for post-upgrade verification
+- Document any version constraints and dependencies in project documentation
+
+### Environment Configuration
+- **REQUIRED**: Store all Clerk-related API keys (publishable key, secret key) in environment variables
+- **REQUIRED**: Use the `NEXT_PUBLIC_` prefix for the publishable key to make it available client-side
+- **REQUIRED**: Never commit Clerk API keys to version control
+- Create separate Clerk application instances for development, staging, and production
+- Validate environment variables at runtime to prevent startup with missing credentials
+- Document all required environment variables with examples in a `.env.example` file
+
+```typescript
+// Validating environment variables at application startup
+if (!process.env.CLERK_SECRET_KEY || !process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY) {
+  throw new Error(
+    'Missing Clerk environment variables. Please set CLERK_SECRET_KEY and NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY.'
+  );
+}
+```
+
+### Initial Setup
+- **REQUIRED**: Install a specific version of `@clerk/nextjs` known to be compatible with your Next.js version
+- **REQUIRED**: Wrap the application in `<ClerkProvider>` at the root level (e.g., in `_app.js` or `app/layout.js`)
+- **REQUIRED**: Add debugging/validation components during development to verify auth state
+- Configure sign-in, sign-up, and user profile URLs in Clerk Dashboard
+- Match public routes in middleware with the same paths in Clerk Dashboard settings
+
+```jsx
+// Good _app.js implementation with ClerkProvider
+import { ClerkProvider } from '@clerk/nextjs';
+
+function MyApp({ Component, pageProps }) {
+  return (
+    <ClerkProvider 
+      publishableKey={process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
+      appearance={{
+        // Consistent styling with application
+        variables: {
+          colorPrimary: '#3b82f6',
+          borderRadius: '0.375rem'
+        }
+      }}
+    >
+      <Component {...pageProps} />
+      {process.env.NODE_ENV === 'development' && <ClerkDebug />}
+    </ClerkProvider>
+  );
+}
+
+export default MyApp;
+```
+
+### Authentication Components
+- **REQUIRED**: Use Clerk's pre-built UI components rather than creating custom auth forms
+- **REQUIRED**: Implement proper loading states while authentication state is being determined
+- **REQUIRED**: Provide clear user feedback for authentication errors
+- Use `<SignedIn>` and `<SignedOut>` components for conditional UI rendering
+- Create reusable authentication wrapper components for consistent functionality
+- Implement clear visual indicators of authentication state in the UI
+
+```jsx
+// Good authentication UI with conditional rendering and loading state
+import { SignedIn, SignedOut, UserButton, SignInButton, useAuth } from '@clerk/nextjs';
+
+function Header() {
+  const { isLoaded } = useAuth();
+  
+  if (!isLoaded) {
+    return <div className="loading-auth">Loading...</div>;
+  }
+  
+  return (
+    <header>
+      <nav>
+        <div className="logo">My App</div>
+        <div className="nav-links">
+          <a href="/">Home</a>
+          <a href="/features">Features</a>
+          
+          <SignedIn>
+            <a href="/dashboard">Dashboard</a>
+            <UserButton afterSignOutUrl="/" />
+          </SignedIn>
+          
+          <SignedOut>
+            <SignInButton mode="modal">
+              <button className="sign-in-button">Sign In</button>
+            </SignInButton>
+          </SignedOut>
+        </div>
+      </nav>
+    </header>
+  );
+}
+```
+
+### Route Protection
+- **REQUIRED**: Use Clerk middleware for route protection, not custom authentication checks
+- **REQUIRED**: Explicitly define all public routes in the middleware configuration
+- **REQUIRED**: Test route protection with both authenticated and unauthenticated users
+- Implement consistent redirect behaviors for unauthorized access attempts
+- Consider implementing role-based route protection for admin/restricted areas
+- Provide meaningful feedback when users attempt to access protected routes
+
+```jsx
+// Good middleware implementation with explicit public/protected routes
+import { authMiddleware } from '@clerk/nextjs';
+
+export default authMiddleware({
+  // Define routes that can be accessed without authentication
+  publicRoutes: [
+    '/',
+    '/about',
+    '/features',
+    '/pricing',
+    '/sign-in(.*)',
+    '/sign-up(.*)',
+    '/api/public/(.*)',
+    // Webhooks should be public but verified by signature
+    '/api/webhooks/(.*)'
+  ],
+  // Optional: Define routes that are always ignored (static assets, etc.)
+  ignoredRoutes: [
+    '/_next/static/(.*)',
+    '/favicon.ico',
+    '/api/health'
+  ]
+});
+
+export const config = {
+  matcher: ['/((?!.*\\..*|_next).*)', '/', '/(api|trpc)(.*)'],
+};
+```
+
+### API Route Protection
+- **REQUIRED**: Use Clerk's `getAuth()` for server-side authentication checks in API routes
+- **REQUIRED**: Return consistent error responses (401/403) for unauthenticated API requests
+- Implement proper error handling for authentication failures
+- Use TypeScript types for authenticated requests when available
+- Add logging for authentication failures (without exposing sensitive information)
+- Consider rate limiting for authentication endpoints to prevent brute force attempts
+
+```typescript
+// Good server-side authentication check
+import { getAuth } from '@clerk/nextjs/server';
+import { NextResponse } from 'next/server';
+
+export async function GET(request) {
+  const { userId } = getAuth(request);
+  
+  if (!userId) {
+    // Consistent error format with status code
+    return NextResponse.json(
+      { error: 'Authentication required' }, 
+      { status: 401 }
+    );
+  }
+  
+  try {
+    // Proceed with authorized endpoint logic
+    const data = await fetchUserData(userId);
+    return NextResponse.json({ data });
+  } catch (error) {
+    console.error('Error in protected API route:', error.message);
+    return NextResponse.json(
+      { error: 'An error occurred processing your request' },
+      { status: 500 }
+    );
+  }
+}
+```
+
+### User Data Handling
+- **REQUIRED**: Use Clerk's hooks (`useUser`, `useAuth`) to access user data client-side
+- **REQUIRED**: Minimize the user data you store in your own database to avoid duplication
+- Apply data minimization principles - only access user fields you actually need
+- Implement proper caching for user profile data when appropriate
+- Create typed interfaces for user objects to ensure consistent usage
+- Consider privacy implications when displaying user information
+
+```typescript
+// Good user data handling with TypeScript typing
+import { useUser } from '@clerk/nextjs';
+
+// Define interface for user data
+interface UserData {
+  id: string;
+  firstName: string | null;
+  lastName: string | null;
+  email: string;
+  profileImageUrl: string;
+}
+
+// Custom hook for typed user data
+function useTypedUser(): {
+  user: UserData | null;
+  isLoaded: boolean;
+  isSignedIn: boolean;
+} {
+  const { user, isLoaded, isSignedIn } = useUser();
+  
+  if (!isLoaded || !isSignedIn || !user) {
+    return { user: null, isLoaded, isSignedIn };
+  }
+  
+  // Extract only the fields we need
+  const userData: UserData = {
+    id: user.id,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    email: user.primaryEmailAddress?.emailAddress || '',
+    profileImageUrl: user.profileImageUrl
+  };
+  
+  return { user: userData, isLoaded, isSignedIn };
+}
+```
+
+### Integration with Subscription Systems
+- **REQUIRED**: Ensure authentication is fully implemented before integrating subscription systems
+- **REQUIRED**: Use the authenticated user's information (email, ID) for subscription management
+- **REQUIRED**: Verify user authentication before processing any subscription-related operations
+- Connect Clerk user identities with subscription entitlements
+- Implement proper error handling for subscription operations tied to authentication
+- Create a clear separation of concerns between authentication and subscription logic
+
+```typescript
+// Good integration with subscription system
+import { getAuth } from '@clerk/nextjs/server';
+import { NextResponse } from 'next/server';
+import { createSubscription } from '@/lib/subscription';
+
+export async function POST(request) {
+  // First verify authentication
+  const { userId } = getAuth(request);
+  
+  if (!userId) {
+    return NextResponse.json(
+      { error: 'Authentication required' }, 
+      { status: 401 }
+    );
+  }
+  
+  try {
+    // Get request data
+    const { priceId } = await request.json();
+    
+    // Create subscription using authenticated user ID
+    const subscription = await createSubscription({
+      userId,
+      priceId
+    });
+    
+    return NextResponse.json({ subscription });
+  } catch (error) {
+    console.error('Subscription creation error:', error.message);
+    return NextResponse.json(
+      { error: 'Failed to create subscription' },
+      { status: 500 }
+    );
+  }
+}
+```
+
+### Testing
+- **REQUIRED**: Create test accounts with different permission levels
+- **REQUIRED**: Test all authentication flows (sign-up, sign-in, sign-out) across browsers
+- **REQUIRED**: Use Clerk's development/test instance for non-production environments
+- Implement automated tests for authentication-dependent features
+- Mock authentication state appropriately in unit and integration tests
+- Test authentication error scenarios and session timeout handling
+
+```typescript
+// Good authentication testing setup with mock
+import { ClerkProvider } from '@clerk/nextjs';
+import { render, screen } from '@testing-library/react';
+
+// Mock Clerk for testing
+jest.mock('@clerk/nextjs', () => ({
+  ClerkProvider: ({ children }) => children,
+  useAuth: () => ({
+    isLoaded: true,
+    isSignedIn: true,
+    userId: 'test-user-id'
+  }),
+  useUser: () => ({
+    isLoaded: true,
+    isSignedIn: true,
+    user: {
+      id: 'test-user-id',
+      firstName: 'Test',
+      lastName: 'User',
+      primaryEmailAddress: {
+        emailAddress: 'test@example.com'
+      },
+      profileImageUrl: 'https://example.com/profile.jpg'
+    }
+  }),
+  SignedIn: ({ children }) => children,
+  SignedOut: () => null
+}));
+
+// Test a protected component
+test('renders user greeting when authenticated', () => {
+  render(<UserProfile />);
+  expect(screen.getByText('Welcome, Test!')).toBeInTheDocument();
+});
+```
+
+### Troubleshooting
+- **REQUIRED**: Include authentication debugging tools during development
+- Create a troubleshooting guide for common authentication issues
+- Add structured logging for authentication events
+- Implement feature flags for toggling authentication features
+- Create a rollback plan in case of authentication system issues
+- Document common error scenarios and their solutions
+
+```jsx
+// Good debugging component for development
+function ClerkDebug() {
+  const { isLoaded, isSignedIn, userId } = useAuth();
+  const { user } = useUser();
+  
+  if (process.env.NODE_ENV !== 'development') {
+    return null;
+  }
+  
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        bottom: '10px',
+        right: '10px',
+        background: '#f0f9ff',
+        border: '1px solid #bae6fd',
+        borderRadius: '4px',
+        padding: '8px',
+        fontSize: '12px',
+        zIndex: 9999,
+        maxWidth: '300px',
+        overflow: 'auto'
+      }}
+    >
+      <div>Auth State: {isLoaded ? (isSignedIn ? '✅ Signed In' : '❌ Signed Out') : '⌛ Loading'}</div>
+      <div>User ID: {userId || 'none'}</div>
+      {isSignedIn && user && (
+        <div>
+          <div>Email: {user.primaryEmailAddress?.emailAddress}</div>
+          <div>Name: {[user.firstName, user.lastName].filter(Boolean).join(' ') || 'N/A'}</div>
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+## Examples
+
+<example>
+// Good Clerk Provider implementation in _app.js
+import { ClerkProvider } from '@clerk/nextjs';
+
+function MyApp({ Component, pageProps }) {
+  return (
+    <ClerkProvider
+      publishableKey={process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
+      appearance={{
+        variables: {
+          colorPrimary: '#0055FF',
+        },
+      }}
+    >
+      <Component {...pageProps} />
+    </ClerkProvider>
+  );
+}
+
+export default MyApp;
+</example>
+
+<example>
+// Good middleware implementation with robust route configuration
+import { authMiddleware } from "@clerk/nextjs";
+
+export default authMiddleware({
+  publicRoutes: [
+    "/",
+    "/about",
+    "/features",
+    "/pricing",
+    "/api/public/(.*)",
+    "/blog/(.*)",
+  ],
+  ignoredRoutes: [
+    "/((?!api|trpc))(_next|.+\\..+)(.*)",
+  ]
+});
+
+export const config = {
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|public/|styles).*)'],
+};
+</example>
+
+<example>
+// Good conditional rendering with proper loading state
+import { useAuth, SignedIn, SignedOut, UserButton, SignInButton } from '@clerk/nextjs';
+
+function AuthenticatedFeature() {
+  const { isLoaded } = useAuth();
+  
+  if (!isLoaded) {
+    return <div className="loading-spinner">Loading authentication...</div>;
+  }
+  
+  return (
+    <div>
+      <SignedIn>
+        <h1>Welcome to your dashboard</h1>
+        <p>This content is only visible to authenticated users</p>
+        <UserButton />
+      </SignedIn>
+      
+      <SignedOut>
+        <div className="auth-required">
+          <h2>Authentication Required</h2>
+          <p>Please sign in to access this feature</p>
+          <SignInButton mode="modal">
+            <button className="btn-primary">Sign In</button>
+          </SignInButton>
+        </div>
+      </SignedOut>
+    </div>
+  );
+}
+</example>
+
+<example>
+// Good server-side authentication check with proper error handling
+import { getAuth } from '@clerk/nextjs/server';
+import { NextResponse } from 'next/server';
+
+export async function GET(request) {
+  try {
+    const { userId } = getAuth(request);
+    
+    if (!userId) {
+      return NextResponse.json(
+        { error: 'Authentication required' }, 
+        { status: 401 }
+      );
+    }
+    
+    // Fetch data for the authenticated user
+    const userData = await db.users.findUnique({
+      where: { clerkId: userId },
+      select: {
+        id: true,
+        name: true,
+        subscriptionTier: true,
+        createdAt: true
+      }
+    });
+    
+    if (!userData) {
+      return NextResponse.json(
+        { error: 'User not found' },
+        { status: 404 }
+      );
+    }
+    
+    return NextResponse.json({ data: userData });
+  } catch (error) {
+    console.error('API route error:', error);
+    return NextResponse.json(
+      { error: 'Server error' },
+      { status: 500 }
+    );
+  }
+}
+</example>
+
+<example type="invalid">
+// Poor implementation: Manual authentication checks
+function BadAuthImplementation() {
+  // ❌ Manually checking auth state from localStorage
+  const isSignedIn = localStorage.getItem('isSignedIn') === 'true';
+  
+  // ❌ No loading state handling
+  
+  if (!isSignedIn) {
+    return <div>Please sign in</div>;
+  }
+  
+  return <div>Protected content</div>;
+}
+</example>
+
+<example type="invalid">
+// Poor implementation: Custom auth forms instead of Clerk components
+function CustomSignInForm() {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  
+  // ❌ Implementing custom auth logic that bypasses Clerk's security features
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      // ❌ Direct API call instead of using Clerk's built-in functionality
+      const response = await fetch('/api/custom-login', {
+        method: 'POST',
+        body: JSON.stringify({ email, password }),
+      });
+      
+      if (response.ok) {
+        // ❌ Manually storing auth state
+        localStorage.setItem('isSignedIn', 'true');
+        window.location.href = '/dashboard';
+      }
+    } catch (error) {
+      console.error('Login failed:', error);
+    }
+  };
+  
+  return (
+    <form onSubmit={handleSubmit}>
+      <input 
+        type="email" 
+        value={email} 
+        onChange={(e) => setEmail(e.target.value)} 
+        placeholder="Email"
+      />
+      <input 
+        type="password" 
+        value={password} 
+        onChange={(e) => setPassword(e.target.value)} 
+        placeholder="Password"
+      />
+      <button type="submit">Sign In</button>
+    </form>
+  );
+}
+</example>
+
+<example type="invalid">
+// Poor implementation: No handling for loading state
+function UserGreeting() {
+  // ❌ Not checking if auth is loaded
+  const { user } = useUser();
+  
+  // ❌ Will error if user is null during loading
+  return <h1>Hello, {user.firstName}!</h1>;
+}
+</example>
+
+## Lessons Learned
+
+- **Verify framework compatibility** with Clerk SDK before starting implementation
+- **Authentication should precede payment systems** in the implementation order
+- **Framework upgrades** to support Clerk require systematic verification
+- **Environment separation** with different Clerk instances reduces risks
+- **Debug components** significantly help in diagnosing authentication issues
+- **Error handling** should be comprehensive for all authentication states
+- **Middleware configuration** must be carefully tested across all routes
+- **Protected features** should have clear pathways to authentication
+
+## Related Rules
+
+- [014-third-party-auth.mdc](mdc:014-third-party-auth.mdc) - General third-party authentication guidelines
+- [046-session-validation.mdc](mdc:046-session-validation.mdc) - Session security for auth flows
+- [047-security-design-system.mdc](mdc:047-security-design-system.mdc) - Security UI components
+- [012-api-security.mdc](mdc:012-api-security.mdc) - API security measures
+- [011-env-var-security.mdc](mdc:011-env-var-security.mdc) - Environment variable protection
+- [020-payment-security.mdc](mdc:020-payment-security.mdc) - Payment systems integration

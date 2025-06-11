@@ -1,0 +1,165 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Context
+
+[shadcn/ui](mdc:https:/ui.shadcn.com) is a collection of reusable components built using Radix UI and Tailwind CSS. It is not a traditional component library, but rather a collection of re-usable components that you can copy into your project and customize as needed. This approach provides flexibility but requires standardization to maintain consistency across projects.
+
+This rule defines how shadcn/ui components should be implemented, customized, and extended within the organization to ensure consistency, accessibility, and maintainability.
+
+# Requirements
+
+## 1. Installation and Setup
+
+1. **Installation Method**
+   - All projects MUST use the CLI installation method for consistent setup: `npx shadcn-ui@latest init`
+   - Components MUST be stored in a dedicated `/components/ui` directory
+   - Teams MUST follow the [official installation documentation](mdc:https:/ui.shadcn.com/docs/installation)
+
+2. **Configuration**
+   - Projects MUST use a `components.json` file at the project root for configuration
+   - Configuration MUST specify tailwind CSS path, components directory, and utilities directory
+   - Teams SHOULD configure CSS variables for theming in the root CSS file
+
+## 2. Component Usage
+
+1. **Component Selection**
+   - Teams MUST use shadcn/ui components for all basic UI elements when available
+   - Developers MUST NOT recreate components that already exist in the library
+   - Teams SHOULD add components only as needed, not all at once
+
+2. **Component Installation**
+   - Developers MUST use the CLI to add components: `npx shadcn-ui@latest add [component]`
+   - Teams MUST review dependencies when adding components
+   - Projects SHOULD document component versions in a central location
+
+3. **Component Strictness**
+   - Developers MUST NOT modify the core functionality of shadcn/ui components
+   - Any API changes MUST be thoroughly documented
+   - Accessibility features MUST NOT be removed or disabled
+   - Teams SHOULD extend components through composition rather than modification
+
+## 3. Customization
+
+1. **Theming**
+   - Projects MUST use CSS variables defined in the global CSS file for theming
+   - Projects MUST follow the [theming guidelines](mdc:https:/ui.shadcn.com/docs/theming) for light and dark mode
+   - Teams SHOULD limit color palette modifications to maintain design consistency
+   - Projects MAY create additional themes using CSS variables
+
+2. **Component Styling**
+   - Developers MUST use the `className` prop for additional styling
+   - Teams MUST use Tailwind classes for styling when possible
+   - Inline styles MUST NOT be used except for dynamic values that cannot be handled with Tailwind
+   - Teams SHOULD create variants using the `variants` pattern from class-variance-authority
+
+3. **Custom Components**
+   - Custom components MUST follow the shadcn/ui component structure
+   - All custom components MUST maintain accessibility standards
+   - Custom components MUST be thoroughly documented
+   - Teams SHOULD use Radix UI primitives for custom interactive components
+
+## 4. Implementation Patterns
+
+1. **Component Composition**
+   - Developers MUST use the provided subcomponents (e.g., `Button.Group`) when available
+   - Complex components MUST follow the slot pattern for composition
+   - Teams SHOULD compose components using React's children prop when appropriate
+
+2. **Form Elements**
+   - Projects MUST use the Form component with React Hook Form
+   - All forms MUST implement proper validation
+   - Form elements MUST use appropriate aria attributes and labels
+   - Teams SHOULD use Zod for schema validation
+
+3. **Controlled vs. Uncontrolled**
+   - Teams SHOULD prefer uncontrolled components with form libraries
+   - Controlled components MUST be documented
+   - State management MUST be properly handled in controlled components
+
+## 5. Performance Considerations
+
+1. **Code Splitting**
+   - Complex components SHOULD be lazy loaded when not needed on initial render
+   - Teams SHOULD consider bundle size impact when adding multiple shadcn/ui components
+
+2. **Rendering Optimization**
+   - Complex components SHOULD use memoization 
+   - Teams SHOULD avoid unnecessary re-renders
+
+## 6. Documentation
+
+1. **Component Documentation**
+   - Any modifications to shadcn/ui components MUST be documented
+   - Custom components MUST include usage examples
+   - Teams SHOULD use Storybook or a similar tool to showcase components
+
+2. **Prop Documentation**
+   - All props MUST be documented, including inherited ones
+   - Prop types MUST be specified using TypeScript
+   - Optional props SHOULD provide default values
+
+## 7. Testing
+
+1. **Accessibility Testing**
+   - Components MUST be tested for accessibility
+   - Keyboard navigation MUST be ensured
+   - Teams SHOULD use tools like axe or similar for automated accessibility testing
+
+2. **Component Testing**
+   - Custom components MUST have unit tests
+   - Component interactions MUST be tested
+   - Complex component combinations SHOULD have integration tests
+
+## 8. Versioning and Updates
+
+1. **Version Control**
+   - Projects MUST track shadcn/ui component versions
+   - Major changes MUST be documented when updating components
+   - Teams SHOULD regularly update components to get bug fixes and new features
+
+2. **Breaking Changes**
+   - Updates with breaking changes MUST be thoroughly reviewed and tested
+   - All affected components MUST be updated when a dependency changes
+   - Teams SHOULD have a migration strategy for major updates
+
+# Forbidden Patterns
+
+1. **Component Anti-Patterns**
+   - ❌ Directly modifying the source code of shadcn/ui components
+   - ❌ Bypassing accessibility features
+   - ❌ Duplicating existing shadcn/ui components
+   - ❌ Using inline styles instead of Tailwind classes
+   - ❌ Mixing other component libraries with shadcn/ui in the same feature
+
+2. **CSS Anti-Patterns**
+   - ❌ Using CSS-in-JS libraries that conflict with Tailwind
+   - ❌ Overriding Tailwind's base styles without good reason
+   - ❌ Hardcoding colors instead of using theme variables
+   - ❌ Adding global styles that affect shadcn/ui components
+
+3. **Implementation Anti-Patterns**
+   - ❌ Creating component wrappers that only pass props through
+   - ❌ Bypassing the slot pattern for complex components
+   - ❌ Using imperative code with shadcn/ui components
+   - ❌ Mixing different state management approaches within the same component
+
+# Examples and References
+
+- [Example shadcn/ui Implementation](mdc:examples/frontend/ShadcnUIImplementation.md)
+- [Custom Component Extension Pattern](mdc:examples/frontend/ShadcnUICustomComponent.md)
+- [Theme Configuration Guide](mdc:examples/frontend/ShadcnUIThemeConfiguration.md)
+- [Form Implementation Example](mdc:examples/frontend/ShadcnUIFormImplementation.md)
+
+# Impact
+
+Adhering to these shadcn/ui standards:
+
+- Ensures consistent, accessible, and maintainable UI components
+- Reduces development time by using established patterns
+- Improves user experience through consistent interaction patterns
+- Simplifies the maintenance of the component library
+- Allows for easier theme customization and branding
+- Enables team members to work across projects with familiar patterns

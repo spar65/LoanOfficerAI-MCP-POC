@@ -1,0 +1,12 @@
+[
+  {"loan_id": "L001", "borrower_id": "B001", "loan_amount": 50000, "interest_rate": 3.5, "term_length": 60, "start_date": "2024-01-01", "end_date": "2029-01-01", "status": "Active"},
+  {"loan_id": "L002", "borrower_id": "B002", "loan_amount": 30000, "interest_rate": 4.0, "term_length": 36, "start_date": "2024-06-15", "end_date": "2027-06-15", "status": "Active"},
+  {"loan_id": "L003", "borrower_id": "B003", "loan_amount": 20000, "interest_rate": 3.0, "term_length": 24, "start_date": "2025-03-10", "end_date": "2027-03-10", "status": "Pending"},
+  {"loan_id": "L004", "borrower_id": "B004", "loan_amount": 40000, "interest_rate": 3.8, "term_length": 48, "start_date": "2023-12-20", "end_date": "2028-12-20", "status": "Closed"},
+  {"loan_id": "L005", "borrower_id": "B005", "loan_amount": 25000, "interest_rate": 3.2, "term_length": 36, "start_date": "2024-11-05", "end_date": "2028-11-05", "status": "Active"},
+  {"loan_id": "L006", "borrower_id": "B006", "loan_amount": 35000, "interest_rate": 4.2, "term_length": 60, "start_date": "2025-04-20", "end_date": "2030-04-20", "status": "Pending"},
+  {"loan_id": "L007", "borrower_id": "B007", "loan_amount": 15000, "interest_rate": 2.8, "term_length": 12, "start_date": "2024-09-10", "end_date": "2025-09-10", "status": "Active"},
+  {"loan_id": "L008", "borrower_id": "B008", "loan_amount": 45000, "interest_rate": 3.9, "term_length": 48, "start_date": "2023-08-15", "end_date": "2028-08-15", "status": "Closed"},
+  {"loan_id": "L009", "borrower_id": "B009", "loan_amount": 28000, "interest_rate": 3.6, "term_length": 36, "start_date": "2024-12-01", "end_date": "2028-12-01", "status": "Active"},
+  {"loan_id": "L010", "borrower_id": "B010", "loan_amount": 32000, "interest_rate": 3.7, "term_length": 48, "start_date": "2025-02-28", "end_date": "2030-02-28", "status": "Pending"}
+]

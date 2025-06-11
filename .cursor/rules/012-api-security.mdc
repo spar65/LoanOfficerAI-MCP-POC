@@ -1,0 +1,306 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+description: Apply ALWAYS when designing, implementing, or maintaining API endpoints to ensure secure data handling and protection against common vulnerabilities
+globs: "**/*.{js,ts,py,rb,php,java,go}"
+
+# API Security Guidelines
+
+This document provides comprehensive guidelines for implementing secure APIs across all applications and services.
+
+## Core Requirements
+
+- **REQUIRED**: Implement proper authentication for all API endpoints
+- **REQUIRED**: Rate limit all API endpoints to prevent abuse
+- **REQUIRED**: Validate all input against strict schemas before processing
+- **REQUIRED**: Implement proper error handling without leaking sensitive information
+- **REQUIRED**: Use HTTPS for all API communications
+
+## Authentication & Authorization
+
+### API Authentication
+
+- Use industry-standard authentication mechanisms (OAuth 2.0, JWT, API keys)
+- Implement token-based authentication with appropriate expiration
+- Use different API keys for different environments
+- Rotate API keys regularly and on security incidents
+- Implement key revocation mechanisms
+- Never expose API keys in client-side code or public repositories
+
+### Authorization Controls
+
+- Implement role-based access control (RBAC) for all API endpoints
+- Validate permissions before performing operations
+- Implement proper multi-tenancy isolation
+- Check authorization at both API gateway and service levels
+- Log all authorization failures for security monitoring
+
+## Input Validation
+
+### Data Validation
+
+- Validate all input parameters against strict schemas
+- Implement type checking, value ranges, and format validation
+- Sanitize inputs to prevent injection attacks
+- Use parameterized queries to prevent SQL injection
+- Validate file uploads (type, size, content)
+
+### Example: Parameter Validation (Node.js/Express)
+
+```javascript
+// GOOD: Using Joi for schema validation
+const express = require('express');
+const Joi = require('joi');
+const app = express();
+
+app.use(express.json());
+
+// Define schema
+const userSchema = Joi.object({
+  username: Joi.string().alphanum().min(3).max(30).required(),
+  email: Joi.string().email().required(),
+  age: Joi.number().integer().min(18).max(120)
+});
+
+// Validate input
+app.post('/api/users', (req, res) => {
+  const { error, value } = userSchema.validate(req.body);
+  
+  if (error) {
+    return res.status(400).json({ error: error.details[0].message });
+  }
+  
+  // Continue with valid data
+  // ...
+  
+  res.status(201).json({ success: true });
+});
+```
+
+### Example: SQL Injection Prevention (Python)
+
+```python
+# BAD: Vulnerable to SQL injection
+def get_user(username):
+    query = f"SELECT * FROM users WHERE username = '{username}'"
+    cursor.execute(query)
+    return cursor.fetchone()
+
+# GOOD: Using parameterized queries
+def get_user(username):
+    query = "SELECT * FROM users WHERE username = %s"
+    cursor.execute(query, (username,))
+    return cursor.fetchone()
+```
+
+## Request Protection
+
+### Rate Limiting
+
+- Implement rate limiting for all API endpoints
+- Use appropriate limits based on endpoint sensitivity and expected usage
+- Apply rate limits per user, IP address, or API key
+- Return appropriate status codes (429 Too Many Requests) with retry-after headers
+- Consider implementing gradually increasing timeouts for repeated violations
+
+### Example: Rate Limiting (Express)
+
+```javascript
+// GOOD: Rate limiting implementation
+const express = require('express');
+const rateLimit = require('express-rate-limit');
+
+const app = express();
+
+// Apply rate limit to all requests
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per windowMs
+  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+  message: {
+    status: 429,
+    message: 'Too many requests, please try again later.'
+  }
+});
+
+// Apply the rate limiting middleware to API calls
+app.use('/api', apiLimiter);
+
+// Apply stricter rate limit to authentication endpoints
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // limit each IP to 5 login requests per windowMs
+  message: {
+    status: 429,
+    message: 'Too many login attempts, please try again later.'
+  }
+});
+
+app.use('/api/auth', authLimiter);
+```
+
+### CORS Configuration
+
+- Implement restrictive CORS policies
+- Allow only trusted domains in your CORS configuration
+- Use specific origins instead of wildcard `*` where possible
+- Specify allowed methods and headers
+- Consider implementing CORS token verification for sensitive operations
+
+### Example: CORS Configuration (Express)
+
+```javascript
+// GOOD: Restrictive CORS setup
+const express = require('express');
+const cors = require('cors');
+const app = express();
+
+// Restrictive CORS for most routes
+const corsOptions = {
+  origin: ['https://trusted-app.com', 'https://admin.trusted-app.com'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  maxAge: 86400, // 24 hours
+  credentials: true
+};
+
+app.use(cors(corsOptions));
+
+// Public API with less restrictive CORS
+const publicApiCors = {
+  origin: '*',
+  methods: ['GET'],
+  maxAge: 86400
+};
+
+app.use('/api/public', cors(publicApiCors), publicApiRouter);
+```
+
+## Response Security
+
+### Error Handling
+
+- Implement proper error handling to prevent information leakage
+- Return generic error messages to clients
+- Log detailed errors server-side
+- Use appropriate HTTP status codes
+- Don't expose stack traces, server information, or internal paths in responses
+
+### Example: Secure Error Handling (Node.js)
+
+```javascript
+// GOOD: Secure error handling
+app.use((err, req, res, next) => {
+  // Log detailed error internally
+  console.error('Detailed error information for internal use:', {
+    message: err.message,
+    stack: err.stack,
+    timestamp: new Date().toISOString(),
+    requestId: req.id
+  });
+  
+  // Send generic response to client
+  const statusCode = err.statusCode || 500;
+  res.status(statusCode).json({
+    status: 'error',
+    message: statusCode === 500 
+      ? 'An internal server error occurred' 
+      : err.message,
+    requestId: req.id // For support reference
+  });
+});
+```
+
+### Data Leakage Prevention
+
+- Implement response filtering to remove sensitive data
+- Use explicit response schemas to control exposed data
+- Sanitize error messages to prevent information disclosure
+- Consider implementing response signing for high-security APIs
+- Monitor responses for unintended data exposure
+
+## Security Headers
+
+### HTTP Security Headers
+
+- Implement Content-Security-Policy (CSP)
+- Set X-Content-Type-Options: nosniff
+- Enable Strict-Transport-Security (HSTS)
+- Use X-Frame-Options to prevent clickjacking
+- Consider implementing X-XSS-Protection and Referrer-Policy
+
+### Example: Security Headers (Express)
+
+```javascript
+// GOOD: Using Helmet for security headers
+const express = require('express');
+const helmet = require('helmet');
+const app = express();
+
+// Apply all default security headers
+app.use(helmet());
+
+// Or customize specific headers
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", 'trusted-scripts.com'],
+      },
+    },
+    hsts: {
+      maxAge: 31536000, // 1 year
+      includeSubDomains: true,
+      preload: true,
+    },
+    referrerPolicy: { policy: 'same-origin' },
+  })
+);
+```
+
+## API Documentation & Testing
+
+### Documentation Security
+
+- Remove sensitive information from API documentation
+- Implement authentication for API documentation access if it contains sensitive details
+- Use placeholders instead of real API keys in examples
+- Consider different documentation levels for public vs. private APIs
+
+### Security Testing
+
+- Implement automated security testing for APIs
+- Use tools like OWASP ZAP, Burp Suite, or specialized API security tools
+- Include security tests in CI/CD pipelines
+- Perform regular penetration testing on critical APIs
+- Implement continuous monitoring for API security issues
+
+## Monitoring & Logging
+
+### Security Monitoring
+
+- Implement logging for all API requests and responses
+- Monitor for suspicious patterns (high failure rates, unusual access patterns)
+- Set up alerts for potential security events
+- Track and analyze authentication failures
+- Monitor API performance for potential DoS conditions
+
+### Logging Best Practices
+
+- Avoid logging sensitive data (tokens, passwords, PII)
+- Use structured logging for better analysis
+- Include trace IDs for request tracking
+- Secure log storage with appropriate retention
+- Implement log rotation and archiving
+
+## Compliance Considerations
+
+- Document API security controls for compliance audits
+- Implement required data handling for regulated industries
+- Ensure API security meets relevant standards (PCI DSS, HIPAA, etc.)
+- Consider regional requirements for API operations (GDPR, CCPA, etc.)
+- Maintain inventory of APIs for security reviews

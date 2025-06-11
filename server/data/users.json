@@ -1,0 +1,14 @@
+[
+  {
+    "id": "u001",
+    "username": "john.doe",
+    "email": "john.doe@example.com",
+    "passwordHash": "$2b$10$7ZXg.a7hMWmwMcZ3pzPir.bSAeY2L4VE9Vpb7ok2OEvQBrUSiLyvy",
+    "firstName": "John",
+    "lastName": "Doe",
+    "role": "loan_officer",
+    "tenantId": "t001",
+    "active": true,
+    "lastLogin": "2025-06-09T21:41:54.065Z"
+  }
+]

@@ -1,0 +1,800 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+description: IMPLEMENT when designing user interfaces for MCP interactions to ensure consistent, intuitive, and accessible experiences
+globs: "client/src/components/**/*.{js,jsx,ts,tsx}"
+
+# 506: MCP User Experience Standards
+
+## Rule
+
+When designing and implementing user interfaces for Model Completion Protocol (MCP) interactions, follow standardized patterns for input mechanisms, result presentation, error handling, and accessibility to ensure consistent, intuitive, and inclusive user experiences.
+
+## Context
+
+Model Completion Protocol (MCP) enables natural language interaction with structured data, requiring specialized UI patterns to:
+1. Facilitate clear user input through natural language
+2. Present complex, data-driven responses in an accessible manner
+3. Handle various states (loading, error, partial results) elegantly
+4. Guide users toward effective queries
+5. Maintain context and continuity throughout interactions
+
+Implementing consistent user experience patterns ensures that MCP interactions are intuitive, accessible, and provide high utility across the application.
+
+## RuleDetails
+
+### Natural Language Input
+
+1. **Query Input Components**
+   - Implement a consistent chat or query input interface
+   - Provide clear affordances for input (prompt, placeholder)
+   - Show examples of effective queries via hints or tooltips
+   - Maintain query history for reference and reuse
+   - Support keyboard shortcuts for common actions
+
+```jsx
+// Chat input component with examples
+function ChatInput({ onSubmit, isLoading }) {
+  const [query, setQuery] = useState('');
+  const [showExamples, setShowExamples] = useState(false);
+  const examples = [
+    "What's the default risk for borrower B001?",
+    "Is the collateral for loan L002 sufficient?",
+    "Show me high-risk farmers in the portfolio"
+  ];
+  
+  return (
+    <div className="chat-input">
+      <div className="input-container">
+        <textarea 
+          value={query}
+          onChange={e => setQuery(e.target.value)}
+          placeholder="Ask about loans, borrowers, or risk assessments..."
+          disabled={isLoading}
+          aria-label="Chat query input"
+        />
+        <button 
+          onClick={() => onSubmit(query)}
+          disabled={isLoading || !query.trim()}
+          aria-label="Submit query"
+        >
+          {isLoading ? <Spinner /> : <SendIcon />}
+        </button>
+      </div>
+      
+      <div className="input-help">
+        <button 
+          className="examples-toggle" 
+          onClick={() => setShowExamples(!showExamples)}
+          aria-expanded={showExamples}
+        >
+          <LightbulbIcon /> Example questions
+        </button>
+        
+        {showExamples && (
+          <div className="examples-list">
+            {examples.map((example, i) => (
+              <button 
+                key={i} 
+                className="example-item" 
+                onClick={() => setQuery(example)}
+              >
+                {example}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+```
+
+2. **Context Preservation**
+   - Maintain conversation history
+   - Display previous queries and responses
+   - Allow referring to previous items in the conversation
+   - Enable query refinement based on previous responses
+   - Support conversation management (clear, save, share)
+
+3. **Query Assistance**
+   - Suggest query completion while typing
+   - Offer entity autocomplete (e.g., borrower names, loan IDs)
+   - Provide feedback on query clarity
+   - Support query templates for common tasks
+   - Include a help section with query tips
+
+### Response Presentation
+
+1. **Response Components**
+   - Design specialized components for each response type
+   - Use consistent visual treatment for similar data
+   - Apply semantic markup for accessibility
+   - Implement responsive layouts for all screen sizes
+   - Support focus management for keyboard users
+
+```jsx
+// Risk assessment result component with proper semantic structure
+function RiskAssessmentResult({ data }) {
+  const { 
+    borrower_name, 
+    risk_score, 
+    risk_level, 
+    risk_factors, 
+    recommendations 
+  } = data;
+  
+  const riskLevelColors = {
+    low: 'var(--color-success)',
+    medium: 'var(--color-warning)',
+    high: 'var(--color-danger)'
+  };
+  
+  return (
+    <section className="result-card risk-assessment" aria-labelledby="risk-title">
+      <h2 id="risk-title">Risk Assessment for {borrower_name}</h2>
+      
+      <div className="risk-score-display" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow={risk_score}>
+        <div className="score-gauge">
+          <div 
+            className="score-fill" 
+            style={{ 
+              width: `${risk_score}%`, 
+              backgroundColor: riskLevelColors[risk_level] 
+            }} 
+          />
+        </div>
+        <div className="score-value">
+          <strong>{risk_score}</strong>
+          <span className={`risk-level risk-level-${risk_level}`}>
+            {risk_level.toUpperCase()}
+          </span>
+        </div>
+      </div>
+      
+      {risk_factors.length > 0 && (
+        <div className="risk-factors">
+          <h3>Risk Factors</h3>
+          <ul>
+            {risk_factors.map((factor, index) => (
+              <li key={index}>{factor}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+      
+      {recommendations.length > 0 && (
+        <div className="recommendations">
+          <h3>Recommendations</h3>
+          <ul>
+            {recommendations.map((rec, index) => (
+              <li key={index}>{rec}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+      
+      <div className="action-bar">
+        <button className="action-button">
+          <DownloadIcon /> Export
+        </button>
+        <button className="action-button">
+          <ShareIcon /> Share
+        </button>
+      </div>
+    </section>
+  );
+}
+```
+
+2. **Data Visualization**
+   - Use appropriate charts for numerical data
+   - Ensure visualizations have proper accessibility features
+   - Provide alternative text representations of visual data
+   - Maintain consistent color coding across visualizations
+   - Support zooming and exploration of complex visuals
+
+3. **Progressive Disclosure**
+   - Present high-level summaries first
+   - Allow expansion for detailed information
+   - Use clear affordances for expandable sections
+   - Maintain context when expanding details
+   - Preserve expanded state during navigation
+
+### Loading and Error States
+
+1. **Loading Indicators**
+   - Show appropriate loading states during MCP operations
+   - Provide meaningful loading messages specific to the operation
+   - Implement skeleton screens for common result types
+   - Update loading status for long-running operations
+   - Support cancellation of requests
+
+```jsx
+// Context-aware loading component
+function MpcLoadingState({ operation, progress, onCancel }) {
+  // Map operation types to friendly messages
+  const operationMessages = {
+    'getBorrowerDefaultRisk': 'Analyzing default risk factors...',
+    'evaluateCollateralSufficiency': 'Evaluating collateral sufficiency...',
+    'getHighRiskFarmers': 'Identifying high-risk farmers...',
+    'default': 'Processing your request...'
+  };
+  
+  const message = operationMessages[operation] || operationMessages.default;
+  
+  return (
+    <div className="mcp-loading-state" role="status" aria-live="polite">
+      <div className="loading-indicator">
+        <Spinner size="medium" />
+      </div>
+      <p className="loading-message">{message}</p>
+      {progress && (
+        <div className="loading-progress">
+          <div className="progress-bar">
+            <div className="progress-fill" style={{ width: `${progress}%` }} />
+          </div>
+          <span className="progress-text">{progress}% complete</span>
+        </div>
+      )}
+      {onCancel && (
+        <button 
+          className="cancel-button" 
+          onClick={onCancel}
+          aria-label="Cancel operation"
+        >
+          Cancel
+        </button>
+      )}
+    </div>
+  );
+}
+```
+
+2. **Error Handling**
+   - Present clear, actionable error messages
+   - Suggest recovery options for common errors
+   - Maintain partial results when errors affect only part of the response
+   - Include retry mechanisms with clear affordances
+   - Log errors for later analysis
+
+```jsx
+// Error display component with recovery options
+function ErrorDisplay({ 
+  error, 
+  operation, 
+  onRetry, 
+  onAlternateAction 
+}) {
+  // Map error types to user-friendly messages and actions
+  const errorHandlers = {
+    'NOT_FOUND': {
+      title: 'Information Not Found',
+      message: 'We couldn\'t find the requested information.',
+      action: 'Try a different query',
+      icon: <SearchIcon />
+    },
+    'AUTHORIZATION': {
+      title: 'Access Restricted',
+      message: 'You don\'t have permission to access this information.',
+      action: 'Contact administrator',
+      icon: <LockIcon />
+    },
+    'TIMEOUT': {
+      title: 'Request Timed Out',
+      message: 'The operation took too long to complete.',
+      action: 'Try again',
+      icon: <ClockIcon />
+    },
+    'DEFAULT': {
+      title: 'Something Went Wrong',
+      message: 'An unexpected error occurred while processing your request.',
+      action: 'Try again',
+      icon: <AlertIcon />
+    }
+  };
+  
+  const errorType = error.type || 'DEFAULT';
+  const handler = errorHandlers[errorType] || errorHandlers.DEFAULT;
+  
+  return (
+    <div className="error-display" role="alert">
+      <div className="error-icon">{handler.icon}</div>
+      <h3 className="error-title">{handler.title}</h3>
+      <p className="error-message">{handler.message}</p>
+      <p className="error-details">{error.message}</p>
+      <div className="error-actions">
+        {onRetry && (
+          <button className="retry-button" onClick={onRetry}>
+            <RefreshIcon /> {handler.action}
+          </button>
+        )}
+        {onAlternateAction && (
+          <button className="alternate-action" onClick={onAlternateAction}>
+            Alternative action
+          </button>
+        )}
+        <button className="help-button">
+          <HelpIcon /> Get help
+        </button>
+      </div>
+    </div>
+  );
+}
+```
+
+3. **Partial Results**
+   - Display available results even when some data is missing
+   - Clearly indicate when results are partial
+   - Provide mechanisms to refresh or retry
+   - Prioritize critical information in partial results
+   - Support incremental display as results arrive
+
+### Accessibility and Inclusion
+
+1. **Screen Reader Support**
+   - Use proper ARIA roles, states, and properties
+   - Implement live regions for dynamic content
+   - Ensure proper heading structure
+   - Provide keyboard navigation for all interactions
+   - Test with screen readers and keyboard-only navigation
+
+2. **Content Clarity**
+   - Use plain language in all interface elements
+   - Provide definitions for technical or domain-specific terms
+   - Ensure sufficient color contrast for text and controls
+   - Support text resizing without breaking layouts
+   - Avoid reliance on color alone to convey information
+
+3. **Multimodal Input/Output**
+   - Support voice input where appropriate
+   - Provide text alternatives for audio/visual content
+   - Enable text-to-speech for responses
+   - Support different input methods (touch, keyboard, mouse)
+   - Allow customization of output format (text, visual, audio)
+
+### Feedback and Learning
+
+1. **Feedback Collection**
+   - Implement thumbs up/down on response quality
+   - Allow adding specific feedback comments
+   - Track which queries lead to errors or confusion
+   - Monitor usage patterns to identify improvement areas
+   - Use feedback to continually improve MCP functions
+
+```jsx
+// Response feedback component
+function ResponseFeedback({ responseId, feedbackHandler }) {
+  const [feedback, setFeedback] = useState(null);
+  const [comment, setComment] = useState('');
+  const [showCommentField, setShowCommentField] = useState(false);
+  
+  const handleFeedback = async (isPositive) => {
+    setFeedback(isPositive);
+    await feedbackHandler({ responseId, isPositive });
+    
+    // Show comment field after feedback
+    if (!isPositive) {
+      setShowCommentField(true);
+    }
+  };
+  
+  const submitComment = async () => {
+    if (comment.trim()) {
+      await feedbackHandler({ responseId, feedback, comment });
+      setShowCommentField(false);
+    }
+  };
+  
+  return (
+    <div className="response-feedback">
+      <p className="feedback-prompt">Was this response helpful?</p>
+      <div className="feedback-buttons">
+        <button 
+          className={`feedback-button ${feedback === true ? 'active' : ''}`} 
+          onClick={() => handleFeedback(true)}
+          aria-pressed={feedback === true}
+          aria-label="Mark response as helpful"
+        >
+          <ThumbsUpIcon />
+        </button>
+        <button 
+          className={`feedback-button ${feedback === false ? 'active' : ''}`}
+          onClick={() => handleFeedback(false)}
+          aria-pressed={feedback === false}
+          aria-label="Mark response as not helpful"
+        >
+          <ThumbsDownIcon />
+        </button>
+      </div>
+      
+      {showCommentField && (
+        <div className="feedback-comment">
+          <textarea
+            value={comment}
+            onChange={e => setComment(e.target.value)}
+            placeholder="Please tell us how we could improve this response..."
+            rows={3}
+            aria-label="Feedback details"
+          />
+          <button 
+            className="submit-comment" 
+            onClick={submitComment}
+            disabled={!comment.trim()}
+          >
+            Submit
+          </button>
+        </div>
+      )}
+      
+      {feedback === true && !showCommentField && (
+        <p className="thank-you-message">Thank you for your feedback!</p>
+      )}
+    </div>
+  );
+}
+```
+
+2. **Continuous Improvement**
+   - Track common queries to improve function coverage
+   - Update examples based on user behavior
+   - Refine response formats based on usage patterns
+   - A/B test different presentation approaches
+   - Document which queries work well for users
+
+## Examples
+
+### Example 1: Good Chat Interface Implementation
+
+```jsx
+// src/components/McpChatInterface.jsx
+import React, { useState, useRef, useEffect } from 'react';
+import { useMcpChat } from '../hooks/useMcpChat';
+import { 
+  ChatInput, 
+  MessageList, 
+  LoadingIndicator, 
+  ErrorMessage, 
+  ResponseFeedback 
+} from '../components/ui';
+
+export function McpChatInterface() {
+  const [messages, setMessages] = useState([]);
+  const chatEndRef = useRef(null);
+  
+  const { 
+    sendMessage, 
+    isLoading, 
+    error,
+    currentOperation,
+    cancelOperation,
+    submitFeedback
+  } = useMcpChat();
+  
+  // Scroll to bottom when messages change
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+  
+  const handleSendMessage = async (text) => {
+    // Add user message to chat
+    const userMessage = {
+      id: Date.now(),
+      type: 'user',
+      content: text,
+      timestamp: new Date()
+    };
+    
+    setMessages(prev => [...prev, userMessage]);
+    
+    try {
+      // Send to MCP and get response
+      const response = await sendMessage(text);
+      
+      // Add response to chat
+      const assistantMessage = {
+        id: response.id,
+        type: 'assistant',
+        content: response.content,
+        data: response.data,
+        timestamp: new Date()
+      };
+      
+      setMessages(prev => [...prev, assistantMessage]);
+    } catch (err) {
+      // Only add error message if the operation wasn't cancelled
+      if (err.name !== 'AbortError') {
+        const errorMessage = {
+          id: Date.now(),
+          type: 'error',
+          error: err,
+          timestamp: new Date()
+        };
+        
+        setMessages(prev => [...prev, errorMessage]);
+      }
+    }
+  };
+  
+  return (
+    <div className="mcp-chat-interface">
+      <div className="chat-header">
+        <h2>Loan Officer Assistant</h2>
+      </div>
+      
+      <div className="chat-message-container">
+        <MessageList 
+          messages={messages} 
+          onFeedback={(messageId, feedback) => {
+            submitFeedback(messageId, feedback);
+          }} 
+        />
+        
+        {isLoading && (
+          <LoadingIndicator 
+            operation={currentOperation}
+            onCancel={cancelOperation}
+          />
+        )}
+        
+        <div ref={chatEndRef} />
+      </div>
+      
+      <div className="chat-input-container">
+        {error && !isLoading && (
+          <ErrorMessage 
+            error={error}
+            onDismiss={() => setError(null)}
+          />
+        )}
+        
+        <ChatInput 
+          onSubmit={handleSendMessage}
+          isLoading={isLoading}
+        />
+      </div>
+    </div>
+  );
+}
+```
+
+### Example 2: Good Result Component for Structured Data
+
+```jsx
+// src/components/results/CollateralSufficiencyResult.jsx
+import React, { useState } from 'react';
+import { 
+  Card, 
+  StatusBadge, 
+  ProgressBar, 
+  ExpandableSection,
+  DataTable,
+  ActionMenu
+} from '../ui';
+
+export function CollateralSufficiencyResult({ data }) {
+  const [showDetails, setShowDetails] = useState(false);
+  
+  if (!data) return null;
+  
+  const { 
+    loan_id, 
+    loan_type,
+    is_sufficient, 
+    current_loan_balance, 
+    collateral_value,
+    collateral_margin_percentage,
+    loan_to_value_ratio,
+    industry_standard_threshold,
+    assessment,
+    collateral_items 
+  } = data;
+  
+  const statusColor = is_sufficient ? 'success' : 'warning';
+  const statusText = is_sufficient ? 'Sufficient' : 'Below Recommended';
+  
+  // Format currency amounts
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD'
+    }).format(amount);
+  };
+  
+  return (
+    <Card className="collateral-result">
+      <div className="result-header">
+        <h3>Collateral Assessment: Loan {loan_id}</h3>
+        <StatusBadge color={statusColor}>{statusText}</StatusBadge>
+      </div>
+      
+      <div className="result-summary">
+        <p className="assessment-text">{assessment}</p>
+        
+        <div className="key-metrics">
+          <div className="metric">
+            <span className="metric-label">Loan Balance</span>
+            <span className="metric-value">{formatCurrency(current_loan_balance)}</span>
+          </div>
+          <div className="metric">
+            <span className="metric-label">Collateral Value</span>
+            <span className="metric-value">{formatCurrency(collateral_value)}</span>
+          </div>
+          <div className="metric">
+            <span className="metric-label">Margin</span>
+            <span className="metric-value">{collateral_margin_percentage}%</span>
+          </div>
+        </div>
+        
+        <div className="ltv-display">
+          <div className="ltv-header">
+            <span>Loan-to-Value Ratio</span>
+            <span>{(loan_to_value_ratio * 100).toFixed(1)}%</span>
+          </div>
+          <ProgressBar 
+            value={loan_to_value_ratio} 
+            max={1.2}
+            threshold={industry_standard_threshold}
+            thresholdLabel="Industry Standard"
+            aria-label="Loan to value ratio"
+          />
+          <div className="ltv-scale">
+            <span>0%</span>
+            <span>50%</span>
+            <span>100%</span>
+            <span>120%</span>
+          </div>
+        </div>
+      </div>
+      
+      <ExpandableSection
+        title={`Collateral Details (${collateral_items} items)`}
+        expanded={showDetails}
+        onToggle={() => setShowDetails(!showDetails)}
+      >
+        {data.collateral_details && (
+          <DataTable
+            data={data.collateral_details}
+            columns={[
+              { key: 'id', header: 'ID' },
+              { key: 'description', header: 'Description' },
+              { 
+                key: 'value', 
+                header: 'Value',
+                render: (value) => formatCurrency(value)
+              }
+            ]}
+          />
+        )}
+      </ExpandableSection>
+      
+      <div className="result-actions">
+        <ActionMenu
+          actions={[
+            { label: 'Export PDF', icon: 'download', onClick: () => {} },
+            { label: 'Print Report', icon: 'print', onClick: () => {} },
+            { label: 'Share Result', icon: 'share', onClick: () => {} }
+          ]}
+        />
+      </div>
+    </Card>
+  );
+}
+```
+
+### Example 3: Good Error Recovery Component
+
+```jsx
+// src/components/McpErrorRecovery.jsx
+import React from 'react';
+import { Card, Button, Icon } from '../ui';
+
+export function McpErrorRecovery({ 
+  error, 
+  operationType,
+  entityId,
+  onRetry,
+  onAlternativeAction,
+  onHelp
+}) {
+  // Map error types to recovery strategies
+  const recoveryStrategies = {
+    'NOT_FOUND': {
+      title: 'Information Not Available',
+      message: `We couldn't find the requested information for ${operationType} ${entityId}.`,
+      primaryAction: 'Try different parameters',
+      secondaryAction: 'View similar items',
+      icon: 'search',
+      helpText: 'This usually happens when the requested entity doesn\'t exist or has been deleted.'
+    },
+    'PERMISSION_DENIED': {
+      title: 'Access Restricted',
+      message: 'You don\'t have permission to access this information.',
+      primaryAction: 'Request access',
+      secondaryAction: 'View public information',
+      icon: 'lock',
+      helpText: 'Contact your administrator to request access to this information.'
+    },
+    'SERVICE_UNAVAILABLE': {
+      title: 'Service Temporarily Unavailable',
+      message: 'This service is currently unavailable. Please try again later.',
+      primaryAction: 'Try again',
+      secondaryAction: 'View cached data',
+      icon: 'cloud-off',
+      helpText: 'The system might be undergoing maintenance or experiencing high traffic.'
+    },
+    'DEFAULT': {
+      title: 'Something Went Wrong',
+      message: 'An unexpected error occurred while processing your request.',
+      primaryAction: 'Try again',
+      secondaryAction: 'Report issue',
+      icon: 'alert-circle',
+      helpText: 'If this keeps happening, please contact support with the error details below.'
+    }
+  };
+  
+  const errorType = error.code || 'DEFAULT';
+  const strategy = recoveryStrategies[errorType] || recoveryStrategies.DEFAULT;
+  
+  return (
+    <Card className="error-recovery">
+      <div className="error-header">
+        <Icon name={strategy.icon} size="large" />
+        <h3>{strategy.title}</h3>
+      </div>
+      
+      <p className="error-message">{strategy.message}</p>
+      
+      {error.message && (
+        <div className="error-details">
+          <p className="error-technical">Error details: {error.message}</p>
+        </div>
+      )}
+      
+      <div className="recovery-help">
+        <Icon name="help-circle" />
+        <p>{strategy.helpText}</p>
+      </div>
+      
+      <div className="recovery-actions">
+        <Button 
+          variant="primary" 
+          onClick={onRetry} 
+          leftIcon="refresh"
+        >
+          {strategy.primaryAction}
+        </Button>
+        
+        {onAlternativeAction && (
+          <Button 
+            variant="secondary" 
+            onClick={onAlternativeAction}
+          >
+            {strategy.secondaryAction}
+          </Button>
+        )}
+        
+        {onHelp && (
+          <Button 
+            variant="text" 
+            onClick={onHelp}
+            leftIcon="help"
+          >
+            Get Help
+          </Button>
+        )}
+      </div>
+    </Card>
+  );
+}
+```
+
+## Enforcement
+
+- UI component library must include standardized MCP interaction components
+- Design system must document MCP input and output patterns
+- Accessibility testing must include MCP-specific interactions
+- User testing must validate MCP interface effectiveness
+- Documentation must include MCP UX guidelines and best practices

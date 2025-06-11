@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MCP UI Integration Test</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .test-container {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-button {
+            background: #2196F3;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .test-button:hover {
+            background: #1976D2;
+        }
+        .test-button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .result-container {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 4px;
+            border-left: 4px solid #2196F3;
+            background: #f8f9fa;
+        }
+        .error {
+            border-left-color: #f44336;
+            background: #ffebee;
+        }
+        .success {
+            border-left-color: #4caf50;
+            background: #e8f5e9;
+        }
+        .loading {
+            color: #666;
+            font-style: italic;
+        }
+        pre {
+            background: #263238;
+            color: #eeff41;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-size: 12px;
+        }
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        .status-online {
+            background-color: #4caf50;
+        }
+        .status-offline {
+            background-color: #f44336;
+        }
+        .status-unknown {
+            background-color: #ff9800;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 MCP UI Integration Test</h1>
+    <p>This page tests the MCP function calling integration with the LoanOfficerAI POC system.</p>
+
+    <!-- System Status -->
+    <div class="test-container">
+        <h2>🏥 System Health Check</h2>
+        <button class="test-button" onclick="checkSystemHealth()">Check System Status</button>
+        <button class="test-button" onclick="checkMcpRegistry()">Check MCP Registry</button>
+        <div id="system-status" class="result-container" style="display: none;">
+            <span class="status-indicator status-unknown"></span>
+            <span>Checking system status...</span>
+        </div>
+    </div>
+
+    <!-- Direct API Tests -->
+    <div class="test-container">
+        <h2>🔧 Direct API Tests</h2>
+        <p>Test the underlying API endpoints directly:</p>
+        <button class="test-button" onclick="testDirectApi('/api/borrowers/B001', 'Borrower B001')">Test Borrower B001</button>
+        <button class="test-button" onclick="testDirectApi('/api/risk/default/B003', 'Default Risk B003')">Test Default Risk B003</button>
+        <button class="test-button" onclick="testDirectApi('/api/risk/non-accrual/B001', 'Non-Accrual Risk B001')">Test Non-Accrual B001</button>
+        <div id="direct-api-results" class="result-container" style="display: none;"></div>
+    </div>
+
+    <!-- MCP Function Calling Tests -->
+    <div class="test-container">
+        <h2>🤖 MCP Function Calling Tests</h2>
+        <p>Test the complete MCP flow through the OpenAI route:</p>
+        <button class="test-button" onclick="testMcpFunction('What is the default risk for borrower B003 in the next 3 months?', 'Default Risk B003')">Test Default Risk</button>
+        <button class="test-button" onclick="testMcpFunction('Is there a risk that borrower B001 will become non-accrual?', 'Non-Accrual Risk B001')">Test Non-Accrual Risk</button>
+        <button class="test-button" onclick="testMcpFunction('Which farmers are at high risk of default?', 'High Risk Farmers')">Test High Risk Farmers</button>
+        <button class="test-button" onclick="testMcpFunction('Show me details for borrower B004', 'Borrower Details B004')">Test Borrower Details</button>
+        <div id="mcp-function-results" class="result-container" style="display: none;"></div>
+    </div>
+
+    <!-- Validation Tests -->
+    <div class="test-container">
+        <h2>✅ Validation Tests</h2>
+        <p>Test the validation system with invalid inputs:</p>
+        <button class="test-button" onclick="testMcpFunction('What is the default risk for borrower XYZ123?', 'Invalid Borrower ID')">Test Invalid Borrower ID</button>
+        <button class="test-button" onclick="testMcpFunction('What is the default risk for borrower ?', 'Empty Borrower ID')">Test Empty Borrower ID</button>
+        <div id="validation-results" class="result-container" style="display: none;"></div>
+    </div>
+
+    <!-- Real-time Log Viewer -->
+    <div class="test-container">
+        <h2>📊 Test Results Summary</h2>
+        <div id="test-summary">
+            <p>Run tests above to see results summary...</p>
+        </div>
+    </div>
+
+    <script>
+        const BASE_URL = 'http://localhost:3001/api';
+        const TEST_CONFIG = {
+            headers: {
+                'Authorization': 'Bearer SYSTEM_INTERNAL_CALL',
+                'X-Internal-Call': 'true',
+                'Content-Type': 'application/json'
+            }
+        };
+
+        let testResults = {
+            passed: 0,
+            failed: 0,
+            total: 0
+        };
+
+        // Utility functions
+        function showResult(containerId, content, isError = false, isSuccess = false) {
+            const container = document.getElementById(containerId);
+            container.style.display = 'block';
+            container.className = `result-container ${isError ? 'error' : isSuccess ? 'success' : ''}`;
+            container.innerHTML = content;
+        }
+
+        function updateTestSummary() {
+            const summary = document.getElementById('test-summary');
+            const percentage = testResults.total > 0 ? Math.round((testResults.passed / testResults.total) * 100) : 0;
+            
+            summary.innerHTML = `
+                <h3>📈 Test Results</h3>
+                <p><strong>Passed:</strong> ${testResults.passed}/${testResults.total} (${percentage}%)</p>
+                <p><strong>Failed:</strong> ${testResults.failed}/${testResults.total}</p>
+                <div style="background: ${percentage > 80 ? '#4caf50' : percentage > 50 ? '#ff9800' : '#f44336'}; 
+                     height: 10px; width: ${percentage}%; border-radius: 5px; margin-top: 10px;"></div>
+            `;
+        }
+
+        function recordTestResult(passed) {
+            testResults.total++;
+            if (passed) {
+                testResults.passed++;
+            } else {
+                testResults.failed++;
+            }
+            updateTestSummary();
+        }
+
+        // System health check
+        async function checkSystemHealth() {
+            try {
+                showResult('system-status', '<span class="loading">Checking system status...</span>');
+                
+                const response = await fetch(`${BASE_URL}/system/status`, {
+                    headers: TEST_CONFIG.headers
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    const statusHtml = `
+                        <span class="status-indicator status-online"></span>
+                        <strong>System Status:</strong> ${data.status}<br>
+                        <strong>Uptime:</strong> ${Math.round(data.uptime)} seconds<br>
+                        <strong>Memory:</strong> ${data.memory.used} / ${data.memory.total}<br>
+                        <strong>Data Health:</strong> ${data.data_health.total_borrowers} borrowers, B001: ${data.data_health.borrower_b001}
+                    `;
+                    showResult('system-status', statusHtml, false, true);
+                    recordTestResult(true);
+                } else {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+            } catch (error) {
+                showResult('system-status', `<span class="status-indicator status-offline"></span>System offline: ${error.message}`, true);
+                recordTestResult(false);
+            }
+        }
+
+        // MCP registry check
+        async function checkMcpRegistry() {
+            try {
+                const response = await fetch(`${BASE_URL}/mcp/functions`, {
+                    headers: TEST_CONFIG.headers
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    const registryHtml = `
+                        <h4>📋 MCP Function Registry</h4>
+                        <strong>Total Functions:</strong> ${data.total_functions}<br>
+                        <strong>Active Functions:</strong> ${data.active_functions}<br>
+                        <strong>Categories:</strong> ${Object.entries(data.categories).map(([cat, count]) => `${cat}: ${count}`).join(', ')}
+                    `;
+                    showResult('system-status', registryHtml, false, true);
+                } else {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+            } catch (error) {
+                showResult('system-status', `MCP Registry error: ${error.message}`, true);
+            }
+        }
+
+        // Test direct API endpoints
+        async function testDirectApi(endpoint, testName) {
+            try {
+                showResult('direct-api-results', `<span class="loading">Testing ${testName}...</span>`);
+                
+                const response = await fetch(`${BASE_URL}${endpoint}`, {
+                    headers: TEST_CONFIG.headers
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    const resultHtml = `
+                        <h4>✅ ${testName} - Success</h4>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                    showResult('direct-api-results', resultHtml, false, true);
+                    recordTestResult(true);
+                } else {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+            } catch (error) {
+                showResult('direct-api-results', `<h4>❌ ${testName} - Failed</h4><p>${error.message}</p>`, true);
+                recordTestResult(false);
+            }
+        }
+
+        // Test MCP function calling
+        async function testMcpFunction(userMessage, testName) {
+            try {
+                const isValidationTest = testName.includes('Invalid') || testName.includes('Empty');
+                const containerId = isValidationTest ? 'validation-results' : 'mcp-function-results';
+                
+                showResult(containerId, `<span class="loading">Testing ${testName}...</span>`);
+                
+                const response = await fetch(`${BASE_URL}/openai/chat`, {
+                    method: 'POST',
+                    headers: TEST_CONFIG.headers,
+                    body: JSON.stringify({
+                        messages: [{ role: 'user', content: userMessage }],
+                        function_call: 'auto'
+                    })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    
+                    // Check if this is an expected validation error
+                    const isValidationError = data.content && data.content.includes('issue with the request');
+                    const shouldBeValidationError = isValidationTest;
+                    
+                    let resultHtml;
+                    let isSuccess = false;
+                    
+                    if (shouldBeValidationError && isValidationError) {
+                        resultHtml = `
+                            <h4>✅ ${testName} - Validation Working</h4>
+                            <p><strong>Expected validation error occurred:</strong></p>
+                            <pre>${data.content}</pre>
+                        `;
+                        isSuccess = true;
+                        recordTestResult(true);
+                    } else if (!shouldBeValidationError && !isValidationError) {
+                        resultHtml = `
+                            <h4>✅ ${testName} - Success</h4>
+                            <p><strong>Function executed successfully:</strong></p>
+                            <pre>${data.content}</pre>
+                        `;
+                        isSuccess = true;
+                        recordTestResult(true);
+                    } else {
+                        resultHtml = `
+                            <h4>❌ ${testName} - Unexpected Result</h4>
+                            <p><strong>Expected ${shouldBeValidationError ? 'validation error' : 'success'} but got:</strong></p>
+                            <pre>${data.content}</pre>
+                        `;
+                        recordTestResult(false);
+                    }
+                    
+                    showResult(containerId, resultHtml, !isSuccess, isSuccess);
+                } else {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+            } catch (error) {
+                const containerId = testName.includes('Invalid') || testName.includes('Empty') ? 'validation-results' : 'mcp-function-results';
+                showResult(containerId, `<h4>❌ ${testName} - Network Error</h4><p>${error.message}</p>`, true);
+                recordTestResult(false);
+            }
+        }
+
+        // Auto-run system check on load
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                checkSystemHealth();
+            }, 500);
+        });
+    </script>
+</body>
+</html> 

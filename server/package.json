@@ -1,0 +1,48 @@
+{
+  "name": "mcp-server",
+  "version": "1.0.0",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js",
+    "build": "echo 'Creating production build...' && npm prune --production && echo 'Build complete'",
+    "start:prod": "NODE_ENV=production node server.js",
+    "test": "jest --config jest.config.js --forceExit && npm run test:openai && npm run test:logging && npm run test:performance && npm run test:security",
+    "test:unit": "jest --config jest.config.js tests/unit --forceExit",
+    "test:integration": "jest --config jest.config.js tests/integration --forceExit",
+    "test:jest": "jest --config jest.config.js --forceExit",
+    "test:coverage": "jest --config jest.config.js --coverage --forceExit",
+    "test:openai": "node tests/helpers/openai-test.js",
+    "test:logging": "node tests/helpers/logging-test.js",
+    "test:performance": "node tests/helpers/performance-test.js",
+    "test:security": "node tests/helpers/security-test.js",
+    "test:custom": "npm run test:openai && npm run test:logging && npm run test:performance && npm run test:security",
+    "test:interactive": "node tests/run-all-tests.js",
+    "test:setup": "node -e \"require('./tests/globalSetup.js')()\""
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "axios": "^1.9.0",
+    "bcrypt": "^6.0.0",
+    "chalk": "^4.1.2",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.5",
+    "dotenv": "^16.5.0",
+    "express": "^4.17.1",
+    "jsonwebtoken": "^9.0.2",
+    "openai": "^4.100.0",
+    "ws": "^8.16.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "chai": "^5.2.0",
+    "jest": "^29.7.0",
+    "mocha": "^11.4.0",
+    "nodemon": "^3.1.10",
+    "supertest": "^7.1.1"
+  }
+}

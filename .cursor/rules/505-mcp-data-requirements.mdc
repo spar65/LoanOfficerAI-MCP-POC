@@ -1,0 +1,590 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+description: IMPLEMENT when designing data schemas and services for MCP functions to ensure consistent, reliable data access
+globs: "server/data/**/*.{json,js}"
+
+# 505: MCP Data Requirements
+
+## Rule
+
+When implementing data models, schemas, and services that support MCP functions, follow standardized patterns to ensure data consistency, integrity, and reliability, enabling robust natural language interactions with structured data.
+
+## Context
+
+Model Completion Protocol (MCP) functions bridge natural language queries and structured data operations. For this to work reliably:
+1. Data structures must be consistent and well-defined
+2. Entity relationships must be clear and navigable
+3. Data must be accessible through standardized patterns
+4. Error cases and missing data must be gracefully handled
+5. Data service implementations must be consistent
+
+Standardizing data requirements ensures MCP functions can reliably access, process, and return consistent results regardless of the specific data domain.
+
+## RuleDetails
+
+### Data Schema Requirements
+
+1. **Entity Identification**
+   - Use clear, consistent ID formats for all entities
+   - Prefer prefixed IDs that indicate entity type (e.g., L001 for loans)
+   - Ensure IDs are unique across their domain
+   - Document ID formats and ranges
+   - Use string IDs to allow for future format changes
+
+```json
+// Good example: Loan entity with clear ID format
+{
+  "loan_id": "L001",
+  "borrower_id": "B001",
+  "amount": 50000,
+  "interest_rate": 3.5,
+  "term_length": 60
+}
+
+// Good example: Borrower entity with matching ID format
+{
+  "borrower_id": "B001",
+  "first_name": "John",
+  "last_name": "Doe",
+  "credit_score": 750
+}
+```
+
+2. **Schema Consistency**
+   - Use consistent naming conventions (snake_case recommended)
+   - Apply consistent data types for similar fields
+   - Document required vs. optional fields
+   - Include type information in JSON Schema or TypeScript interfaces
+   - Maintain backward compatibility when evolving schemas
+
+```typescript
+// TypeScript interface example with clear type definitions
+interface Loan {
+  loan_id: string;           // Required, format: "L{number}"
+  borrower_id: string;       // Required, format: "B{number}"
+  amount: number;            // Required, decimal
+  interest_rate: number;     // Required, percentage as decimal
+  term_length: number;       // Required, months
+  start_date: string;        // Required, ISO8601 format
+  end_date: string;          // Required, ISO8601 format
+  status: LoanStatus;        // Required
+  loan_type: string;         // Required
+  last_payment_date?: string; // Optional, ISO8601 format
+  next_payment_date?: string; // Optional, ISO8601 format
+}
+
+type LoanStatus = 'Pending' | 'Active' | 'Closed' | 'Default';
+```
+
+3. **Relationship Modeling**
+   - Define clear foreign key relationships
+   - Document cardinality (one-to-one, one-to-many, many-to-many)
+   - Use consistent relationship patterns
+   - Ensure referential integrity
+   - Prefer normalized data structures
+
+```javascript
+// Example of clearly defined relationships in a data service
+class DataService {
+  // Get all loans for a borrower (one-to-many relationship)
+  getLoansByBorrowerId(borrowerId) {
+    const loans = this.loadData('loans');
+    return loans.filter(loan => loan.borrower_id === borrowerId);
+  }
+  
+  // Get collateral items for a loan (one-to-many relationship)
+  getCollateralByLoanId(loanId) {
+    const collateral = this.loadData('collateral');
+    return collateral.filter(item => item.loan_id === loanId);
+  }
+  
+  // Get borrower for a loan (many-to-one relationship)
+  getBorrowerForLoan(loanId) {
+    const loans = this.loadData('loans');
+    const loan = loans.find(l => l.loan_id === loanId);
+    
+    if (!loan) return null;
+    
+    const borrowers = this.loadData('borrowers');
+    return borrowers.find(b => b.borrower_id === loan.borrower_id);
+  }
+}
+```
+
+### Data Service Patterns
+
+1. **Data Access Layer**
+   - Implement a consistent data service interface
+   - Abstract data source details (files, database, API)
+   - Include proper error handling
+   - Support lazy loading and caching as needed
+   - Document service behavior and assumptions
+
+```javascript
+// Example data service implementation
+class DataService {
+  constructor(options = {}) {
+    this.dataDir = options.dataDir || path.join(__dirname, '..', 'data');
+    this.useCache = options.useCache !== false;
+    this.cache = {};
+    
+    // Define data paths
+    this.paths = {
+      loans: path.join(this.dataDir, 'loans.json'),
+      borrowers: path.join(this.dataDir, 'borrowers.json'),
+      payments: path.join(this.dataDir, 'payments.json'),
+      collateral: path.join(this.dataDir, 'collateral.json')
+    };
+  }
+  
+  loadData(entityType) {
+    if (this.useCache && this.cache[entityType]) {
+      return this.cache[entityType];
+    }
+    
+    try {
+      const filePath = this.paths[entityType];
+      if (!filePath) {
+        throw new Error(`Unknown entity type: ${entityType}`);
+      }
+      
+      if (!fs.existsSync(filePath)) {
+        return [];
+      }
+      
+      const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+      
+      if (this.useCache) {
+        this.cache[entityType] = data;
+      }
+      
+      return data;
+    } catch (error) {
+      LogService.error(`Error loading ${entityType} data:`, error);
+      return [];
+    }
+  }
+  
+  // Additional methods for fetching specific entities
+  getEntityById(entityType, id, idField = `${entityType.slice(0, -1)}_id`) {
+    const data = this.loadData(entityType);
+    return data.find(item => item[idField] === id);
+  }
+}
+```
+
+2. **Error Handling**
+   - Return consistent error formats
+   - Handle missing data gracefully
+   - Provide meaningful error messages
+   - Include error context (entity type, ID, operation)
+   - Log data access errors with appropriate detail
+
+```javascript
+// Example error handling in data service
+getEntityById(entityType, id, idField = `${entityType.slice(0, -1)}_id`) {
+  try {
+    const data = this.loadData(entityType);
+    
+    if (!data || !Array.isArray(data)) {
+      throw new Error(`Invalid data format for ${entityType}`);
+    }
+    
+    const entity = data.find(item => item[idField] === id);
+    
+    if (!entity) {
+      LogService.debug(`${entityType} not found with ${idField}=${id}`);
+      return null; // Return null instead of throwing for not found
+    }
+    
+    return entity;
+  } catch (error) {
+    LogService.error(`Error in getEntityById for ${entityType}/${id}:`, {
+      error: error.message,
+      entityType,
+      id,
+      idField
+    });
+    
+    throw new DataServiceError(
+      `Failed to retrieve ${entityType} with ID ${id}`,
+      {
+        entityType,
+        entityId: id,
+        operation: 'getEntityById',
+        originalError: error
+      }
+    );
+  }
+}
+```
+
+3. **Validation**
+   - Validate data upon loading
+   - Check for required fields
+   - Verify data types and formats
+   - Log validation failures
+   - Reject invalid data with clear errors
+
+```javascript
+validateData(entityType, data) {
+  const validators = {
+    loans: this.validateLoan,
+    borrowers: this.validateBorrower,
+    // Other entity validators
+  };
+  
+  const validator = validators[entityType];
+  if (!validator) {
+    LogService.warn(`No validator defined for ${entityType}`);
+    return true; // Skip validation
+  }
+  
+  try {
+    if (!Array.isArray(data)) {
+      throw new Error(`Expected array of ${entityType}`);
+    }
+    
+    const invalidItems = [];
+    
+    data.forEach((item, index) => {
+      try {
+        validator(item);
+      } catch (validationError) {
+        invalidItems.push({
+          index,
+          id: item.id || `item-${index}`,
+          error: validationError.message
+        });
+      }
+    });
+    
+    if (invalidItems.length > 0) {
+      LogService.warn(`Found ${invalidItems.length} invalid ${entityType}:`, invalidItems);
+    }
+    
+    return invalidItems.length === 0;
+  } catch (error) {
+    LogService.error(`Validation failed for ${entityType}:`, error);
+    return false;
+  }
+}
+```
+
+### Default and Fallback Data
+
+1. **Default Data**
+   - Provide sensible defaults for optional fields
+   - Document default values
+   - Ensure defaults are type-safe
+   - Update defaults when schema evolves
+   - Test with default values
+
+2. **Seed Data**
+   - Create comprehensive seed data for testing
+   - Include edge cases in seed data
+   - Document seed data purpose and structure
+   - Refresh seed data when schema changes
+   - Ensure seed data covers all entity relationships
+
+```javascript
+// Example seed data generator
+function generateSeedData() {
+  // Generate borrowers
+  const borrowers = [
+    {
+      borrower_id: "B001",
+      first_name: "John",
+      last_name: "Doe",
+      credit_score: 750,
+      income: 100000
+    },
+    {
+      borrower_id: "B002",
+      first_name: "Jane",
+      last_name: "Smith",
+      credit_score: 720,
+      income: 90000
+    },
+    // Additional borrowers with various credit scores and scenarios
+  ];
+  
+  // Generate loans with relationships to borrowers
+  const loans = [
+    {
+      loan_id: "L001",
+      borrower_id: "B001",
+      amount: 50000,
+      interest_rate: 3.5,
+      term_length: 60,
+      status: "Active"
+    },
+    // Additional loans with various statuses and scenarios
+  ];
+  
+  // Generate related data (payments, collateral, etc.)
+  
+  return {
+    borrowers,
+    loans,
+    // Other entity types
+  };
+}
+```
+
+3. **Fallback Mechanisms**
+   - Implement graceful fallbacks for missing data
+   - Create mechanisms to detect corrupt data
+   - Provide sensible responses when data is unavailable
+   - Log fallback usage for monitoring
+   - Consider caching for resilience
+
+```javascript
+// Example fallback mechanism in data access
+getBorrowerById(borrowerId) {
+  try {
+    const borrower = this.getEntityById('borrowers', borrowerId);
+    
+    if (!borrower) {
+      LogService.warn(`Borrower not found: ${borrowerId}, using fallback data`);
+      return this.getFallbackBorrower(borrowerId);
+    }
+    
+    return borrower;
+  } catch (error) {
+    LogService.error(`Error retrieving borrower ${borrowerId}:`, error);
+    return this.getFallbackBorrower(borrowerId);
+  }
+}
+
+getFallbackBorrower(borrowerId) {
+  // Log usage of fallback for monitoring
+  LogService.info(`Using fallback data for borrower: ${borrowerId}`);
+  
+  // Return minimal valid borrower data
+  return {
+    borrower_id: borrowerId,
+    first_name: "Unknown",
+    last_name: "Borrower",
+    credit_score: null,
+    income: null,
+    is_fallback: true // Flag to indicate this is fallback data
+  };
+}
+```
+
+## Examples
+
+### Example 1: Good Data Schema Definition
+
+```json
+// File: server/data/loans.json
+[
+  {
+    "loan_id": "L001",
+    "borrower_id": "B001",
+    "loan_amount": 50000,
+    "interest_rate": 3.5,
+    "term_length": 60,
+    "start_date": "2024-01-01",
+    "end_date": "2029-01-01",
+    "status": "Active",
+    "loan_type": "Farm Equipment"
+  },
+  {
+    "loan_id": "L002",
+    "borrower_id": "B002",
+    "loan_amount": 30000,
+    "interest_rate": 4.0,
+    "term_length": 36,
+    "start_date": "2024-06-15",
+    "end_date": "2027-06-15",
+    "status": "Active",
+    "loan_type": "Crop Production"
+  }
+]
+```
+
+```json
+// File: server/data/collateral.json
+[
+  {
+    "collateral_id": "C001",
+    "loan_id": "L001",
+    "description": "Farm equipment",
+    "value": 75000
+  },
+  {
+    "collateral_id": "C002",
+    "loan_id": "L002",
+    "description": "Tractor and equipment",
+    "value": 35000
+  }
+]
+```
+
+### Example 2: Good Data Service Implementation
+
+```javascript
+// File: server/services/dataService.js
+const fs = require('fs');
+const path = require('path');
+const LogService = require('./logService');
+
+class DataService {
+  constructor() {
+    this.dataDir = path.join(__dirname, '..', 'data');
+    this.cache = {};
+    
+    // Define data paths with clear naming
+    this.paths = {
+      loans: path.join(this.dataDir, 'loans.json'),
+      borrowers: path.join(this.dataDir, 'borrowers.json'),
+      payments: path.join(this.dataDir, 'payments.json'),
+      collateral: path.join(this.dataDir, 'collateral.json')
+    };
+  }
+  
+  loadData(filePath) {
+    try {
+      // Check cache first
+      if (this.cache[filePath]) {
+        return this.cache[filePath];
+      }
+      
+      // Check if file exists
+      if (!fs.existsSync(filePath)) {
+        LogService.warn(`Data file not found: ${filePath}`);
+        return [];
+      }
+      
+      // Read and parse data
+      const data = fs.readFileSync(filePath, 'utf8');
+      const parsedData = JSON.parse(data);
+      
+      // Validate data structure
+      if (!Array.isArray(parsedData)) {
+        throw new Error(`Expected array in ${filePath}`);
+      }
+      
+      // Cache the result
+      this.cache[filePath] = parsedData;
+      
+      return parsedData;
+    } catch (error) {
+      LogService.error(`Error loading data from ${filePath}:`, {
+        message: error.message,
+        stack: error.stack
+      });
+      
+      // Return empty array as fallback
+      return [];
+    }
+  }
+  
+  // Helper for related data
+  getRelatedData(id, data, foreignKey) {
+    return data.filter(item => item[foreignKey] === id);
+  }
+  
+  // Clear cache (for testing or after data updates)
+  clearCache() {
+    this.cache = {};
+    LogService.debug('Data service cache cleared');
+  }
+}
+
+// Export singleton instance
+module.exports = new DataService();
+```
+
+### Example 3: Good Validation Implementation
+
+```javascript
+// File: server/validators/dataValidators.js
+const Joi = require('joi');
+const LogService = require('../services/logService');
+
+// Schema definitions for validation
+const schemas = {
+  loan: Joi.object({
+    loan_id: Joi.string().pattern(/^L\d{3}$/).required(),
+    borrower_id: Joi.string().pattern(/^B\d{3}$/).required(),
+    loan_amount: Joi.number().positive().required(),
+    interest_rate: Joi.number().min(0).max(100).required(),
+    term_length: Joi.number().integer().positive().required(),
+    start_date: Joi.date().iso().required(),
+    end_date: Joi.date().iso().min(Joi.ref('start_date')).required(),
+    status: Joi.string().valid('Pending', 'Active', 'Closed', 'Default').required(),
+    loan_type: Joi.string().required()
+  }),
+  
+  borrower: Joi.object({
+    borrower_id: Joi.string().pattern(/^B\d{3}$/).required(),
+    first_name: Joi.string().required(),
+    last_name: Joi.string().required(),
+    credit_score: Joi.number().integer().min(300).max(850).required(),
+    income: Joi.number().positive().required()
+  }),
+  
+  // Additional schemas for other entity types
+};
+
+// Validation function
+function validateData(entityType, data) {
+  const schema = schemas[entityType];
+  
+  if (!schema) {
+    LogService.warn(`No validation schema for entity type: ${entityType}`);
+    return { valid: true, errors: [] };
+  }
+  
+  try {
+    const errors = [];
+    
+    // Validate each item in the array
+    data.forEach((item, index) => {
+      const { error } = schema.validate(item, { abortEarly: false });
+      
+      if (error) {
+        errors.push({
+          index,
+          id: item[`${entityType}_id`] || `item-${index}`,
+          details: error.details.map(d => d.message)
+        });
+      }
+    });
+    
+    if (errors.length > 0) {
+      LogService.warn(`Found ${errors.length} invalid ${entityType} items:`, errors);
+    }
+    
+    return {
+      valid: errors.length === 0,
+      errors
+    };
+  } catch (error) {
+    LogService.error(`Validation error for ${entityType}:`, error);
+    return {
+      valid: false,
+      errors: [{ general: error.message }]
+    };
+  }
+}
+
+module.exports = {
+  validateData,
+  schemas
+};
+```
+
+## Enforcement
+
+- Code reviews must verify adherence to data standards
+- Data schema changes must be documented and reviewed
+- Automated validation tests must be implemented for all data types
+- Data integrity tests must verify relationships between entities
+- Documentation must be updated when data schemas change

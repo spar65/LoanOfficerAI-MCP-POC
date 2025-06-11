@@ -1,0 +1,382 @@
+import React, { useState, useRef, useEffect } from 'react';
+import mcpClient from '../mcp/mcpClient';
+import axios from 'axios';
+import authService from '../mcp/authService';  // Import auth service
+import {
+  Box,
+  Typography,
+  TextField,
+  Button,
+  Paper,
+  Card,
+  CardContent,
+  InputAdornment,
+  List,
+  ListItem,
+  ListItemText,
+  Divider,
+  IconButton,
+  Chip,
+  CircularProgress,
+  Avatar,
+  Fade,
+  Grow,
+  Alert,
+  Badge
+} from '@mui/material';
+import SendIcon from '@mui/icons-material/Send';
+import SmartToyIcon from '@mui/icons-material/SmartToy';
+import PersonIcon from '@mui/icons-material/Person';
+import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
+import DescriptionIcon from '@mui/icons-material/Description';
+import PaymentsIcon from '@mui/icons-material/Payments';
+import AssessmentIcon from '@mui/icons-material/Assessment';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import AgricultureIcon from '@mui/icons-material/Agriculture';
+import InfoIcon from '@mui/icons-material/Info';
+import ErrorIcon from '@mui/icons-material/Error';
+
+// Define advanced MCP function schemas for OpenAI
+export const MCP_FUNCTIONS = [
+  // Basic loan data retrieval functions
+  {
+    name: "getAllLoans",
+    description: "Get a list of all loans in the system",
+    parameters: { type: "object", properties: {}, required: [] },
+  },
+  {
+    name: "getLoanDetails",
+    description: "Get detailed information about a specific loan including borrower, amount, interest rate, term, status, and type",
+    parameters: {
+      type: "object",
+      properties: {
+        loan_id: {
+          type: "string",
+          description: "The ID of the loan to retrieve (e.g., L001, L002)",
+        },
+      },
+      required: ["loan_id"],
+    },
+  },
+  // ... more functions truncated for brevity
+];
+
+const Chatbot = ({ onClose }) => {
+  // Agricultural lending domain knowledge system prompt
+  const systemPrompt = `You are an AI Farm Loan Assistant specializing in agricultural lending. Help users understand their loan portfolio, assess risks, and make informed lending decisions.
+
+DOMAIN KNOWLEDGE:
+- Agricultural loans are affected by seasonal cash flow, with farmers often receiving most income after harvest
+- Weather conditions, crop prices, and input costs significantly impact a farmer's ability to repay loans
+- Payment history patterns often follow seasonal trends in farming operations
+- Collateral typically includes land, equipment, and sometimes future crop yields
+- Default risk increases with multiple late payments, especially those outside normal seasonal patterns
+- Farm size, crop diversity, and equipment condition are key factors in risk assessment
+
+AVAILABLE DATA:
+- Loan details: terms, interest rates, payment schedules, and current status
+- Borrower information: credit scores, farm size, crops grown, and financial statements
+- Payment histories showing patterns and potential delinquencies
+- Collateral records with valuations and condition reports
+- Predictive analytics for default risk, non-accrual risk, equipment maintenance, and crop yield forecasts
+- Market price impact analysis and loan restructuring recommendations
+
+USE APPROPRIATE FUNCTIONS:
+- For basic loan questions, use getLoanDetails, getLoanStatus, or getLoansByBorrower
+- For default prediction, use predictDefaultRisk with a borrower_id and optional time horizon
+- For non-accrual risk analysis, use predictNonAccrualRisk with a borrower_id
+- For equipment maintenance forecasts, use forecastEquipmentMaintenance with a borrower_id and time horizon
+- For crop yield risk assessment, use assessCropYieldRisk with a borrower_id and optional crop_type
+- For market price impact analysis, use analyzeMarketPriceImpact with a borrower_id
+- For loan restructuring recommendations, use recommendLoanRestructuring with a loan_id
+
+EXAMPLE COMPLEX QUESTIONS YOU CAN ANSWER:
+- "Which farmers are at high risk of default in the next 3 months?"
+- "Will John Smith become non-accrual given his payment history?"
+- "How much should borrower B002 budget for equipment maintenance next year?"
+- "What's the likelihood of crop yields falling below break-even for Smith Farms?"
+- "How will current corn price trends impact Sarah Johnson's income?"
+- "What are the best restructuring options for loan L003?"
+- "Should I be concerned about the collateral for William Brown's loans?"
+
+Always provide clear, actionable information with data-driven insights. For complex questions, use the appropriate predictive function to provide accurate forecasts and recommendations.`;
+
+  // Convert initial bot message to OpenAI format
+  const [conversationHistory, setConversationHistory] = useState([
+    { role: "system", content: systemPrompt },
+    { role: "assistant", content: "Hello! I'm your Farm Loan Assistant. Ask me about loan status, details, payments, collateral, active loans, or loans by borrower. I can also help with risk assessment and refinancing options." }
+  ]);
+  
+  // For display in the UI
+  const [messages, setMessages] = useState([
+    { 
+      id: 1,
+      text: 'Hello! I\'m your Farm Loan Assistant. Ask me about loan status, details, payments, collateral, active loans, or loans by borrower. I can also help with risk assessment and refinancing options.', 
+      sender: 'bot',
+      timestamp: new Date().toISOString()
+    },
+  ]);
+  
+  const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  const messagesEndRef = useRef(null);
+  const [sessionId] = useState(() => `session-${Date.now()}`);
+  const [mcpConnected, setMcpConnected] = useState(false);
+
+  // Scroll to bottom whenever messages change
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  useEffect(() => {
+    // Initial welcome message
+    setMessages([{
+      id: 1,
+      role: 'assistant',
+      content: 'Welcome to LoanOfficer AI! I can help you with loan management, risk assessment, and predictive analytics. Ask me anything about your agricultural lending portfolio.',
+      timestamp: new Date().toISOString()
+    }]);
+    
+    // Check MCP connection status
+    const checkConnection = setInterval(() => {
+      setMcpConnected(mcpClient.isConnected());
+    }, 1000);
+    
+    return () => clearInterval(checkConnection);
+  }, []);
+
+  // Manual MCP reconnection function
+  const handleMCPReconnect = async () => {
+    try {
+      console.log('[Chatbot] Attempting to reconnect to MCP server...');
+      const success = await mcpClient.connect();
+      if (success) {
+        console.log('[Chatbot] Successfully reconnected to MCP server');
+        setMcpConnected(true);
+      } else {
+        console.warn('[Chatbot] Failed to reconnect to MCP server');
+        setMcpConnected(false);
+      }
+    } catch (error) {
+      console.error('[Chatbot] MCP reconnection error:', error);
+      setMcpConnected(false);
+    }
+  };
+
+  // Format currency values
+  const formatCurrency = (amount) => {
+    return amount?.toLocaleString(undefined, { 
+      style: 'currency', 
+      currency: 'USD',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2 
+    });
+  };
+
+  // Process function calls from OpenAI
+  const processFunctionCall = async (functionCall) => {
+    try {
+      const { name, arguments: argsString } = functionCall;
+      console.log(`Executing function: ${name} with args: ${argsString}`);
+      
+      // Parse function arguments
+      const args = JSON.parse(argsString);
+      console.log('Parsed args:', args);
+      
+      // Execute the appropriate function based on the name
+      if (typeof mcpClient[name] === 'function') {
+        let result;
+        
+        // ... function execution logic truncated for brevity
+      } else {
+        throw new Error(`Function ${name} not found in mcpClient`);
+      }
+    } catch (error) {
+      console.error("Error executing function:", error);
+      
+      // Create user-friendly error messages for common issues
+      let userMessage = error.message;
+      
+      if (error.message.includes('Network Error') || error.message.includes('ECONNREFUSED')) {
+        userMessage = 'Unable to connect to the server. Please check if the server is running.';
+      } else if (error.message.includes('401') || error.message.includes('Unauthorized')) {
+        userMessage = 'Authentication error. Please refresh the page and try again.';
+      } else if (error.message.includes('404') || error.message.includes('not found')) {
+        userMessage = 'The requested information was not found. Please check the ID and try again.';
+      } else if (error.message.includes('timeout')) {
+        userMessage = 'The request timed out. Please try again.';
+      }
+      
+      return { 
+        role: "function", 
+        name: functionCall.name, 
+        content: JSON.stringify({ 
+          error: userMessage,
+          technical_details: error.message 
+        }) 
+      };
+    }
+  };
+
+  const handleSend = async () => {
+    if (!input.trim() || loading) return;
+    
+    const userMessage = { 
+      id: Date.now(),
+      text: input, 
+      sender: 'user',
+      timestamp: new Date().toISOString()
+    };
+    const userMessageForAPI = { role: "user", content: input };
+    
+    setMessages(prev => [...prev, userMessage]);
+    setConversationHistory(prev => [...prev, userMessageForAPI]);
+    setInput('');
+    setLoading(true);
+    
+    try {
+      // Get auth token using the auth service
+      let token = authService.getToken();
+      
+      if (!token) {
+        console.error('No authentication token available, attempting to get one...');
+        
+        // Try to auto-login if no token
+        try {
+          const response = await axios.post('http://localhost:3001/api/auth/login', {
+            username: 'john.doe',
+            password: 'password123'
+          });
+          
+          if (response.data.success) {
+            authService.setAuth(response.data);
+            token = response.data.accessToken;
+            console.log('Got new auth token');
+          } else {
+            throw new Error('Login failed');
+          }
+        } catch (loginError) {
+          console.error('Auto-login failed:', loginError);
+          throw new Error('Authentication required - please refresh the page');
+        }
+      }
+      
+      // Add typing indicator
+      setMessages(prev => [...prev, { 
+        id: Date.now() + 1,
+        text: !authService.getToken() ? 'Authenticating...' : '...', 
+        sender: 'bot', 
+        isTyping: true,
+        timestamp: new Date().toISOString()
+      }]);
+      
+      // Make API request to our OpenAI proxy
+      const response = await axios.post(`${mcpClient.baseURL}/openai/chat`, {
+        messages: [...conversationHistory, userMessageForAPI],
+        functions: MCP_FUNCTIONS,
+        function_call: 'auto'
+      }, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      // Remove typing indicator
+      setMessages(prev => prev.filter(msg => !msg.isTyping));
+      
+      // Handle the response
+      const aiMessage = response.data;
+      let responseText = aiMessage.content;
+      let updatedHistory = [...conversationHistory, userMessageForAPI, aiMessage];
+      
+      // Handle function call if present
+      if (aiMessage.function_call) {
+        // Debug what we're getting from OpenAI
+        console.log("==== OPENAI FUNCTION CALL RECEIVED BY CLIENT ====");
+        console.log("Function name:", aiMessage.function_call.name);
+        console.log("Raw arguments:", aiMessage.function_call.arguments);
+        console.log("Parsed arguments:", JSON.parse(aiMessage.function_call.arguments));
+        console.log("=================================================");
+        
+        // Execute the function
+        const functionResult = await processFunctionCall(aiMessage.function_call);
+        updatedHistory.push(functionResult);
+        
+        // Get a second response from OpenAI that incorporates the function result
+        const secondResponse = await axios.post(`${mcpClient.baseURL}/openai/chat`, {
+          messages: updatedHistory,
+          functions: MCP_FUNCTIONS,
+          function_call: 'auto'
+        }, {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        
+        // Update with the final response
+        const finalAiMessage = secondResponse.data;
+        responseText = finalAiMessage.content;
+        updatedHistory.push(finalAiMessage);
+      }
+      
+      // Add final message to UI
+      const botMessage = { 
+        id: Date.now() + 2,
+        text: responseText, 
+        sender: 'bot',
+        timestamp: new Date().toISOString()
+      };
+      setMessages(prev => [...prev.filter(msg => !msg.isTyping), botMessage]);
+      
+      // Update conversation history
+      setConversationHistory(updatedHistory);
+      
+    } catch (error) {
+      console.error("Error calling OpenAI API:", error);
+      
+      // Remove typing indicator
+      setMessages(prev => prev.filter(msg => !msg.isTyping));
+      
+      // Add error message
+      const errorMessage = { 
+        id: Date.now() + 3,
+        text: `Sorry, I encountered an error: ${error.message || 'Unknown error'}. Please try again.`, 
+        sender: 'bot',
+        timestamp: new Date().toISOString()
+      };
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // UI rendering code and example sections truncated for brevity
+
+  return (
+    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      {/* Header */}
+      <Paper elevation={2} sx={{ p: 2, borderRadius: 0 }}>
+        {/* Header content */}
+      </Paper>
+      
+      {/* Message area */}
+      <Box sx={{ 
+        flexGrow: 1, 
+        overflow: 'auto', 
+        p: 2,
+        bgcolor: '#f5f5f5'
+      }}>
+        {/* Message list */}
+      </Box>
+      
+      {/* Input area */}
+      <Paper elevation={3} sx={{ p: 2, borderRadius: 0 }}>
+        {/* Input form and example sections */}
+      </Paper>
+    </Box>
+  );
+};
+
+export default Chatbot; 

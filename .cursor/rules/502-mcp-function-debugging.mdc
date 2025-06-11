@@ -1,0 +1,223 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# 502: MCP Function Debugging and Troubleshooting
+
+## Rule
+
+When debugging or troubleshooting Model Completion Protocol (MCP) functions, follow a systematic diagnostic approach that ensures comprehensive verification across all system layers from data to user experience.
+
+## Context
+
+The Model Completion Protocol (MCP) connects natural language queries to structured data operations through multiple system layers. When these functions fail, the error might occur in the data, API endpoint, function handler, or LLM integration. Effective debugging requires a methodical approach to isolate the issue.
+
+## RuleDetails
+
+### Diagnostic Approach
+
+1. **Create Specialized Test Scripts**
+   - Create dedicated test scripts that isolate the problematic MCP function
+   - Test each layer independently (data, API endpoint, function handler, LLM response)
+   - Include proper error handling and logging in test scripts
+   - Make tests repeatable and integrate them into the test suite
+
+2. **Data Layer Verification**
+   - Directly inspect the relevant data files to ensure necessary data exists
+   - Verify ID matching (e.g., confirm loan_id exists in both loans and collateral)
+   - Check data types and values align with endpoint expectations
+   - Document data requirements for each MCP function
+
+3. **API Endpoint Diagnostics**
+   - Test direct API calls independent of the MCP function
+   - Verify endpoint returns expected data structure
+   - Add granular logging within endpoints to track execution flow
+   - Ensure error responses include actionable information
+
+4. **MCP Function Handler Improvements**
+   - Implement pre-call validation (verify entity exists before requesting details)
+   - Add defensive error handling with meaningful fallbacks
+   - Structure logging to capture key decision points
+   - Include context in returned data (thresholds, standards, criteria)
+
+5. **Response Enhancement**
+   - Provide clear context with results (e.g., industry standards, thresholds)
+   - Include supplementary data that helps interpret results
+   - Add summary fields that explain results in plain language
+   - Present relative measures alongside absolute values
+
+### Implementation Pattern
+
+When debugging an MCP function, follow this pattern:
+
+```javascript
+// MCP Function Handler Pattern
+async function handleMcpFunction(functionArgs) {
+  const { entityId, parameters } = functionArgs;
+  
+  // 1. Log function call details
+  LogService.mcp(`Processing ${functionName} for ${entityId}`, {
+    parameters,
+    endpoint: `/api/endpoint/${entityId}`
+  });
+  
+  try {
+    // 2. Verify entity exists first
+    const entityCheck = await callInternalApi(`/api/entity/${entityId}`);
+    
+    if (entityCheck.error) {
+      LogService.warn(`Entity check failed for ${entityId}: ${entityCheck.error}`);
+      return {
+        error: 'Entity not found',
+        entity_id: entityId,
+        details: `Unable to verify entity with ID ${entityId}`
+      };
+    }
+    
+    // 3. Call the actual endpoint
+    LogService.debug(`Entity ${entityId} verified, proceeding with operation`);
+    const result = await callInternalApi(`/api/endpoint/${entityId}?parameters=${parameters}`);
+    
+    // 4. Enhance the response with context
+    if (result.error) {
+      LogService.error(`Error in operation for ${entityId}:`, {
+        error: result.error,
+        details: result.details
+      });
+      return result;
+    }
+    
+    // 5. Add interpretative summary
+    result.summary = generateSummary(result);
+    
+    // 6. Log success with key metrics
+    LogService.info(`Successfully processed ${functionName} for ${entityId}: ${result.key_metric}`);
+    return result;
+  } catch (error) {
+    // 7. Comprehensive error handling
+    LogService.error(`Error in ${functionName} for ${entityId}:`, {
+      message: error.message,
+      stack: error.stack
+    });
+    
+    return {
+      error: `Failed to process ${functionName}`,
+      entity_id: entityId,
+      details: error.message
+    };
+  }
+}
+```
+
+### Test Script Pattern
+
+```javascript
+/**
+ * Test script to verify [MCP function] functionality
+ */
+require('dotenv').config();
+const axios = require('axios');
+const LogService = require('./services/logService');
+const dataService = require('./services/dataService');
+
+// Step 1: Verify data 
+LogService.info('Verifying relevant data');
+try {
+  // Load and check data directly
+  const entityData = dataService.loadData(dataService.paths.entityType);
+  LogService.info(`Found ${entityData.length} entities`);
+  
+  // Look for specific test entity
+  const testEntity = entityData.find(e => e.id === 'TEST_ID');
+  if (testEntity) {
+    LogService.info('Test entity found:', testEntity);
+  } else {
+    LogService.error('Test entity not found in data');
+  }
+  
+  // Check related data
+  const relatedData = dataService.loadData(dataService.paths.relatedType);
+  const entityRelatedItems = relatedData.filter(i => i.entity_id === 'TEST_ID');
+  if (entityRelatedItems.length > 0) {
+    LogService.info(`Found ${entityRelatedItems.length} related items`);
+  } else {
+    LogService.warn('No related items found');
+  }
+} catch (error) {
+  LogService.error('Error verifying data:', error);
+}
+
+// Step 2: Test direct endpoint
+async function testEndpoint() {
+  try {
+    const response = await axios.get(`${BASE_URL}/api/endpoint/TEST_ID`, {
+      headers: { 'X-Internal-Call': 'true' }
+    });
+    LogService.info('Endpoint response:', response.data);
+  } catch (error) {
+    LogService.error('Endpoint test failed:', error.response?.data || error.message);
+  }
+}
+
+// Step 3: Test via MCP function
+async function testMcpFunction() {
+  try {
+    const response = await axios.post(`${BASE_URL}/api/openai/chat`, {
+      messages: [{ role: 'user', content: "Natural language query about TEST_ID" }],
+      function_call: 'auto'
+    }, {
+      headers: { 'X-Internal-Call': 'true' }
+    });
+    LogService.info('MCP function response:', response.data);
+  } catch (error) {
+    LogService.error('MCP function test failed:', error.response?.data || error.message);
+  }
+}
+
+// Run tests if server is running
+axios.get(`${BASE_URL}/api/health`)
+  .then(() => {
+    testEndpoint();
+    testMcpFunction();
+  })
+  .catch(error => {
+    LogService.error('Server not running, please start the server first');
+  });
+```
+
+## Examples
+
+### Example: Debugging Collateral Sufficiency Function
+
+**Problem**: The LLM returns an error when asked about loan L002's collateral sufficiency.
+
+**Diagnostic Process**:
+
+1. **Data Verification**: 
+   - Confirmed loan L002 exists with $30,000 balance
+   - Confirmed collateral C002 exists for loan L002 valued at $35,000
+
+2. **API Endpoint Diagnosis**: 
+   - Direct call to `/api/risk/collateral/L002` worked but returned `is_sufficient: false`
+   - The issue was in the assessment logic: LTV ratio 0.86 exceeded the 0.8 threshold
+
+3. **Response Enhancement**:
+   - Added industry standard threshold context (0.8)
+   - Added collateral margin percentage (16.7%)
+   - Improved assessment language: "below recommended levels but still covers the loan"
+   - Added collateral details and summary
+
+4. **Function Handler Improvement**:
+   - Added loan existence checking before evaluation
+   - Enhanced error handling with specific error messages
+   - Added summary field explaining the LTV ratio in context
+
+**Resolution**: The function now clearly communicates that while the collateral technically "covers" the loan (value > loan amount), it falls short of the industry standard of 80% LTV ratio.
+
+## Enforcement
+
+- Direct code review to ensure MCP function handlers follow the prescribed pattern
+- Require test scripts for each MCP function that validate functionality at all layers
+- Documentation of data requirements for each MCP function
+- Periodic testing of error scenarios to ensure graceful degradation

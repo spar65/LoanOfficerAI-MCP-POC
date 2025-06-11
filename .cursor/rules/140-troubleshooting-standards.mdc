@@ -1,0 +1,310 @@
+description: Use when encountering errors, authentication issues, database connection problems, or other technical challenges to ensure structured, methodical troubleshooting rather than implementing workarounds
+globs: **/*.{js,ts,jsx,tsx,py,java,c,cpp,go,rb,php,swift,rs}
+
+# Troubleshooting Standards & Best Practices
+
+This rule defines the standard approach to troubleshooting issues, particularly for authentication, database connections, and other critical infrastructure components.
+
+## Core Principles
+
+### Fix Root Causes, Not Symptoms
+- Always seek to understand and address the fundamental issue rather than circumventing it.
+- Avoid temporary fixes, fake data, stubs, or mocks in production or development code.
+- Document clearly when addressing root causes requires significant architectural changes.
+
+### Structured Troubleshooting Process
+- Follow a systematic debugging approach rather than making random changes.
+- Isolate issues by testing components individually where possible.
+- Record steps taken and results observed during troubleshooting.
+- Use a "bisection" approach to narrow down problems in complex systems.
+
+### Authentication & Security Issues
+- Authentication issues should never be bypassed with hardcoded credentials.
+- Security-related errors require complete resolution, not workarounds.
+- Any temporary changes for troubleshooting must be completely removed afterward.
+- Document all attempts to resolve authentication issues for future reference.
+
+### Database Connection Problems
+- Database connection issues should be properly diagnosed using logs and connection testing.
+- Never substitute real database interactions with fake data returns in non-test code.
+- Mock or stub database connections only in test environments, never in development or production code.
+- Verify database schema, credentials, network connectivity, and configuration separately.
+
+### Persistent Troubleshooting
+- Make multiple systematic attempts before resorting to asking for help.
+- At minimum, try 5 different approaches before concluding an issue cannot be solved independently.
+- Document all attempted solutions and their outcomes.
+- When seeking assistance, provide complete information about all troubleshooting steps already taken.
+
+## Implementation Guidelines
+
+### Troubleshooting Process
+
+1. **Identify the Issue**:
+   - Gather specific error messages and stack traces
+   - Identify exact conditions that reproduce the issue
+   - Check logs for related errors or warnings
+   - Define expected vs. actual behavior precisely
+
+2. **Isolate the Problem Area**:
+   ```typescript
+   // Good: Isolate database connection issue
+   async function testDatabaseConnection() {
+     try {
+       // Test just the connection without application logic
+       const connection = await mongoose.createConnection(process.env.MONGODB_URI, {
+         useNewUrlParser: true,
+         useUnifiedTopology: true,
+         serverSelectionTimeoutMS: 5000, // Short timeout for quick feedback
+       });
+       console.log('Database connection successful');
+       await connection.close();
+       return true;
+     } catch (error) {
+       console.error('Database connection test failed:', error.message);
+       return false;
+     }
+   }
+   ```
+
+3. **Analyze Deeply**:
+   - Check configuration values and environment variables
+   - Review recent code changes that might have introduced the issue
+   - Examine similar working components for comparison
+   - Use debugging tools appropriate for the technology stack
+
+4. **Implement and Test Solution**:
+   - Make small, targeted changes addressing the root cause
+   - Verify the solution works in all relevant environments
+   - Ensure the fix doesn't introduce new issues
+   - Add tests to prevent regression
+
+### Authentication Troubleshooting
+
+When facing authentication issues:
+
+```typescript
+// Good: Systematic testing of authentication components
+async function troubleshootAuthentication() {
+  // 1. Test credential validation logic in isolation
+  const credentialsValid = await testCredentialValidation();
+  console.log('Credentials validation working:', credentialsValid);
+  
+  // 2. Test token generation
+  const tokenGeneration = await testTokenGeneration();
+  console.log('Token generation working:', tokenGeneration);
+  
+  // 3. Test token verification
+  const tokenVerification = await testTokenVerification();
+  console.log('Token verification working:', tokenVerification);
+  
+  // 4. Test integration with route protection
+  const routeProtection = await testRouteProtection();
+  console.log('Route protection working:', routeProtection);
+  
+  return {
+    credentialsValid,
+    tokenGeneration,
+    tokenVerification,
+    routeProtection
+  };
+}
+```
+
+### Database Troubleshooting
+
+For database issues:
+
+```typescript
+// Good: Systematic database troubleshooting
+async function troubleshootDatabase() {
+  // 1. Check connection string validity
+  const connectionStringValid = validateConnectionString(process.env.MONGODB_URI);
+  console.log('Connection string valid:', connectionStringValid);
+  
+  // 2. Check network connectivity to database server
+  const networkConnectivity = await checkNetworkConnectivity();
+  console.log('Network connectivity:', networkConnectivity);
+  
+  // 3. Check authentication credentials
+  const authCredentialsValid = await testDatabaseAuth();
+  console.log('Authentication credentials valid:', authCredentialsValid);
+  
+  // 4. Check database existence and permissions
+  const databaseAccessible = await testDatabaseAccess();
+  console.log('Database accessible:', databaseAccessible);
+  
+  // 5. Check schema compatibility
+  const schemaCompatible = await testSchemaCompatibility();
+  console.log('Schema compatible:', schemaCompatible);
+  
+  return {
+    connectionStringValid,
+    networkConnectivity,
+    authCredentialsValid, 
+    databaseAccessible,
+    schemaCompatible
+  };
+}
+```
+
+## Seeking Assistance Properly
+
+When issues persist after thorough troubleshooting:
+
+1. **Summarize the Issue**:
+   - Provide a clear, concise description of the problem
+   - Include relevant error messages and stack traces
+   - Specify the exact conditions that reproduce the issue
+
+2. **Document Troubleshooting Steps**:
+   - List all approaches already attempted
+   - Include the outcome of each attempt
+   - Explain why each approach did not resolve the issue
+
+3. **Present Options**:
+   - Provide 2-3 potential solutions with pros and cons of each
+   - Include your recommended approach with rationale
+   - Estimate effort/impact for each option
+
+4. **Example Format**:
+
+```
+ISSUE SUMMARY:
+Authentication fails when connecting to MongoDB in the test environment.
+Error: MongooseServerSelectionError: Authentication failed
+
+TROUBLESHOOTING STEPS TAKEN:
+1. Verified MongoDB URI format is correct
+   Result: URI format is valid, includes proper authentication parameters
+
+2. Tested connection using mongo command line with same credentials
+   Result: Successfully connected via command line
+
+3. Verified environment variables are correctly loaded in test environment
+   Result: Environment variables are correctly loaded and accessible
+
+4. Checked MongoDB user permissions
+   Result: User has readWrite role on the test database
+
+5. Attempted connection with increased timeout
+   Result: Same authentication error after timeout period
+
+POTENTIAL SOLUTIONS:
+
+Option 1: Update MongoDB user with enhanced permissions
+- Pros: May resolve permission-related authentication issues
+- Cons: Requires database admin access, potential security implications
+- Effort: Low (15-30 minutes)
+
+Option 2: Create dedicated test database with simplified authentication
+- Pros: Isolation of test environment, reduced complexity
+- Cons: Maintenance of separate database, potential divergence from production
+- Effort: Medium (1-2 hours)
+
+Option 3: Use MongoDB memory server for tests
+- Pros: No external dependencies, consistent clean state for tests
+- Cons: May not catch certain MongoDB-specific issues
+- Effort: Medium (2-3 hours)
+
+RECOMMENDATION:
+I recommend Option 3 as it provides the most reliable and isolated testing environment while eliminating external authentication dependencies.
+```
+
+## Avoiding Common Anti-Patterns
+
+### Anti-Pattern: Bypassing Authentication
+
+```typescript
+// BAD: Bypassing authentication for development
+if (process.env.NODE_ENV === 'development') {
+  // Skip token verification
+  req.user = { id: 'default-user-id', role: 'admin' };
+  return next();
+}
+
+// GOOD: Proper authentication in all environments
+const token = extractTokenFromRequest(req);
+try {
+  const decoded = await verifyToken(token);
+  req.user = decoded;
+  next();
+} catch (error) {
+  return res.status(401).json({ error: 'Authentication failed' });
+}
+```
+
+### Anti-Pattern: Fake Database Responses
+
+```typescript
+// BAD: Returning fake data instead of fixing database issues
+async function getUsers() {
+  try {
+    return await User.find({});
+  } catch (error) {
+    console.error('Database error:', error);
+    // Returning fake data to keep application working
+    return [
+      { id: '1', name: 'Test User 1', email: 'test1@example.com' },
+      { id: '2', name: 'Test User 2', email: 'test2@example.com' }
+    ];
+  }
+}
+
+// GOOD: Proper error handling without fake data
+async function getUsers() {
+  try {
+    return await User.find({});
+  } catch (error) {
+    console.error('Database error:', error);
+    // Proper error handling
+    throw new DatabaseError('Failed to retrieve users');
+  }
+}
+```
+
+### Anti-Pattern: Temporary Fixes Without Follow-up
+
+```typescript
+// BAD: Temporary fix without tracking
+// TODO: Fix this properly later
+if (!user) {
+  user = { id: 'temp-user', permissions: ['read'] };
+}
+
+// GOOD: Properly tracked temporary solution with ticket reference
+if (!user) {
+  logger.warn('User not found - using fallback mechanism', { 
+    issue: 'JIRA-1234: Authentication fallback needs proper implementation'
+  });
+  throw new AuthenticationError('User not found');
+}
+```
+
+## Testing During Troubleshooting
+
+Create focused tests to verify specific components:
+
+```typescript
+describe('Authentication Flow Tests', () => {
+  test('should validate user credentials correctly', async () => {
+    // Specific test for credential validation
+  });
+  
+  test('should generate valid JWT with correct payload', async () => {
+    // Specific test for token generation
+  });
+  
+  test('should verify valid tokens correctly', async () => {
+    // Specific test for token verification
+  });
+  
+  test('should reject expired tokens', async () => {
+    // Specific test for expired token handling
+  });
+});
+```
+
+---
+
+By following these troubleshooting standards, developers will methodically address issues at their root cause rather than implementing workarounds that may lead to technical debt and security vulnerabilities. 

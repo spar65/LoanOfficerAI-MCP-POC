@@ -1,0 +1,965 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+description: IMPLEMENT when integrating MCP with real-time applications that require live updates and push notifications
+globs: "**/*.{js,jsx,ts,tsx}"
+
+# 510: MCP Real-Time Systems
+
+## Rule
+
+When implementing real-time features, extend the Model Completion Protocol (MCP) framework with standardized patterns for streaming, push notifications, and event subscriptions while maintaining the structured function-based interaction model.
+
+## Context
+
+Traditional MCP implementations follow a request-response pattern that isn't ideal for real-time applications requiring immediate updates, notifications, or continuous data streams. By extending MCP to support real-time patterns, applications can maintain a consistent architectural approach while supporting dynamic experiences.
+
+Real-time MCP capabilities enable:
+1. **Live Data Updates** - Stream updates to clients without polling
+2. **Event-Based Architecture** - React to system events with MCP function execution
+3. **Subscription Management** - Allow clients to subscribe to specific data changes
+4. **Notification Delivery** - Push alerts and notifications through the MCP channel
+5. **Bidirectional Communication** - Support two-way communication for collaborative features
+
+## RuleDetails
+
+### Real-Time MCP Architecture
+
+1. **Server-Sent Events Integration**
+   - Extend MCP endpoints to support SSE connections
+   - Implement event stream management for long-lived connections
+   - Define structured event formats that maintain MCP schemas
+   - Create reconnection and recovery mechanisms
+   - Support filtering and throttling at the connection level
+
+```javascript
+// Server-side SSE integration with MCP
+function createMcpEventStream(req, res) {
+  // Set up SSE headers
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive'
+  });
+
+  // Extract subscription parameters from request
+  const { userId, entityTypes = ['loan', 'borrower'], filters = {} } = req.query;
+  
+  // Create unique client ID
+  const clientId = `${userId}_${Date.now()}`;
+  
+  // Register client in subscription manager
+  const unsubscribe = subscriptionManager.register(clientId, {
+    userId,
+    entityTypes,
+    filters,
+    send: (eventName, data) => {
+      // Format as SSE
+      res.write(`event: ${eventName}\n`);
+      res.write(`data: ${JSON.stringify(data)}\n\n`);
+      
+      // Ensure data is sent immediately
+      res.flush();
+    }
+  });
+  
+  // Send initial connection event
+  res.write(`event: connected\n`);
+  res.write(`data: ${JSON.stringify({ 
+    clientId, 
+    timestamp: new Date().toISOString(),
+    subscriptions: entityTypes
+  })}\n\n`);
+  
+  // Handle client disconnect
+  req.on('close', () => {
+    unsubscribe();
+    LogService.info(`MCP event stream closed for client ${clientId}`);
+  });
+}
+```
+
+2. **WebSocket Protocol Support**
+   - Implement WebSocket transport for MCP functions
+   - Support bidirectional communication with standardized message formats
+   - Maintain security context across WebSocket connections
+   - Handle connection lifecycle events appropriately
+   - Provide graceful degradation to polling when WebSockets are unavailable
+
+```javascript
+// WebSocket message formats for MCP
+const MCP_WS_MESSAGE_TYPES = {
+  FUNCTION_CALL: 'function_call',        // Client calls MCP function
+  FUNCTION_RESULT: 'function_result',     // Server returns function result
+  EVENT: 'event',                        // Server pushes event to client
+  SUBSCRIPTION: 'subscription',           // Client subscribes to events
+  UNSUBSCRIPTION: 'unsubscription',      // Client unsubscribes from events
+  ERROR: 'error',                        // Error notification
+  HEARTBEAT: 'heartbeat'                 // Connection health check
+};
+
+// WebSocket handler for MCP
+function handleWebSocketConnection(ws, req) {
+  // Extract auth token from request
+  const token = req.headers.authorization?.split(' ')[1];
+  let user = null;
+  
+  // Set up message handler
+  ws.on('message', async (message) => {
+    try {
+      const parsedMessage = JSON.parse(message);
+      const { type, payload, requestId } = parsedMessage;
+      
+      // Handle different message types
+      switch (type) {
+        case MCP_WS_MESSAGE_TYPES.FUNCTION_CALL:
+          // Verify authentication for all function calls
+          if (!user) {
+            user = await authService.verifyToken(token);
+            if (!user) {
+              sendError(ws, requestId, 'Authentication required');
+              return;
+            }
+          }
+          
+          // Process MCP function call
+          try {
+            const { function: funcName, arguments: args } = payload;
+            const result = await mcpRouter.executeFunction(funcName, args, { user });
+            
+            // Send result back to client
+            ws.send(JSON.stringify({
+              type: MCP_WS_MESSAGE_TYPES.FUNCTION_RESULT,
+              requestId,
+              payload: result
+            }));
+          } catch (error) {
+            sendError(ws, requestId, error.message);
+          }
+          break;
+          
+        case MCP_WS_MESSAGE_TYPES.SUBSCRIPTION:
+          // Handle subscription request
+          const { events, filter } = payload;
+          subscriptionManager.subscribe(ws, events, filter);
+          ws.send(JSON.stringify({
+            type: MCP_WS_MESSAGE_TYPES.SUBSCRIPTION,
+            requestId,
+            payload: { success: true, events }
+          }));
+          break;
+          
+        // Handle other message types...
+      }
+    } catch (error) {
+      LogService.error('Error handling WebSocket message:', error);
+      sendError(ws, null, 'Failed to process message');
+    }
+  });
+  
+  // Handle disconnection
+  ws.on('close', () => {
+    subscriptionManager.unsubscribeAll(ws);
+    LogService.info('WebSocket connection closed');
+  });
+  
+  // Helper function for sending errors
+  function sendError(ws, requestId, message) {
+    ws.send(JSON.stringify({
+      type: MCP_WS_MESSAGE_TYPES.ERROR,
+      requestId,
+      payload: { message }
+    }));
+  }
+}
+```
+
+### Event and Subscription Management
+
+1. **Event-Based MCP Functions**
+   - Define MCP functions that trigger on system events
+   - Implement a consistent event notification schema
+   - Support both push and pull notification models
+   - Include pagination and cursor-based retrieval for event history
+   - Document event types and their payload structures
+
+```javascript
+// Event-triggered MCP function definition
+const eventBasedFunctions = [
+  {
+    name: "onLoanStatusChanged",
+    description: "Triggered when a loan status changes",
+    parameters: {
+      type: "object",
+      properties: {
+        loanId: {
+          type: "string",
+          description: "ID of the loan that changed"
+        },
+        newStatus: {
+          type: "string",
+          description: "New loan status",
+          enum: ["active", "pending", "approved", "closed", "defaulted"]
+        },
+        previousStatus: {
+          type: "string",
+          description: "Previous loan status"
+        },
+        timestamp: {
+          type: "string",
+          description: "ISO timestamp when the change occurred"
+        }
+      },
+      required: ["loanId", "newStatus", "timestamp"]
+    }
+  },
+  {
+    name: "onPaymentReceived",
+    description: "Triggered when a payment is received",
+    parameters: {
+      type: "object",
+      properties: {
+        paymentId: {
+          type: "string",
+          description: "ID of the payment received"
+        },
+        loanId: {
+          type: "string",
+          description: "ID of the loan associated with payment"
+        },
+        amount: {
+          type: "number",
+          description: "Payment amount"
+        },
+        timestamp: {
+          type: "string",
+          description: "ISO timestamp when payment was received"
+        }
+      },
+      required: ["paymentId", "loanId", "amount", "timestamp"]
+    }
+  }
+];
+```
+
+2. **Subscription Management**
+   - Implement client subscription management for MCP events
+   - Support filtering and selection criteria for subscriptions
+   - Handle subscription lifecycle (creation, updates, cancellation)
+   - Manage resource usage across multiple subscriptions
+   - Implement back-pressure mechanisms for high-volume events
+
+```javascript
+// Server-side subscription manager
+class McpSubscriptionManager {
+  constructor() {
+    this.subscriptions = new Map();
+    this.clientConnections = new Map();
+    this.entitySubscribers = new Map();
+  }
+  
+  // Register a client connection
+  register(clientId, connection) {
+    this.clientConnections.set(clientId, connection);
+    
+    return () => {
+      // Return unsubscribe function
+      this.unregisterClient(clientId);
+    };
+  }
+  
+  // Unregister client and all subscriptions
+  unregisterClient(clientId) {
+    const connection = this.clientConnections.get(clientId);
+    if (!connection) return;
+    
+    // Remove from all subscriptions
+    this.subscriptions.forEach((subscribers, topic) => {
+      if (subscribers.has(clientId)) {
+        subscribers.delete(clientId);
+      }
+    });
+    
+    // Remove client connection
+    this.clientConnections.delete(clientId);
+    
+    LogService.debug(`Client ${clientId} unregistered from all subscriptions`);
+  }
+  
+  // Subscribe a client to specific events
+  subscribe(clientId, entityType, entityId = null, filter = {}) {
+    // Create subscription key based on parameters
+    const key = entityId 
+      ? `${entityType}:${entityId}` 
+      : `${entityType}:all`;
+    
+    // Initialize subscription set if needed
+    if (!this.subscriptions.has(key)) {
+      this.subscriptions.set(key, new Map());
+    }
+    
+    // Add client subscription with filters
+    this.subscriptions.get(key).set(clientId, { filter });
+    
+    // Track entity subscribers for lookup optimization
+    if (!this.entitySubscribers.has(entityType)) {
+      this.entitySubscribers.set(entityType, new Set());
+    }
+    this.entitySubscribers.get(entityType).add(clientId);
+    
+    LogService.debug(`Client ${clientId} subscribed to ${key}`);
+  }
+  
+  // Unsubscribe from specific events
+  unsubscribe(clientId, entityType, entityId = null) {
+    const key = entityId 
+      ? `${entityType}:${entityId}` 
+      : `${entityType}:all`;
+    
+    if (this.subscriptions.has(key)) {
+      this.subscriptions.get(key).delete(clientId);
+    }
+    
+    LogService.debug(`Client ${clientId} unsubscribed from ${key}`);
+  }
+  
+  // Publish an event to all subscribed clients
+  publish(entityType, entityId, eventData) {
+    // Create event keys for specific entity and type-wide subscribers
+    const specificKey = `${entityType}:${entityId}`;
+    const typeKey = `${entityType}:all`;
+    
+    // Get unique set of subscribers
+    const notifiedClients = new Set();
+    
+    // Notify entity-specific subscribers
+    if (this.subscriptions.has(specificKey)) {
+      this.notifySubscribers(specificKey, eventData, notifiedClients);
+    }
+    
+    // Notify type-wide subscribers
+    if (this.subscriptions.has(typeKey)) {
+      this.notifySubscribers(typeKey, eventData, notifiedClients);
+    }
+    
+    return notifiedClients.size;
+  }
+  
+  // Helper to notify subscribers with filter matching
+  notifySubscribers(key, eventData, notifiedSet) {
+    const subscribers = this.subscriptions.get(key);
+    
+    subscribers.forEach((subscription, clientId) => {
+      const { filter } = subscription;
+      const connection = this.clientConnections.get(clientId);
+      
+      // Skip if already notified or no connection
+      if (notifiedSet.has(clientId) || !connection) return;
+      
+      // Check if event matches filter
+      if (this.matchesFilter(eventData, filter)) {
+        try {
+          // Notify client
+          connection.send('event', {
+            key,
+            data: eventData,
+            timestamp: new Date().toISOString()
+          });
+          
+          notifiedSet.add(clientId);
+        } catch (error) {
+          LogService.error(`Failed to notify client ${clientId}:`, error);
+        }
+      }
+    });
+  }
+  
+  // Check if event data matches subscription filter
+  matchesFilter(eventData, filter) {
+    if (!filter || Object.keys(filter).length === 0) {
+      return true;
+    }
+    
+    return Object.entries(filter).every(([key, value]) => {
+      if (typeof value === 'function') {
+        return value(eventData[key]);
+      }
+      
+      if (Array.isArray(value)) {
+        return value.includes(eventData[key]);
+      }
+      
+      return eventData[key] === value;
+    });
+  }
+}
+```
+
+### Client Integration
+
+1. **Real-Time MCP Client**
+   - Extend MCP client to support real-time connections
+   - Implement connection strategies based on browser capabilities
+   - Handle reconnection and state recovery
+   - Manage subscription lifecycle on the client side
+   - Provide event emitters for application components
+
+```javascript
+// Client-side real-time MCP integration
+class RealtimeMcpClient extends McpClient {
+  constructor(config) {
+    super(config);
+    this.eventEmitter = new EventEmitter();
+    this.subscriptions = new Map();
+    this.connectionState = 'disconnected';
+    this.reconnectAttempts = 0;
+    this.maxReconnectAttempts = config.maxReconnectAttempts || 5;
+    this.reconnectDelay = config.reconnectDelay || 1000;
+    this.webSocketUrl = config.webSocketUrl || this.deriveWebSocketUrl();
+  }
+  
+  // Connect to real-time services
+  async connect() {
+    if (this.connectionState === 'connected' || this.connectionState === 'connecting') {
+      return;
+    }
+    
+    this.connectionState = 'connecting';
+    
+    // Get authentication token
+    const token = await this.authProvider.getToken();
+    if (!token) {
+      throw new Error('Authentication required for real-time connection');
+    }
+    
+    try {
+      // Create WebSocket connection
+      this.ws = new WebSocket(this.webSocketUrl);
+      
+      // Set up connection handlers
+      this.ws.onopen = this.handleConnectionOpen.bind(this);
+      this.ws.onclose = this.handleConnectionClose.bind(this);
+      this.ws.onerror = this.handleConnectionError.bind(this);
+      this.ws.onmessage = this.handleMessage.bind(this);
+      
+      // Set connection timeout
+      this.connectionTimeout = setTimeout(() => {
+        if (this.connectionState !== 'connected') {
+          this.ws.close();
+          this.eventEmitter.emit('error', new Error('Connection timeout'));
+        }
+      }, 10000);
+    } catch (error) {
+      this.connectionState = 'disconnected';
+      this.eventEmitter.emit('error', error);
+      throw error;
+    }
+  }
+  
+  // Handle WebSocket connection success
+  handleConnectionOpen() {
+    clearTimeout(this.connectionTimeout);
+    this.connectionState = 'connected';
+    this.reconnectAttempts = 0;
+    this.eventEmitter.emit('connected');
+    
+    // Restore subscriptions
+    this.restoreSubscriptions();
+    
+    // Start heartbeat
+    this.startHeartbeat();
+  }
+  
+  // Handle WebSocket connection close
+  handleConnectionClose(event) {
+    this.connectionState = 'disconnected';
+    clearInterval(this.heartbeatInterval);
+    
+    this.eventEmitter.emit('disconnected', {
+      code: event.code,
+      reason: event.reason
+    });
+    
+    // Attempt reconnection if not a clean close
+    if (event.code !== 1000 && this.reconnectAttempts < this.maxReconnectAttempts) {
+      this.scheduleReconnect();
+    }
+  }
+  
+  // Handle incoming WebSocket messages
+  handleMessage(event) {
+    try {
+      const message = JSON.parse(event.data);
+      const { type, requestId, payload } = message;
+      
+      switch (type) {
+        case 'event':
+          // Handle received event
+          const { key, data } = payload;
+          this.eventEmitter.emit(key, data);
+          this.eventEmitter.emit('*', key, data);
+          break;
+          
+        case 'function_result':
+          // Handle function call response
+          this.resolvePendingCall(requestId, payload);
+          break;
+          
+        case 'error':
+          // Handle error message
+          this.rejectPendingCall(requestId, new Error(payload.message));
+          this.eventEmitter.emit('error', new Error(payload.message));
+          break;
+          
+        case 'heartbeat':
+          // Handle heartbeat response
+          this.lastHeartbeatResponse = Date.now();
+          break;
+      }
+    } catch (error) {
+      console.error('Error handling WebSocket message:', error);
+    }
+  }
+  
+  // Subscribe to entity events
+  async subscribe(entityType, entityId = null, filter = {}) {
+    // Ensure connected
+    if (this.connectionState !== 'connected') {
+      await this.connect();
+    }
+    
+    // Create subscription key
+    const key = entityId 
+      ? `${entityType}:${entityId}` 
+      : `${entityType}:all`;
+    
+    // Store subscription details
+    this.subscriptions.set(key, { entityType, entityId, filter });
+    
+    // Send subscription request
+    const requestId = this.generateRequestId();
+    
+    // Send over WebSocket
+    this.ws.send(JSON.stringify({
+      type: 'subscription',
+      requestId,
+      payload: {
+        entityType,
+        entityId,
+        filter
+      }
+    }));
+    
+    return key;
+  }
+  
+  // Helper methods for managing connection, heartbeats, etc.
+  // ...
+}
+```
+
+2. **Component Integration Patterns**
+   - Create React hooks and components for real-time data
+   - Implement subscription management in UI components
+   - Handle connection status in the interface
+   - Support real-time data updates in renders
+   - Provide feedback on connection quality and state
+
+```jsx
+// React hook for MCP real-time data
+function useMcpRealtime(entityType, entityId = null, filter = {}) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [status, setStatus] = useState('disconnected');
+  
+  const mcpClient = useMcpClient();
+  
+  useEffect(() => {
+    let subscriptionKey = null;
+    let isMounted = true;
+    
+    async function setupSubscription() {
+      try {
+        // First load initial data
+        const initialData = await mcpClient.execute(
+          entityId ? 'getEntityById' : 'listEntities',
+          entityId ? { entityType, id: entityId } : { entityType, filters: filter }
+        );
+        
+        if (isMounted) {
+          setData(initialData);
+          setLoading(false);
+        }
+        
+        // Then subscribe to updates
+        subscriptionKey = await mcpClient.subscribe(entityType, entityId, filter);
+        
+        // Handle updates
+        const handleUpdate = (updatedData) => {
+          if (isMounted) {
+            setData(prevData => {
+              // Handle different update types based on entity structure
+              if (Array.isArray(prevData)) {
+                // For collections, update matching item or add new one
+                const index = prevData.findIndex(item => item.id === updatedData.id);
+                if (index >= 0) {
+                  return [
+                    ...prevData.slice(0, index),
+                    { ...prevData[index], ...updatedData },
+                    ...prevData.slice(index + 1)
+                  ];
+                } else {
+                  return [...prevData, updatedData];
+                }
+              } else {
+                // For single entity, merge the update
+                return { ...prevData, ...updatedData };
+              }
+            });
+          }
+        };
+        
+        // Register event listener
+        mcpClient.on(subscriptionKey, handleUpdate);
+        
+        // Update connection status
+        if (isMounted) {
+          setStatus('connected');
+        }
+      } catch (err) {
+        if (isMounted) {
+          setError(err);
+          setLoading(false);
+          setStatus('error');
+        }
+      }
+    }
+    
+    setupSubscription();
+    
+    // Track connection status
+    const handleConnect = () => isMounted && setStatus('connected');
+    const handleDisconnect = () => isMounted && setStatus('disconnected');
+    const handleError = (err) => isMounted && setStatus('error');
+    
+    mcpClient.on('connected', handleConnect);
+    mcpClient.on('disconnected', handleDisconnect);
+    mcpClient.on('error', handleError);
+    
+    return () => {
+      isMounted = false;
+      
+      // Clean up subscription and listeners
+      if (subscriptionKey) {
+        mcpClient.unsubscribe(subscriptionKey);
+      }
+      
+      mcpClient.off('connected', handleConnect);
+      mcpClient.off('disconnected', handleDisconnect);
+      mcpClient.off('error', handleError);
+    };
+  }, [entityType, entityId, JSON.stringify(filter)]);
+  
+  return { data, loading, error, status };
+}
+```
+
+### Performance and Scaling
+
+1. **Connection Management**
+   - Implement connection pooling for WebSockets
+   - Monitor and limit concurrent connections
+   - Support graceful degradation under heavy load
+   - Implement client-side rate limiting
+   - Document scaling considerations for WebSocket deployments
+
+2. **Event Filtering and Batching**
+   - Filter events on the server before transmission
+   - Batch related events to reduce connection overhead
+   - Implement server-side throttling for high-frequency updates
+   - Prioritize critical events during high load
+   - Support client-side event debouncing
+
+## Examples
+
+### Example 1: Real-Time Loan Status Dashboard
+
+```jsx
+// Server-side: Publishing loan status changes
+function updateLoanStatus(loanId, newStatus, userId) {
+  try {
+    // Update database
+    const result = await db.loans.updateStatus(loanId, newStatus, userId);
+    
+    if (result.success) {
+      // Publish event through MCP subscription manager
+      subscriptionManager.publish('loan', loanId, {
+        type: 'status_changed',
+        loan_id: loanId,
+        previous_status: result.previousStatus,
+        new_status: newStatus,
+        updated_by: userId,
+        timestamp: new Date().toISOString()
+      });
+      
+      // Log successful update
+      LogService.info(`Loan ${loanId} status updated to ${newStatus} by ${userId}`);
+    }
+    
+    return result;
+  } catch (error) {
+    LogService.error(`Failed to update loan ${loanId} status:`, error);
+    throw error;
+  }
+}
+
+// Client-side: Loan status dashboard with real-time updates
+function LoanStatusDashboard() {
+  const { data: loans, loading, status } = useMcpRealtime('loan', null, { status: ['active', 'pending'] });
+  
+  // Group loans by status
+  const loansByStatus = useMemo(() => {
+    if (!loans) return {};
+    
+    return loans.reduce((acc, loan) => {
+      if (!acc[loan.status]) {
+        acc[loan.status] = [];
+      }
+      acc[loan.status].push(loan);
+      return acc;
+    }, {});
+  }, [loans]);
+  
+  if (loading) {
+    return <LoadingSpinner />;
+  }
+  
+  return (
+    <div className="loan-dashboard">
+      <ConnectionStatus status={status} />
+      
+      <h1>Loan Status Dashboard</h1>
+      
+      {Object.entries(loansByStatus).map(([status, statusLoans]) => (
+        <StatusColumn 
+          key={status}
+          status={status}
+          loans={statusLoans}
+        />
+      ))}
+      
+      {status === 'disconnected' && (
+        <ReconnectBanner />
+      )}
+    </div>
+  );
+}
+```
+
+### Example 2: Collaborative Loan Review
+
+```javascript
+// Server-side: Collaborative document editing via MCP
+function handleCollaborativeEvents(ws, message) {
+  const { type, payload, requestId } = message;
+  
+  switch (type) {
+    case 'join_session':
+      // Add user to collaborative session
+      const { sessionId, userId, userName } = payload;
+      collaborationManager.joinSession(sessionId, userId, userName, ws);
+      
+      // Notify other participants
+      collaborationManager.broadcastToSession(sessionId, {
+        type: 'user_joined',
+        userId,
+        userName,
+        timestamp: Date.now()
+      }, userId); // Exclude the joining user
+      
+      // Send current document state to joining user
+      const documentState = collaborationManager.getSessionState(sessionId);
+      ws.send(JSON.stringify({
+        type: 'session_state',
+        requestId,
+        payload: documentState
+      }));
+      break;
+      
+    case 'document_change':
+      // Process document change
+      const { sessionId: docSession, change, cursorPosition } = payload;
+      
+      // Apply change to shared document
+      const updatedState = collaborationManager.applyChange(docSession, change, cursorPosition, userId);
+      
+      // Broadcast change to all other participants
+      collaborationManager.broadcastToSession(docSession, {
+        type: 'document_updated',
+        change,
+        appliedBy: userId,
+        cursorPosition,
+        documentVersion: updatedState.version,
+        timestamp: Date.now()
+      }, userId);
+      break;
+  }
+}
+
+// Client-side: Collaborative loan review component
+function CollaborativeLoanReview({ loanId }) {
+  const [reviewState, setReviewState] = useState({
+    comments: [],
+    decisions: {},
+    activeUsers: []
+  });
+  const [connected, setConnected] = useState(false);
+  
+  // Use real-time MCP client
+  const mcpClient = useMcpClient();
+  
+  useEffect(() => {
+    // Join collaborative session
+    async function joinSession() {
+      try {
+        // Initialize WebSocket connection
+        await mcpClient.connect();
+        
+        // Join collaborative session for this loan
+        await mcpClient.send('join_session', {
+          sessionId: `loan_review_${loanId}`,
+          userId: currentUser.id,
+          userName: currentUser.name
+        });
+        
+        setConnected(true);
+        
+        // Listen for document updates
+        mcpClient.on('document_updated', (update) => {
+          setReviewState(prevState => ({
+            ...prevState,
+            comments: mergeComments(prevState.comments, update.change.comments),
+            decisions: { ...prevState.decisions, ...update.change.decisions }
+          }));
+        });
+        
+        // Listen for user presence changes
+        mcpClient.on('user_joined', (event) => {
+          setReviewState(prevState => ({
+            ...prevState,
+            activeUsers: [...prevState.activeUsers, {
+              id: event.userId,
+              name: event.userName,
+              joinedAt: event.timestamp
+            }]
+          }));
+        });
+        
+        mcpClient.on('user_left', (event) => {
+          setReviewState(prevState => ({
+            ...prevState,
+            activeUsers: prevState.activeUsers.filter(u => u.id !== event.userId)
+          }));
+        });
+      } catch (error) {
+        console.error('Failed to join collaborative session:', error);
+      }
+    }
+    
+    joinSession();
+    
+    return () => {
+      // Leave the session on unmount
+      if (connected) {
+        mcpClient.send('leave_session', {
+          sessionId: `loan_review_${loanId}`
+        });
+      }
+    };
+  }, [loanId]);
+  
+  // Add a comment to the loan review
+  const addComment = (comment) => {
+    const newComment = {
+      id: generateId(),
+      text: comment,
+      author: currentUser.id,
+      authorName: currentUser.name,
+      createdAt: Date.now()
+    };
+    
+    // Update local state immediately (optimistic update)
+    setReviewState(prevState => ({
+      ...prevState,
+      comments: [...prevState.comments, newComment]
+    }));
+    
+    // Send change to server
+    mcpClient.send('document_change', {
+      sessionId: `loan_review_${loanId}`,
+      change: {
+        comments: [newComment],
+        decisions: {}
+      },
+      cursorPosition: null
+    });
+  };
+  
+  return (
+    <div className="collaborative-review">
+      <header>
+        <h2>Loan Review: {loanId}</h2>
+        <CollaborationStatus
+          connected={connected}
+          activeUsers={reviewState.activeUsers}
+        />
+      </header>
+      
+      <div className="review-content">
+        <CommentsList comments={reviewState.comments} />
+        <DecisionPanel 
+          decisions={reviewState.decisions}
+          onDecisionChange={updateDecision}
+        />
+      </div>
+      
+      <CommentInput onAddComment={addComment} />
+    </div>
+  );
+}
+```
+
+## Enforcement
+
+1. **Connection Management**
+   - Monitor and limit WebSocket connections per user
+   - Implement authentication timeouts for WebSocket connections
+   - Document release procedures that handle active connections
+   - Test reconnection behavior systematically
+
+2. **Event Optimization**
+   - Review event payloads for size optimization
+   - Set policies for event throttling and batching
+   - Document expected event volumes for key operations
+   - Define backpressure handling for high-volume subscriptions
+
+3. **Testing Requirements**
+   - Test reconnection scenarios with network interruptions
+   - Simulate high-latency connections
+   - Verify graceful degradation to polling
+   - Test event delivery order and consistency
+
+4. **Stress Testing**
+   - Simulate high-volume events with many connected clients
+   - Test server memory usage under load
+   - Verify scale-out capabilities with multiple server nodes
+   - Document performance characteristics at various scales
+
+## Implementation Guide
+
+For detailed examples and implementation patterns, see the [MCP Real-Time Systems guide](mdc:examples/mcp/04-mcp-real-time-systems.md).
+
+For a comprehensive overview of all MCP implementation approaches, start with the [MCP Implementation Guide](mdc:examples/mcp/01-mcp-implementation-guide.md).

@@ -1,0 +1,31 @@
+{
+  "name": "loan-officer-ai-mcp-poc",
+  "version": "1.0.0",
+  "description": "Loan Officer AI with MCP Integration - Proof of Concept",
+  "main": "index.js",
+  "scripts": {
+    "start": "concurrently \"cd server && npm start\" \"cd client && npm start\"",
+    "install:all": "npm install && cd server && npm install && cd ../client && npm install",
+    "test": "cd server && npm test && cd ../client && npm test -- --watchAll=false",
+    "test:server": "cd server && npm test",
+    "test:client": "cd client && npm test -- --watchAll=false",
+    "test:jest": "cd server && npm run test:jest",
+    "test:openai": "cd server && npm run test:openai",
+    "test:logging": "cd server && npm run test:logging",
+    "test:performance": "cd server && npm run test:performance",
+    "test:security": "cd server && npm run test:security",
+    "test:custom": "cd server && npm run test:custom",
+    "test:interactive": "cd server && npm run test:interactive"
+  },
+  "keywords": [
+    "ai",
+    "mcp",
+    "loan",
+    "openai"
+  ],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

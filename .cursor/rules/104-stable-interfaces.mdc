@@ -1,0 +1,350 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+___
+description: ALWAYS APPLY when maintaining, enhancing, or creating interfaces (APIs, UI components) that require stability and backward compatibility
+globs: "**/*.{js,ts,jsx,tsx,py,java,c,cpp,go,rb,php,swift,rs,graphql}"
+___
+
+# Stable Interfaces Principle
+
+## Context
+
+- Interfaces (APIs, UI components, data structures) represent contracts with consumers
+- Changes to interfaces can cause cascading failures across dependent systems
+- Stable interfaces foster trust, ease adoption, and reduce development friction
+- Enterprise systems may contain hundreds of interfaces requiring different stability guarantees
+- Interface stability directly impacts service level agreements and customer satisfaction
+- AI assistants may suggest changes that inadvertently break interface contracts
+
+## Core Requirements
+
+### Interface Classification System
+
+- **REQUIRED**: All interfaces MUST be classified according to stability level:
+  - **Locked**: Considered immutable - no changes allowed without formal approval process
+  - **Stable**: Additive-only changes allowed, backward compatibility required
+  - **Experimental**: Changes allowed but must be documented and communicated
+  - **Internal**: Not exposed outside the module/component, can change with internal requirements
+- **REQUIRED**: Interface stability classification MUST be explicitly documented in code
+- **REQUIRED**: Locked and Stable interfaces MUST include version identifiers
+- **REQUIRED**: Classification MUST be determined based on consumer impact assessment
+
+### Locked Interfaces Protection
+
+- **REQUIRED**: Locked interfaces MUST be protected with VIBE patterns
+- **REQUIRED**: Locked interfaces MUST have explicit tests verifying contract compliance
+- **REQUIRED**: Any change to Locked interfaces REQUIRES formal change review
+- **REQUIRED**: Locked interfaces MUST have automated CI verification of contracts
+- **REQUIRED**: Locked interfaces MUST be listed in a centralized Interface Registry
+- **REQUIRED**: AI assistants MUST NOT modify Locked interfaces without explicit approval
+
+### Stable Interfaces Maintenance
+
+- **REQUIRED**: Stable interfaces MAY add new capabilities but MUST NOT remove or break existing ones
+- **REQUIRED**: Stable interfaces MUST maintain argument names, types, and return types
+- **REQUIRED**: Stable interfaces MAY add optional parameters but not required ones
+- **REQUIRED**: UI component props in Stable interfaces MUST maintain backward compatibility
+- **REQUIRED**: Stable interfaces MUST have versioning and clear deprecation paths
+
+### Experimental Interfaces Management
+
+- **REQUIRED**: Experimental interfaces MUST be clearly marked as non-stable
+- **REQUIRED**: Experimental interfaces SHOULD have a projected stability timeline
+- **REQUIRED**: Changes to Experimental interfaces MUST be clearly communicated to consumers
+- **REQUIRED**: Experimental interfaces SHOULD include usage tracking for impact assessment
+- **RECOMMENDED**: Consider time-limiting Experimental interfaces to force stability decisions
+
+### Interface Documentation
+
+- **REQUIRED**: All interfaces MUST document their stability classification
+- **REQUIRED**: Interfaces MUST document version information and compatibility ranges
+- **REQUIRED**: Breaking changes MUST be clearly marked in documentation
+- **REQUIRED**: Documentation MUST include contact information for interface owners
+- **REQUIRED**: Interfaces MUST document their review and release process
+
+## Examples
+
+### API Interface Classification
+
+<example>
+// Correct: API with explicit stability classification
+```typescript
+/**
+ * @api Authentication API
+ * @stability LOCKED
+ * @version 1.0.0
+ * @since 2022-01-01
+ * @owners auth-team@example.com
+ * 
+ * @ai-preserve
+ * This API is considered LOCKED and requires formal change approval.
+ * No modifications should be made without an approved RFC.
+ */
+export interface AuthenticationService {
+  /**
+   * Authenticates a user with username/password
+   * @stable since v1.0.0
+   */
+  login(username: string, password: string): Promise<AuthResult>;
+  
+  /**
+   * Refreshes an authentication token
+   * @stable since v1.0.0
+   */
+  refreshToken(token: string): Promise<AuthResult>;
+  
+  /**
+   * Logs out a user and invalidates their token
+   * @stable since v1.0.0
+   */
+  logout(token: string): Promise<void>;
+  
+  /**
+   * Initiates multi-factor authentication flow
+   * @experimental since v1.2.0
+   * @stabilityTarget v1.3.0
+   */
+  initiateMultiFactorAuth(userId: string): Promise<MFAChallenge>;
+}
+```
+
+// Correct: UI component with stability markers
+```tsx
+/**
+ * @component DataTable
+ * @stability STABLE
+ * @version 2.1.0
+ * @since 2023-03-15
+ * @owners ui-platform@example.com
+ */
+export interface DataTableProps {
+  /**
+   * Data to display in the table
+   * @stable since v1.0.0
+   */
+  data: Array<Record<string, any>>;
+  
+  /**
+   * Columns configuration for the table
+   * @stable since v1.0.0
+   */
+  columns: ColumnDefinition[];
+  
+  /**
+   * Handler for row selection events
+   * @stable since v1.0.0
+   */
+  onRowSelect?: (row: Record<string, any>) => void;
+  
+  /**
+   * Enables advanced filtering capabilities
+   * @experimental since v2.0.0
+   * @stabilityTarget v2.2.0
+   */
+  enableAdvancedFiltering?: boolean;
+}
+
+export const DataTable: React.FC<DataTableProps> = (props) => {
+  // Component implementation
+};
+```
+</example>
+
+### Interface Registry and Lock Files
+
+<example>
+// Correct: Interface registry file
+```json
+// interface-registry.json
+{
+  "version": "1.0",
+  "locked_interfaces": [
+    {
+      "name": "AuthenticationService",
+      "type": "API",
+      "path": "src/services/auth/AuthenticationService.ts",
+      "version": "1.0.0",
+      "owners": ["auth-team@example.com"],
+      "lockedSince": "2023-05-15",
+      "changeProcess": "RFC required and approval from Auth Team and Security Team",
+      "reviewCycle": "Quarterly",
+      "testSuite": "tests/services/auth/AuthenticationService.spec.ts"
+    },
+    {
+      "name": "PaymentProcessingAPI",
+      "type": "API",
+      "path": "src/services/payments/PaymentAPI.ts",
+      "version": "2.1.0",
+      "owners": ["payments-team@example.com", "finance-team@example.com"],
+      "lockedSince": "2023-06-22",
+      "changeProcess": "RFC required and approval from Payments Team, Finance Team, and Security Team",
+      "reviewCycle": "Monthly",
+      "testSuite": "tests/services/payments/PaymentAPI.spec.ts"
+    }
+  ],
+  "stable_interfaces": [
+    {
+      "name": "UserProfileService",
+      "type": "API",
+      "path": "src/services/users/UserProfileService.ts",
+      "version": "3.2.0",
+      "owners": ["user-team@example.com"],
+      "stableSince": "2023-04-10",
+      "deprecationPolicy": "Minimum 12 months notice before any deprecation"
+    },
+    {
+      "name": "DataTable",
+      "type": "UIComponent",
+      "path": "src/components/tables/DataTable.tsx",
+      "version": "2.1.0",
+      "owners": ["ui-platform@example.com"],
+      "stableSince": "2023-03-15",
+      "publicDocs": "docs.example.com/components/data-table"
+    }
+  ]
+}
+```
+
+// Correct: Interface lock file
+```yaml
+# .interface-locks.yaml
+version: 1.0
+locks:
+  - path: src/services/auth/AuthenticationService.ts
+    reason: Critical authentication API used across all applications
+    stakeholders:
+      - Security Team
+      - Auth Team
+      - Platform Team
+    approval_required:
+      - Director of Security
+      - Auth Team Lead
+    expiration: never
+    
+  - path: src/services/payments/PaymentAPI.ts
+    reason: Financial API subject to compliance and audit requirements
+    stakeholders:
+      - Finance Team
+      - Compliance Team
+      - Payments Team
+    approval_required:
+      - Finance Director
+      - Compliance Officer
+    expiration: 2025-12-31
+    reviews: quarterly
+    
+  - path: src/components/design-system/**/*.tsx
+    reason: Core design system components used by all product teams
+    stakeholders:
+      - UX Team
+      - Design System Team
+    approval_required:
+      - Design System Team Lead
+      - UX Director for breaking changes
+    excludes:
+      - src/components/design-system/experimental/**
+    expiration: 2025-06-30
+    reviews: biannual
+```
+</example>
+
+### Invalid Interface Practices
+
+<example type="invalid">
+// WRONG: Modifying locked interface without proper versioning
+```typescript
+// Original locked interface
+export interface PaymentProcessor {
+  processPayment(amount: number, cardToken: string): Promise<PaymentResult>;
+}
+
+// Incorrectly modified interface (breaking change)
+export interface PaymentProcessor {
+  // Changed parameter order and types - breaking change with no versioning
+  processPayment(cardToken: string, amount: number): Promise<PaymentResult>;
+}
+```
+
+// WRONG: Undocumented experimental feature in stable component
+```tsx
+function DataTable({ data, columns, onRowSelect, enableExperimental }) {
+  // Using undocumented experimental feature without stability markers
+  const experimentalFeature = enableExperimental 
+    ? <ExperimentalComponent /> 
+    : null;
+    
+  return (
+    <div>
+      {experimentalFeature}
+      {/* Rest of the component */}
+    </div>
+  );
+}
+```
+
+// WRONG: Missing stability documentation
+```typescript
+export class UserService {
+  // No stability documentation, version, or ownership information
+  getUserProfile(id: string) { /* implementation */ }
+  updateUserProfile(id: string, data: any) { /* implementation */ }
+  deleteUser(id: string) { /* implementation */ }
+}
+```
+</example>
+
+## Implementation Patterns
+
+### Interface Stability Workflow
+
+1. **Classification**: Assign initial stability classification during interface design
+2. **Documentation**: Document stability level, version, and ownership
+3. **Protection**: Implement VIBE patterns for locked interfaces
+4. **Registration**: Add to interface registry if locked or stable
+5. **Verification**: Implement contract tests for all interfaces
+6. **Review Process**: Define approval process for changes based on classification
+7. **Monitoring**: Track interface usage and detect breaking changes
+8. **Evolution**: Follow proper versioning when evolving interfaces
+9. **Deprecation**: Implement formal deprecation process when needed
+
+### Integration with CI/CD
+
+- Implement automated contract testing in CI pipelines
+- Create PR checks that detect changes to locked interfaces
+- Generate interface lock violations as high-priority issues
+- Include interface stability status in automated documentation
+- Create change reports showing interface modifications and their impact
+
+### Compatibility Testing
+
+- Implement automated tests verifying interface contracts
+- Use consumer-driven contract testing for all locked interfaces
+- Create automated compatibility verification for API responses
+- Implement visual regression testing for UI component interfaces
+- Create end-to-end tests demonstrating stable interface functionality
+
+## Security Considerations
+
+- Ensure authentication and authorization interfaces are properly locked
+- Protect payment and financial interfaces with highest stability requirements
+- Consider regulatory and compliance needs when classifying interfaces
+- Balance security patch requirements with interface stability needs
+- Document security-related exceptions to the lock process
+
+## Related Rules
+
+- [002-rule-application.mdc](mdc:002-rule-application.mdc)
+- [060-api-standards.mdc](mdc:departments/engineering/api/060-api-standards.mdc)
+- [100-coding-patterns.mdc](mdc:departments/engineering/coding-standards/100-coding-patterns.mdc)
+- [103-do-no-harm.mdc](mdc:departments/engineering/coding-standards/103-do-no-harm.mdc)
+- [042-ui-component-architecture.mdc](mdc:technologies/frameworks/042-ui-component-architecture.mdc)
+
+## Full Documentation Access
+
+For detailed implementation examples and patterns, refer to:
+
+- [Stable Interfaces Implementation Guide](mdc:examples/interfaces/StableInterfacesGuide.md) - Comprehensive examples for implementing and maintaining stable interfaces
+- [Interface Locking Patterns](mdc:examples/interfaces/InterfaceLockingPatterns.md) - Techniques for protecting critical interfaces from unwanted changes

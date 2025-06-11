@@ -1,0 +1,112 @@
+[
+  {
+    "borrower_id": "B001",
+    "first_name": "John",
+    "last_name": "Doe",
+    "address": "123 Farm Rd, Smalltown, USA",
+    "phone": "555-1234",
+    "email": "john@example.com",
+    "credit_score": 750,
+    "income": 100000.0,
+    "farm_size": 500
+  },
+  {
+    "borrower_id": "B002",
+    "first_name": "Jane",
+    "last_name": "Smith",
+    "address": "456 Barn Ave, Smalltown, USA",
+    "phone": "555-5678",
+    "email": "jane@example.com",
+    "credit_score": 720,
+    "income": 80000.0,
+    "farm_size": 300
+  },
+  {
+    "borrower_id": "B003",
+    "first_name": "Alice",
+    "last_name": "Johnson",
+    "address": "789 Field St, Smalltown, USA",
+    "phone": "555-9012",
+    "email": "alice@example.com",
+    "credit_score": 680,
+    "income": 60000.0,
+    "farm_size": 150
+  },
+  {
+    "borrower_id": "B004",
+    "first_name": "Bob",
+    "last_name": "Brown",
+    "address": "101 Crop Way, Smalltown, USA",
+    "phone": "555-3456",
+    "email": "bob@example.com",
+    "credit_score": 780,
+    "income": 90000.0,
+    "farm_size": 400
+  },
+  {
+    "borrower_id": "B005",
+    "first_name": "Charlie",
+    "last_name": "Davis",
+    "address": "202 Tractor Ln, Smalltown, USA",
+    "phone": "555-7890",
+    "email": "charlie@example.com",
+    "credit_score": 700,
+    "income": 75000.0,
+    "farm_size": 250
+  },
+  {
+    "borrower_id": "B006",
+    "first_name": "Diana",
+    "last_name": "Evans",
+    "address": "303 Soil Rd, Smalltown, USA",
+    "phone": "555-4321",
+    "email": "diana@example.com",
+    "credit_score": 690,
+    "income": 85000.0,
+    "farm_size": 350
+  },
+  {
+    "borrower_id": "B007",
+    "first_name": "Frank",
+    "last_name": "Garcia",
+    "address": "404 Harvest St, Smalltown, USA",
+    "phone": "555-5432",
+    "email": "frank@example.com",
+    "credit_score": 760,
+    "income": 65000.0,
+    "farm_size": 100
+  },
+  {
+    "borrower_id": "B008",
+    "first_name": "Grace",
+    "last_name": "Harris",
+    "address": "505 Barnyard Ave, Smalltown, USA",
+    "phone": "555-6789",
+    "email": "grace@example.com",
+    "credit_score": 770,
+    "income": 95000.0,
+    "farm_size": 450
+  },
+  {
+    "borrower_id": "B009",
+    "first_name": "Henry",
+    "last_name": "Ivy",
+    "address": "606 Silo Ln, Smalltown, USA",
+    "phone": "555-7654",
+    "email": "henry@example.com",
+    "credit_score": 730,
+    "income": 78000.0,
+    "farm_size": 280
+  },
+  {
+    "borrower_id": "B010",
+    "first_name": "Ivy",
+    "last_name": "Jones",
+    "address": "707 Orchard Rd, Smalltown, USA",
+    "phone": "555-8765",
+    "email": "ivy@example.com",
+    "credit_score": 740,
+    "income": 82000.0,
+    "farm_size": 320
+  }
+]

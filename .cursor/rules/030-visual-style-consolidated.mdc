@@ -1,0 +1,397 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+___
+description: IMPLEMENT consistent visual design patterns when CREATING user interfaces to ENSURE brand cohesion, usability, and accessibility
+globs: "**/*.{css,scss,tsx,jsx}, **/styles/**/*"
+___
+
+# Visual Design System & Vibe Coding
+
+## Context
+- Our platform has a distinct visual identity that combines modern SaaS aesthetics with a professional enterprise feel
+- The platform needs to maintain visual consistency while supporting organization-specific branding
+- "Vibe coding" focuses on the emotional and experiential aspects of UI implementation
+- Components must be accessible and responsive across devices
+- The application supports multiple user roles with context-specific visual treatments
+
+## Requirements
+
+### Color System
+
+- **REQUIRED**: Use CSS variables for all color values rather than hardcoded colors
+- **REQUIRED**: Apply appropriate color variables based on context (platform vs. organization)
+- **REQUIRED**: Maintain sufficient contrast ratios for accessibility (minimum 4.5:1 for normal text, 3:1 for large text)
+- Use the correct semantic color variables based on the element's purpose
+- Include appropriate hover, focus, and active states for interactive elements
+
+```tsx
+// Good: Using color variables from the system
+<Button 
+  variant="primary" 
+  className="bg-platform-primary hover:bg-platform-primary-dark"
+>
+  Submit
+</Button>
+
+// Bad: Hardcoding colors
+<Button style={{ backgroundColor: '#0F52BA', color: 'white' }}>
+  Submit
+</Button>
+```
+
+#### Platform & Organization Colors
+- **Platform**: `--platform-primary`, `--platform-primary-light`, `--platform-primary-dark`
+- **Organization**: `--org-primary`, `--org-primary-light`, `--org-primary-dark`
+- **Contextual**: Use `.platform-context` or `.org-context` wrapper classes to apply appropriate context
+
+```tsx
+// Good: Using appropriate context classes
+<div className="platform-context">
+  <Button variant="primary">Platform Action</Button>
+</div>
+
+<div className="org-context">
+  <Button variant="primary">Organization Action</Button>
+</div>
+```
+
+#### Status Colors
+- **Success**: `--success-color` for positive confirmations and successful operations
+- **Warning**: `--warning-color` for cautionary information and warnings
+- **Error**: `--error-color` for errors, failures, and destructive actions
+- **Info**: `--info-color` for informational notifications
+- Always pair color with text or icons to ensure accessibility
+
+### Typography
+
+- **REQUIRED**: Use the typography classes for consistent text styling
+- **REQUIRED**: Follow the established type scale for consistent sizing
+- **REQUIRED**: Maintain proper text hierarchy with appropriate heading levels
+- Use consistent line heights and letter spacing
+- Apply proper font weights for emphasis and hierarchy
+
+```tsx
+// Good: Using typography classes
+<h1 className="text-2xl font-medium leading-tight">Dashboard</h1>
+<p className="text-base leading-normal">Welcome to your workspace.</p>
+
+// Bad: Inline font styling
+<h1 style={{ fontSize: '32px', fontWeight: 500 }}>Dashboard</h1>
+```
+
+#### Text Hierarchy
+- **Headings**: Use proper heading elements (`h1`-`h6`) with appropriate classes
+- **Body Text**: Use the base text size for main content
+- **Small Text**: Use smaller sizes for supporting information
+- **Emphasis**: Use font weight rather than italic or underline for emphasis
+- Maintain consistent heading structures across similar pages
+
+### Spacing & Layout
+
+- **REQUIRED**: Use the spacing system for margins, padding, and gaps
+- **REQUIRED**: Implement consistent component spacing across the application
+- **REQUIRED**: Maintain proper spacing between related and unrelated elements
+- Use appropriate container widths for different viewport sizes
+- Apply vertical rhythm principles for content layout
+
+```tsx
+// Good: Using spacing classes
+<div className="p-4 mb-6 space-y-4">
+  <Card className="px-4 py-3" />
+</div>
+
+// Bad: Hardcoded pixel values
+<div style={{ padding: '16px', marginBottom: '24px' }}>
+  <Card style={{ padding: '16px 12px' }} />
+</div>
+```
+
+#### Grid System
+- Use the grid system for complex layouts
+- Implement responsive columns appropriate for content
+- Maintain consistent gutters between columns
+- Use container constraints for content width
+- Apply appropriate breakpoints for layout changes
+
+### Component Styling
+
+- **REQUIRED**: Follow established patterns for common components
+- **REQUIRED**: Maintain consistent styling for similar components
+- **REQUIRED**: Use appropriate variants for different contexts
+- Apply proper interaction states (hover, focus, active)
+- Ensure components adapt appropriately to different viewport sizes
+
+```tsx
+// Good: Consistent card styling
+<Card className="bg-white rounded-lg shadow-sm p-4">
+  <CardHeader>
+    <CardTitle>Card Title</CardTitle>
+  </CardHeader>
+  <CardContent>Content goes here</CardContent>
+  <CardFooter>
+    <Button variant="primary">Action</Button>
+  </CardFooter>
+</Card>
+```
+
+#### Button Variants
+- **Primary**: Main actions, use sparingly
+- **Secondary**: Alternative actions, can be used more freely
+- **Outline**: Less prominent actions
+- **Ghost**: Minimal visual impact for secondary actions
+- **Destructive**: Dangerous or irreversible actions
+
+### Vibe Coding Principles
+
+- **REQUIRED**: Design for how the interface feels, not just how it looks
+- **REQUIRED**: Balance aesthetics with usability and accessibility
+- Use subtle animations to enhance the user experience
+- Create layouts that "breathe" with appropriate whitespace
+- Design for different states (empty, loading, error, success)
+
+```tsx
+// Good: Thoughtful state representation
+function SubmitButton({ isLoading, isDisabled }) {
+  return (
+    <button
+      type="submit"
+      disabled={isLoading || isDisabled}
+      className={cn(
+        "relative px-4 py-2 rounded-md font-medium transition-colors",
+        isDisabled 
+          ? "bg-muted text-muted-foreground cursor-not-allowed" 
+          : isLoading 
+            ? "bg-primary text-primary-foreground" 
+            : "bg-primary text-primary-foreground hover:bg-primary/90"
+      )}
+    >
+      {isLoading && (
+        <span className="absolute inset-0 flex items-center justify-center">
+          <Spinner className="h-5 w-5 text-primary-foreground" />
+        </span>
+      )}
+      <span className={isLoading ? "opacity-0" : ""}>Submit</span>
+    </button>
+  );
+}
+```
+
+#### Animation & Motion
+- Use subtle animations for state changes
+- Apply consistent timing and easing across similar interactions
+- Avoid excessive or distracting animations
+- Respect user preferences for reduced motion
+- Use animation to reinforce user actions
+
+### Responsive Design
+
+- **REQUIRED**: Design components to work across all supported viewport sizes
+- **REQUIRED**: Implement mobile-first responsive layouts
+- **REQUIRED**: Use appropriate breakpoints for layout changes
+- **REQUIRED**: Ensure touch targets are appropriately sized for mobile (minimum 44px × 44px)
+- Test designs at various viewport sizes
+
+```tsx
+// Good: Responsive design approach
+<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+  {items.map(item => (
+    <Card key={item.id}>Card content</Card>
+  ))}
+</div>
+```
+
+#### Viewport Breakpoints
+- **xs**: < 576px (Mobile phones)
+- **sm**: ≥ 576px (Large phones, small tablets)
+- **md**: ≥ 768px (Tablets)
+- **lg**: ≥ 992px (Small laptops)
+- **xl**: ≥ 1200px (Large laptops, desktops)
+
+### Accessibility Considerations
+
+- **REQUIRED**: Ensure sufficient color contrast for all text
+- **REQUIRED**: Don't rely on color alone to convey information
+- **REQUIRED**: Provide focus indicators for keyboard navigation
+- **REQUIRED**: Support screen readers with appropriate ARIA attributes
+- Ensure content is perceivable when zoomed
+
+```tsx
+// Good: Accessible button with proper labeling
+<Button 
+  aria-label="Delete item"
+  variant="destructive"
+>
+  <Trash2 className="h-4 w-4 mr-2" />
+  <span>Delete</span>
+</Button>
+```
+
+## Examples
+
+<example>
+// Good: Complete example using visual design principles
+import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Spinner } from '@/components/ui/spinner';
+
+export function DashboardCard({ title, data, onRefresh }) {
+  const [isLoading, setIsLoading] = useState(false);
+  
+  async function handleRefresh() {
+    setIsLoading(true);
+    await onRefresh();
+    setIsLoading(false);
+  }
+  
+  return (
+    <Card className="bg-white rounded-lg shadow-sm overflow-hidden">
+      <CardHeader className="pb-2 border-b border-gray-100">
+        <div className="flex justify-between items-center">
+          <CardTitle className="text-lg font-medium text-gray-800">{title}</CardTitle>
+          <Button 
+            onClick={handleRefresh} 
+            variant="ghost" 
+            size="sm"
+            disabled={isLoading}
+            aria-label="Refresh data"
+            className="text-gray-500 hover:text-gray-700"
+          >
+            {isLoading ? <Spinner className="h-4 w-4" /> : <RefreshIcon className="h-4 w-4" />}
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent className="py-4 px-5">
+        {data ? (
+          <div className="space-y-2">
+            <div className="text-3xl font-bold text-platform-primary">{data.value}</div>
+            <div className="text-sm text-gray-500">{data.description}</div>
+          </div>
+        ) : (
+          <div className="py-8 text-center text-gray-400">
+            <p>No data available</p>
+          </div>
+        )}
+      </CardContent>
+      <CardFooter className="pt-2 px-5 border-t border-gray-100">
+        <div className="w-full flex justify-between items-center">
+          <span className="text-xs text-gray-500">
+            Last updated: {data?.lastUpdated || 'Never'}
+          </span>
+          <Button 
+            variant="link" 
+            size="sm"
+            className="text-platform-primary hover:text-platform-primary-dark"
+          >
+            View Details
+          </Button>
+        </div>
+      </CardFooter>
+    </Card>
+  );
+}
+</example>
+
+<example>
+// Good: Responsive layout implementation
+function DashboardLayout({ children }) {
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Responsive sidebar that collapses on mobile */}
+      <div className="fixed inset-y-0 left-0 z-10 w-64 transform transition-transform duration-200 ease-in-out 
+                     -translate-x-full md:translate-x-0 md:static md:flex-shrink-0">
+        <SideNavigation />
+      </div>
+      
+      {/* Main content area with responsive padding */}
+      <div className="flex-1 flex flex-col min-w-0 mx-auto w-full
+                     px-4 sm:px-6 md:px-8 lg:px-10 
+                     pt-16 pb-12 md:pb-20 md:ml-64">
+        <div className="flex items-center mb-6">
+          <h1 className="text-xl md:text-2xl font-semibold text-gray-800">Dashboard</h1>
+        </div>
+        
+        {/* Responsive grid layout */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+}
+</example>
+
+<example type="invalid">
+// Bad: Inconsistent styling and hardcoded values
+function InconsistentCard({ title, content }) {
+  return (
+    <div style={{ 
+      border: '1px solid #ddd', 
+      borderRadius: '4px',
+      marginBottom: '20px',
+      padding: '15px',
+      boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+    }}>
+      <h3 style={{ fontSize: '18px', color: '#333', marginBottom: '10px' }}>{title}</h3>
+      <div>{content}</div>
+      <button style={{ 
+        backgroundColor: '#0066cc', 
+        color: 'white',
+        padding: '8px 12px',
+        border: 'none',
+        borderRadius: '4px',
+        marginTop: '10px'
+      }}>
+        View Details
+      </button>
+    </div>
+  );
+}
+</example>
+
+<example type="invalid">
+// Bad: Non-accessible color usage
+function StatusIndicator({ status }) {
+  // ❌ Relies solely on color to convey status
+  const getStatusColor = () => {
+    switch (status) {
+      case 'success': return '#00aa55';
+      case 'warning': return '#ffcc00';
+      case 'error': return '#cc3300';
+      default: return '#999999';
+    }
+  };
+
+  return (
+    <div className="flex items-center">
+      {/* ❌ Missing text or icon to support color */}
+      <div 
+        className="h-3 w-3 rounded-full mr-2" 
+        style={{ backgroundColor: getStatusColor() }} 
+      />
+      {/* ❌ Poor contrast on some background colors */}
+      <span style={{ color: getStatusColor() }}>{status}</span>
+    </div>
+  );
+}
+</example>
+
+## Implementation Checklist
+
+- [ ] Colors: Use CSS variables for all colors, with proper context awareness
+- [ ] Typography: Follow the type scale and hierarchy consistently
+- [ ] Spacing: Apply spacing system for margins, padding, and layout
+- [ ] Components: Implement consistent styling for component variants
+- [ ] Interactions: Design proper hover, focus, and active states
+- [ ] Animation: Use subtle animations that support user interactions
+- [ ] Responsiveness: Test designs at all supported viewport sizes
+- [ ] Accessibility: Ensure sufficient contrast and screen reader support
+
+## Related Rules
+- [departments/engineering/architecture/015-white-labeling.mdc](mdc:departments/engineering/architecture/015-white-labeling.mdc) - Organization branding and white-labeling
+- [departments/product/050-css-architecture.mdc](mdc:departments/product/050-css-architecture.mdc) - CSS organization and architecture
+- [technologies/languages/javascript/054-accessibility-requirements.mdc](mdc:technologies/languages/javascript/054-accessibility-requirements.mdc) - Accessibility standards
+- [technologies/frameworks/042-ui-component-architecture.mdc](mdc:technologies/frameworks/042-ui-component-architecture.mdc) - UI component structure and patterns

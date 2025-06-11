@@ -1,0 +1,670 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+description: IMPLEMENT when securing MCP functions to protect against common vulnerabilities and ensure data privacy
+globs: "**/*.{js,jsx,ts,tsx}"
+
+# 515: MCP Security Patterns
+
+## Rule
+
+When implementing MCP functions, apply comprehensive security patterns to protect against common vulnerabilities, ensure proper authentication and authorization, and maintain data privacy and integrity throughout the execution flow.
+
+## Context
+
+MCP functions often operate with privileged access to systems and sensitive data, making them critical points for security enforcement. A secure MCP implementation provides:
+
+1. **Access Control** - Proper authentication and authorization for function execution
+2. **Data Protection** - Secure handling of sensitive information in transit and at rest
+3. **Input Validation** - Protection against injection attacks and malformed input
+4. **Audit Trails** - Comprehensive logging of security-relevant operations
+5. **Principle of Least Privilege** - Functions operate with minimal necessary permissions
+
+## RuleDetails
+
+### Authentication and Authorization
+
+1. **MCP Function Authentication**
+   - Implement robust authentication for MCP function access
+   - Support multiple authentication methods (tokens, keys, certificates)
+   - Apply proper token validation and refresh mechanisms
+   - Implement rate limiting to prevent brute force attacks
+   - Securely manage authentication credentials
+
+```javascript
+// Authentication middleware for MCP functions
+function authMiddleware(next) {
+  return async (context) => {
+    const { headers, functionName } = context;
+    const authToken = headers.authorization;
+    
+    if (!authToken) {
+      throw new AuthenticationError('Authentication required');
+    }
+    
+    try {
+      // Validate auth token
+      const user = await authService.validateToken(authToken);
+      
+      // Add user to context
+      context.user = user;
+      
+      // Check authorization for specific function
+      if (!await authService.canExecuteFunction(user, functionName)) {
+        throw new AuthorizationError(
+          `User not authorized to execute function: ${functionName}`
+        );
+      }
+      
+      // Execute the function
+      return next(context);
+    } catch (error) {
+      if (error instanceof AuthenticationError || 
+          error instanceof AuthorizationError) {
+        // Pass through auth errors
+        throw error;
+      }
+      
+      // Log auth system errors without exposing details
+      logger.error('Authentication error', { error });
+      throw new AuthenticationError('Authentication failed');
+    }
+  };
+}
+```
+
+2. **Function-Level Access Control**
+   - Define granular permissions for each MCP function
+   - Implement role-based access control (RBAC) 
+   - Support attribute-based access control (ABAC) for complex scenarios
+   - Enforce context-aware authorization rules
+   - Maintain detailed permission definitions
+
+```javascript
+// Role-based access control for MCP functions
+const functionPermissions = {
+  // Customer data functions
+  'getCustomerProfile': {
+    roles: ['admin', 'customer_service', 'loan_officer'],
+    custom: (user, args) => {
+      // Allow customers to view their own profile
+      return user.type === 'customer' && user.id === args.customerId;
+    }
+  },
+  
+  'updateCustomerProfile': {
+    roles: ['admin', 'customer_service'],
+    custom: (user, args) => {
+      // Allow customers to update their own profile
+      return user.type === 'customer' && user.id === args.customerId;
+    }
+  },
+  
+  // Loan functions
+  'createLoanApplication': {
+    roles: ['admin', 'loan_officer'],
+    custom: (user, args) => {
+      // Allow customers to create loan applications
+      return user.type === 'customer';
+    }
+  },
+  
+  'approveLoanApplication': {
+    roles: ['admin', 'loan_officer'],
+    conditions: {
+      // Only allow loan officers to approve loans within their limit
+      'loan_officer': (user, args) => {
+        return args.loanAmount <= user.approvalLimit;
+      }
+    }
+  },
+  
+  // Administrative functions
+  'viewAuditLogs': {
+    roles: ['admin', 'security_officer'],
+    conditions: {
+      // Restrict security officers to logs in their domain
+      'security_officer': (user, args) => {
+        return user.domains.includes(args.domain);
+      }
+    }
+  }
+};
+```
+
+### Data Protection
+
+1. **Sensitive Data Handling**
+   - Implement proper encryption for sensitive data
+   - Apply data masking in logs and responses
+   - Define and enforce data classification policies
+   - Implement secure data storage patterns
+   - Support data redaction in error messages
+
+```javascript
+// PII protection middleware
+function piiProtectionMiddleware(next) {
+  return async (context) => {
+    try {
+      // Execute the function
+      const result = await next(context);
+      
+      // Apply PII masking to the result
+      const maskedResult = piiService.maskSensitiveData(result);
+      
+      return maskedResult;
+    } catch (error) {
+      // Ensure errors don't contain PII
+      const sanitizedError = new Error(
+        piiService.sanitizeErrorMessage(error.message)
+      );
+      
+      // Copy stack without PII
+      sanitizedError.stack = piiService.sanitizeStackTrace(error.stack);
+      
+      throw sanitizedError;
+    }
+  };
+}
+
+// PII masking service implementation
+class PiiService {
+  constructor() {
+    this.patterns = [
+      // SSN: XXX-XX-XXXX or XXXXXXXXX
+      { 
+        regex: /\b(\d{3}[-]?\d{2}[-]?\d{4})\b/g,
+        replacement: 'XXX-XX-XXXX' 
+      },
+      
+      // Credit card: XXXX-XXXX-XXXX-XXXX
+      { 
+        regex: /\b(\d{4}[-]?\d{4}[-]?\d{4}[-]?\d{4})\b/g,
+        replacement: 'XXXX-XXXX-XXXX-XXXX' 
+      },
+      
+      // Email addresses
+      { 
+        regex: /\b([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})\b/g,
+        replacement: (match) => {
+          const [name, domain] = match.split('@');
+          return `${name.charAt(0)}...@${domain}`;
+        }
+      },
+      
+      // Phone numbers: (XXX) XXX-XXXX or XXX-XXX-XXXX
+      { 
+        regex: /\b(\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4})\b/g,
+        replacement: 'XXX-XXX-XXXX' 
+      },
+      
+      // Date of birth
+      { 
+        regex: /\b\d{1,2}\/\d{1,2}\/\d{2,4}\b/g,
+        replacement: 'XX/XX/XXXX' 
+      }
+    ];
+  }
+  
+  // Mask sensitive data in objects
+  maskSensitiveData(data) {
+    if (!data) return data;
+    
+    if (typeof data === 'string') {
+      return this.maskString(data);
+    }
+    
+    if (Array.isArray(data)) {
+      return data.map(item => this.maskSensitiveData(item));
+    }
+    
+    if (typeof data === 'object') {
+      const result = { ...data };
+      
+      // Handle special fields
+      if (result.ssn) result.ssn = 'XXX-XX-XXXX';
+      if (result.creditCardNumber) result.creditCardNumber = 'XXXX-XXXX-XXXX-XXXX';
+      if (result.password) result.password = '********';
+      
+      // Process all fields
+      Object.keys(result).forEach(key => {
+        result[key] = this.maskSensitiveData(result[key]);
+      });
+      
+      return result;
+    }
+    
+    return data;
+  }
+  
+  // Mask a string using regex patterns
+  maskString(str) {
+    if (typeof str !== 'string') return str;
+    
+    let result = str;
+    this.patterns.forEach(pattern => {
+      result = result.replace(
+        pattern.regex, 
+        typeof pattern.replacement === 'function' 
+          ? pattern.replacement 
+          : pattern.replacement
+      );
+    });
+    
+    return result;
+  }
+  
+  // Sanitize error messages
+  sanitizeErrorMessage(message) {
+    if (!message) return 'An error occurred';
+    
+    // Remove potential stack traces
+    message = message.split('\n')[0];
+    
+    // Mask PII in error message
+    return this.maskString(message);
+  }
+  
+  // Sanitize stack traces
+  sanitizeStackTrace(stack) {
+    if (!stack) return '';
+    
+    // Sanitize each line
+    return stack
+      .split('\n')
+      .map(line => this.maskString(line))
+      .join('\n');
+  }
+}
+```
+
+2. **Secure MCP State Management**
+   - Implement secure state storage mechanisms
+   - Encrypt sensitive state data
+   - Apply proper access controls to state information
+   - Implement state tampering detection
+   - Define secure state persistence policies
+
+### Input Validation
+
+1. **Parameter Validation**
+   - Apply strict schema validation for all function inputs
+   - Implement proper type checking and constraints
+   - Validate business rules and data integrity
+   - Sanitize inputs to prevent injection attacks
+   - Enforce size and complexity limits
+
+```javascript
+// Schema validation middleware for MCP functions
+function validationMiddleware(schema) {
+  return (next) => async (context) => {
+    const { args } = context;
+    
+    try {
+      // Validate args against schema
+      const validationResult = await schema.validate(args, {
+        abortEarly: false,
+        stripUnknown: true
+      });
+      
+      // Update context with validated args
+      context.args = validationResult;
+      
+      // Continue execution
+      return next(context);
+    } catch (error) {
+      // Transform validation errors to a structured format
+      if (error.name === 'ValidationError') {
+        const validationErrors = error.inner.map(err => ({
+          path: err.path,
+          message: err.message,
+          type: err.type
+        }));
+        
+        throw new InputValidationError(
+          'Invalid input parameters', 
+          validationErrors
+        );
+      }
+      
+      throw error;
+    }
+  };
+}
+
+// Example schema for a loan application
+const loanApplicationSchema = yup.object({
+  customerId: yup.string()
+    .required('Customer ID is required')
+    .matches(/^CUST\d{6}$/, 'Invalid customer ID format'),
+    
+  loanAmount: yup.number()
+    .required('Loan amount is required')
+    .positive('Loan amount must be positive')
+    .max(1000000, 'Loan exceeds maximum amount'),
+    
+  loanPurpose: yup.string()
+    .required('Loan purpose is required')
+    .oneOf([
+      'home_purchase', 
+      'refinance', 
+      'home_improvement',
+      'debt_consolidation',
+      'other'
+    ], 'Invalid loan purpose'),
+    
+  term: yup.number()
+    .required('Loan term is required')
+    .oneOf([12, 24, 36, 48, 60, 120, 180, 240, 360], 'Invalid loan term'),
+    
+  employmentInfo: yup.object({
+    employerName: yup.string()
+      .required('Employer name is required')
+      .max(100, 'Employer name too long'),
+      
+    monthlyIncome: yup.number()
+      .required('Monthly income is required')
+      .positive('Income must be positive'),
+      
+    yearsEmployed: yup.number()
+      .required('Years employed is required')
+      .min(0, 'Years employed cannot be negative')
+  })
+});
+```
+
+### Audit and Compliance
+
+1. **Security Audit Logging**
+   - Implement comprehensive security audit logs
+   - Record all security-relevant events
+   - Ensure log immutability and integrity
+   - Support log aggregation and analysis
+   - Implement log retention policies
+
+```javascript
+// Security audit logging middleware
+function auditLogMiddleware(next) {
+  return async (context) => {
+    const { functionName, args, user, requestId } = context;
+    const startTime = new Date();
+    
+    // Create initial audit record
+    const auditRecord = {
+      id: uuidv4(),
+      requestId,
+      timestamp: startTime.toISOString(),
+      functionName,
+      userId: user?.id,
+      userRoles: user?.roles,
+      clientIp: context.clientInfo?.ip,
+      userAgent: context.clientInfo?.userAgent
+    };
+    
+    try {
+      // Log access attempt
+      await auditLogger.log({
+        ...auditRecord,
+        eventType: 'function_access',
+        status: 'attempt',
+        sensitiveArgs: sanitizeArgs(functionName, args)
+      });
+      
+      // Execute the function
+      const result = await next(context);
+      
+      // Calculate duration
+      const endTime = new Date();
+      const duration = endTime - startTime;
+      
+      // Log successful execution
+      await auditLogger.log({
+        ...auditRecord,
+        eventType: 'function_access',
+        status: 'success',
+        duration,
+        resultCode: 200
+      });
+      
+      return result;
+    } catch (error) {
+      // Calculate duration
+      const endTime = new Date();
+      const duration = endTime - startTime;
+      
+      // Determine error type
+      let errorType = 'internal_error';
+      let statusCode = 500;
+      
+      if (error instanceof AuthenticationError) {
+        errorType = 'authentication_error';
+        statusCode = 401;
+      } else if (error instanceof AuthorizationError) {
+        errorType = 'authorization_error';
+        statusCode = 403;
+      } else if (error instanceof InputValidationError) {
+        errorType = 'validation_error';
+        statusCode = 400;
+      }
+      
+      // Log failed execution
+      await auditLogger.log({
+        ...auditRecord,
+        eventType: 'function_access',
+        status: 'failure',
+        duration,
+        errorType,
+        errorMessage: error.message,
+        resultCode: statusCode
+      });
+      
+      throw error;
+    }
+  };
+}
+
+// Sanitize sensitive arguments for logging
+function sanitizeArgs(functionName, args) {
+  // Define sensitive parameters to be masked
+  const sensitiveParams = {
+    // Auth functions
+    'login': ['password'],
+    'resetPassword': ['oldPassword', 'newPassword'],
+    
+    // Customer functions
+    'createCustomer': ['ssn', 'dateOfBirth'],
+    'updateCustomer': ['ssn', 'dateOfBirth'],
+    
+    // Payment functions
+    'processPayment': ['creditCardNumber', 'cvv', 'accountNumber', 'routingNumber']
+  };
+  
+  // Clone args to avoid modifying original
+  const sanitized = JSON.parse(JSON.stringify(args));
+  
+  // Apply specific masking rules
+  const fieldsToMask = sensitiveParams[functionName] || [];
+  fieldsToMask.forEach(field => {
+    if (sanitized[field]) {
+      sanitized[field] = '********';
+    }
+  });
+  
+  return sanitized;
+}
+```
+
+## Examples
+
+### Example 1: Secure MCP Function Implementation
+
+```javascript
+// Define a secure MCP function
+const getLoanDetailsFunction = {
+  name: 'getLoanDetails',
+  description: 'Get detailed information about a loan',
+  parameters: loanDetailsSchema,
+  
+  middlewares: [
+    // Apply authentication and authorization
+    authMiddleware,
+    
+    // Validate input parameters
+    validationMiddleware(loanDetailsSchema),
+    
+    // Log all access for auditing
+    auditLogMiddleware,
+    
+    // Protect sensitive information
+    piiProtectionMiddleware
+  ],
+  
+  // Function implementation
+  handler: async (context) => {
+    const { args, user } = context;
+    const { loanId } = args;
+    
+    // Retrieve loan from database
+    const loan = await loanService.getLoanById(loanId);
+    
+    if (!loan) {
+      throw new NotFoundError(`Loan not found: ${loanId}`);
+    }
+    
+    // Additional security check - ensure user has access to this loan
+    if (!await loanAccessPolicy.canViewLoan(user, loan)) {
+      throw new AuthorizationError(
+        `User does not have permission to view loan: ${loanId}`
+      );
+    }
+    
+    // Return loan details (PII will be masked by middleware)
+    return {
+      id: loan.id,
+      amount: loan.amount,
+      term: loan.term,
+      interestRate: loan.interestRate,
+      status: loan.status,
+      originationDate: loan.originationDate,
+      nextPaymentDate: loan.nextPaymentDate,
+      borrower: {
+        id: loan.borrowerId,
+        name: `${loan.borrowerFirstName} ${loan.borrowerLastName}`,
+        email: loan.borrowerEmail,
+        phone: loan.borrowerPhone
+      },
+      paymentHistory: loan.payments.map(payment => ({
+        date: payment.date,
+        amount: payment.amount,
+        type: payment.type,
+        status: payment.status
+      }))
+    };
+  }
+};
+```
+
+### Example 2: API Endpoint with Security Controls
+
+```javascript
+// Express route with MCP security integration
+app.post('/api/mcp', async (req, res) => {
+  const { function: functionName, arguments: args } = req.body;
+  
+  try {
+    // Create security context
+    const context = {
+      functionName,
+      args,
+      headers: req.headers,
+      requestId: req.id,
+      clientInfo: {
+        ip: req.ip,
+        userAgent: req.get('User-Agent')
+      }
+    };
+    
+    // Find and execute the requested function
+    const mcpFunction = mcpRegistry.getFunction(functionName);
+    
+    if (!mcpFunction) {
+      return res.status(404).json({ 
+        error: 'Function not found',
+        functionName
+      });
+    }
+    
+    // Create middleware chain
+    const executeWithMiddlewares = composeMiddlewares(
+      mcpFunction.middlewares, 
+      mcpFunction.handler
+    );
+    
+    // Execute function with all security controls
+    const result = await executeWithMiddlewares(context);
+    
+    // Return successful response
+    return res.json({ result });
+  } catch (error) {
+    // Handle errors based on type
+    if (error instanceof AuthenticationError) {
+      return res.status(401).json({ 
+        error: 'Authentication failed',
+        message: error.message
+      });
+    }
+    
+    if (error instanceof AuthorizationError) {
+      return res.status(403).json({ 
+        error: 'Permission denied',
+        message: error.message
+      });
+    }
+    
+    if (error instanceof InputValidationError) {
+      return res.status(400).json({ 
+        error: 'Validation failed',
+        message: error.message,
+        validationErrors: error.errors
+      });
+    }
+    
+    // Log unexpected errors
+    logger.error('MCP function error', {
+      functionName,
+      error: error.message,
+      stack: error.stack
+    });
+    
+    // Return generic error to client
+    return res.status(500).json({ 
+      error: 'Internal server error',
+      requestId: req.id
+    });
+  }
+});
+```
+
+## Enforcement
+
+1. **Security Requirements**
+   - Ensure all MCP functions implement proper authentication
+   - Require input validation for all functions
+   - Mandate PII protection for relevant functions
+   - Require comprehensive audit logging
+   - Enforce secure error handling
+
+2. **Security Testing**
+   - Implement automated security testing
+   - Conduct regular security code reviews
+   - Perform penetration testing on MCP interfaces
+   - Use static analysis tools to identify vulnerabilities
+   - Test for common OWASP Top 10 vulnerabilities
+
+## Implementation Guide
+
+While there is no dedicated guide for security patterns yet, you can find security-related examples in the [MCP as Service Protocol guide](mdc:examples/mcp/02-mcp-service-protocol.md).
+
+For a comprehensive overview of all MCP implementation approaches, start with the [MCP Implementation Guide](mdc:examples/mcp/01-mcp-implementation-guide.md).

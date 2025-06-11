@@ -1,0 +1,78 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# MindStudio Integration
+
+**Cursor Rule**: 115-mindstudio-integration
+**Priority**: P1 (Important)
+**Globs**: `*.mindstudio.{json,yaml}`, `*/mindstudio/*`
+**Rule type**: Platform Integration
+
+## Context
+
+MindStudio is an advanced AI development platform that requires specific integration patterns to ensure optimal performance, security, and maintainability. This rule provides guidelines for integrating MindStudio into enterprise workflows.
+
+## Requirements
+
+### REQUIRED:
+
+- All MindStudio projects MUST use the official SDK version pinned to a specific version
+- MindStudio API keys MUST be managed through the enterprise secrets management system
+- All MindStudio model deployments MUST include monitoring and observability integrations
+- MindStudio API calls MUST implement proper error handling and circuit breaker patterns
+- MindStudio models MUST be versioned and tagged according to enterprise standards
+
+### RECOMMENDED:
+
+- Use the MindStudio abstraction layer for all interactions with the platform
+- Implement model fallback strategies for critical AI features
+- Cache MindStudio API responses when appropriate to reduce costs
+- Use the enterprise MindStudio templates for new projects
+- Implement A/B testing capabilities for model evaluation
+
+## Examples
+
+**Good**:
+```typescript
+import { MindStudioClient } from '@enterprise/mindstudio-abstraction';
+
+const client = new MindStudioClient({
+  modelVersion: 'v2.5.0',
+  timeout: 3000,
+  circuitBreaker: true,
+  fallbackStrategy: 'cached',
+  monitoring: true
+});
+
+try {
+  const result = await client.generateContent(prompt);
+  return result;
+} catch (error) {
+  logger.error('MindStudio API failure', { error, prompt });
+  return fallbackHandler.process(prompt);
+}
+```
+
+**Bad**:
+```typescript
+import { MindStudio } from 'mindstudio';
+
+// Direct API key in code
+const studio = new MindStudio('sk-api12345');
+
+// No error handling
+const result = await studio.generate(prompt);
+return result;
+```
+
+## Implementation
+
+See the full documentation for implementation details, deployment patterns, and enterprise-specific configurations.
+
+## Full Documentation Access
+
+- Example MindStudio configuration: mdc:examples/mindstudio/MindStudioConfig.md
+- MindStudio abstraction layer: mdc:examples/mindstudio/AbstractionLayerGuide.md
+- Enterprise model registry: mdc:examples/mindstudio/ModelRegistryGuide.md

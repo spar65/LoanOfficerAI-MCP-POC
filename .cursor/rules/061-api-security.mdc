@@ -1,0 +1,378 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+___
+description: IMPLEMENT security best practices when DESIGNING APIs to ENSURE protection of data and resources
+globs: "**/api/**/*.{ts,js}, **/server/**/*.{ts,js}, **/routes/**/*.{ts,js}"
+___
+
+# API Security Standards
+
+## Context
+- Our APIs provide access to sensitive data and operations
+- Proper security measures are essential to protect user data and system integrity
+- Multiple attack vectors need to be addressed in a consistent manner
+- Security must be applied at multiple layers (network, application, data)
+- Security implementations should follow industry standards
+
+## Authentication & Authorization Requirements
+
+### Authentication Strategy
+- **REQUIRED**: All API endpoints that access protected resources must require authentication
+- **REQUIRED**: Use token-based authentication (JWT or similar) with appropriate expiration
+- **REQUIRED**: Store tokens securely (HTTP-only cookies, secure storage, etc.)
+- **REQUIRED**: Implement refresh token rotation for long-lived sessions
+- API keys for service-to-service communication must be rotated regularly
+- Rate limiting must be applied for authentication endpoints
+
+### Authorization Controls
+- **REQUIRED**: Implement role-based access control (RBAC) for all protected endpoints
+- **REQUIRED**: Enforce organization-level permissions for multi-tenant resources
+- **REQUIRED**: Validate access rights at the endpoint and service layers
+- Implement attribute-based access control (ABAC) for complex permission scenarios
+- Log all access denied events for security monitoring
+
+```typescript
+// Good: Comprehensive authentication middleware
+function authenticate(req: Request, res: Response, next: NextFunction) {
+  const token = extractToken(req);
+  
+  if (!token) {
+    return res.status(401).json({
+      error: {
+        code: 'AUTHENTICATION_REQUIRED',
+        message: 'Authentication is required for this endpoint'
+      }
+    });
+  }
+  
+  try {
+    const decodedToken = verifyToken(token);
+    
+    // Check token expiration
+    if (isTokenExpired(decodedToken)) {
+      return res.status(401).json({
+        error: {
+          code: 'TOKEN_EXPIRED',
+          message: 'Authentication token has expired'
+        }
+      });
+    }
+    
+    // Attach user context to request
+    req.user = {
+      id: decodedToken.sub,
+      roles: decodedToken.roles || [],
+      permissions: decodedToken.permissions || [],
+      organizationId: decodedToken.organizationId
+    };
+    
+    next();
+  } catch (error) {
+    return res.status(401).json({
+      error: {
+        code: 'INVALID_TOKEN',
+        message: 'Invalid authentication token'
+      }
+    });
+  }
+}
+
+// Good: Role-based authorization middleware
+function authorize(requiredRoles: string[]) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    if (!req.user) {
+      return res.status(401).json({
+        error: {
+          code: 'AUTHENTICATION_REQUIRED',
+          message: 'Authentication is required for this endpoint'
+        }
+      });
+    }
+    
+    const hasRequiredRole = requiredRoles.some(role => 
+      req.user.roles.includes(role)
+    );
+    
+    if (!hasRequiredRole) {
+      return res.status(403).json({
+        error: {
+          code: 'INSUFFICIENT_PERMISSIONS',
+          message: 'You do not have the required permissions'
+        }
+      });
+    }
+    
+    next();
+  };
+}
+```
+
+## Input Validation & Output Sanitization
+
+### Input Validation
+- **REQUIRED**: Validate all client-provided data against a schema before processing
+- **REQUIRED**: Use strict type checking for all inputs
+- **REQUIRED**: Limit input lengths appropriately for each field
+- **REQUIRED**: Validate request parameters, query strings, and headers
+- Implement business logic validation after schema validation
+- Use parameterized queries for database operations
+
+### Output Sanitization
+- **REQUIRED**: Sanitize all data before returning to clients
+- **REQUIRED**: Explicitly select fields to include in responses
+- **REQUIRED**: Use appropriate content security policies
+- **REQUIRED**: Set proper security headers in all responses
+- Remove sensitive information from error messages
+- Implement JSON schema validation for responses
+
+```typescript
+// Good: Input validation with schema
+function validateUserInput(req: Request, res: Response, next: NextFunction) {
+  const schema = Joi.object({
+    name: Joi.string().trim().min(2).max(100).required(),
+    email: Joi.string().email().required(),
+    role: Joi.string().valid('user', 'admin', 'editor').required(),
+    settings: Joi.object({
+      notifications: Joi.boolean().default(true),
+      theme: Joi.string().valid('light', 'dark', 'system').default('system')
+    }).optional()
+  });
+  
+  const { error, value } = schema.validate(req.body, { 
+    abortEarly: false,
+    stripUnknown: true
+  });
+  
+  if (error) {
+    return res.status(400).json({
+      error: {
+        code: 'VALIDATION_ERROR',
+        message: 'Invalid input data',
+        details: error.details.map(detail => ({
+          field: detail.path.join('.'),
+          message: detail.message
+        }))
+      }
+    });
+  }
+  
+  // Replace request body with validated data
+  req.body = value;
+  next();
+}
+
+// Good: Output sanitization
+function sanitizeUserOutput(user: UserModel): UserResponse {
+  // Explicitly select fields to return
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    createdAt: user.createdAt.toISOString()
+    // Note: password, internal flags, etc. are not included
+  };
+}
+```
+
+## Protection Against Common Attacks
+
+### CSRF Protection
+- **REQUIRED**: Implement CSRF protection for all state-changing operations
+- **REQUIRED**: Use the Double Submit Cookie pattern or similar
+- **REQUIRED**: Validate the Origin/Referer header for cross-origin requests
+- Use SameSite=Strict or SameSite=Lax for cookies
+- Include CSRF tokens in secure, HTTP-only cookies
+
+### XSS Prevention
+- **REQUIRED**: Sanitize all user-generated content before rendering
+- **REQUIRED**: Set Content-Security-Policy headers
+- **REQUIRED**: Use appropriate context-specific encoding
+- Implement XSS-specific headers (X-XSS-Protection)
+- Use template systems with automatic context-aware encoding
+
+### Injection Prevention
+- **REQUIRED**: Use parameterized queries for all database operations
+- **REQUIRED**: Validate and sanitize all inputs to prevent command injection
+- **REQUIRED**: Use ORM or query builders with proper escaping
+- **REQUIRED**: Avoid dynamic code evaluation (eval, new Function, etc.)
+- Implement proper error handling to prevent information leakage
+
+## Secure Communication
+
+### Transport Security
+- **REQUIRED**: Use HTTPS for all API communication
+- **REQUIRED**: Implement HSTS headers
+- **REQUIRED**: Configure TLS properly (minimum TLS 1.2)
+- **REQUIRED**: Use secure cookies (Secure flag)
+- Disable insecure SSL/TLS versions and ciphers
+- Implement certificate pinning for high-security scenarios
+
+### Rate Limiting & Throttling
+- **REQUIRED**: Implement rate limiting for all public-facing APIs
+- **REQUIRED**: Apply stricter limits for authentication endpoints
+- **REQUIRED**: Return standard 429 Too Many Requests responses with Retry-After headers
+- Implement both IP-based and user-based rate limiting
+- Use token bucket or sliding window algorithms for rate limiting
+
+```typescript
+// Good: Rate limiting middleware
+function rateLimiter(options: { limit: number, windowMs: number }) {
+  const { limit, windowMs } = options;
+  const requests = new Map<string, number[]>();
+  
+  return (req: Request, res: Response, next: NextFunction) => {
+    const key = req.ip || 'unknown';
+    const now = Date.now();
+    
+    // Get existing requests in the current window
+    const userRequests = requests.get(key) || [];
+    
+    // Filter out requests outside the current window
+    const recentRequests = userRequests.filter(
+      time => now - time < windowMs
+    );
+    
+    if (recentRequests.length >= limit) {
+      // Rate limit exceeded
+      const oldestRequest = Math.min(...recentRequests);
+      const resetTime = oldestRequest + windowMs;
+      const retryAfter = Math.ceil((resetTime - now) / 1000);
+      
+      res.setHeader('X-RateLimit-Limit', limit.toString());
+      res.setHeader('X-RateLimit-Remaining', '0');
+      res.setHeader('X-RateLimit-Reset', Math.ceil(resetTime / 1000).toString());
+      res.setHeader('Retry-After', retryAfter.toString());
+      
+      return res.status(429).json({
+        error: {
+          code: 'RATE_LIMIT_EXCEEDED',
+          message: 'Too many requests, please try again later',
+          details: {
+            retryAfter: retryAfter
+          }
+        }
+      });
+    }
+    
+    // Update request log
+    recentRequests.push(now);
+    requests.set(key, recentRequests);
+    
+    // Set rate limit headers
+    res.setHeader('X-RateLimit-Limit', limit.toString());
+    res.setHeader('X-RateLimit-Remaining', (limit - recentRequests.length).toString());
+    
+    next();
+  };
+}
+```
+
+## Security Monitoring & Response
+
+### Logging & Monitoring
+- **REQUIRED**: Log all authentication attempts (success and failure)
+- **REQUIRED**: Log all access to sensitive operations and data
+- **REQUIRED**: Implement structured logging for security events
+- **REQUIRED**: Include correlation IDs for request tracing
+- Monitor for unusual patterns or suspicious activities
+- Implement real-time alerting for security incidents
+
+### Security Headers
+- **REQUIRED**: Implement recommended security headers:
+  - Content-Security-Policy
+  - X-Content-Type-Options: nosniff
+  - X-Frame-Options: DENY
+  - Strict-Transport-Security
+  - Cache-Control: no-store (for sensitive data)
+- Regularly audit security headers against industry best practices
+- Update security header configuration as new protections emerge
+
+## Implementation Examples
+
+```typescript
+// Good: Comprehensive API route with security measures
+router.post(
+  '/api/v1/organizations/:orgId/users',
+  authenticate,
+  authorize(['admin']),
+  validateOrgAccess,
+  rateLimiter({ limit: 20, windowMs: 60 * 1000 }),
+  validateUserInput,
+  csrfProtection,
+  async (req: Request, res: Response) => {
+    try {
+      const { orgId } = req.params;
+      const userData = req.body;
+      
+      // Create user
+      const user = await userService.createUser(orgId, userData);
+      
+      // Sanitize output
+      const sanitizedUser = sanitizeUserOutput(user);
+      
+      // Add security headers
+      res.setHeader('Cache-Control', 'no-store');
+      res.setHeader('Content-Security-Policy', "default-src 'self'");
+      
+      // Return successful response
+      return res.status(201).json({
+        data: sanitizedUser,
+        message: 'User created successfully'
+      });
+    } catch (error) {
+      // Handle error without leaking details
+      logger.error('User creation failed', {
+        error: error.message,
+        organizationId: req.params.orgId,
+        userId: req.user.id,
+        correlationId: req.correlationId
+      });
+      
+      return res.status(500).json({
+        error: {
+          code: 'USER_CREATION_FAILED',
+          message: 'Failed to create user'
+        }
+      });
+    }
+  }
+);
+```
+
+## Relationship with Other Rules
+
+- [departments/engineering/api/060-api-standards.mdc](mdc:departments/engineering/api/060-api-standards.mdc) - API design standards
+- [core/001-security.mdc](mdc:core/001-security.mdc) - Core security principles
+- [departments/engineering/security/046-session-validation.mdc](mdc:departments/engineering/security/046-session-validation.mdc) - Session validation
+
+## Reference Implementations
+
+For detailed examples of API security implementation, refer to our documentation:
+
+- [SessionSecurityImplementation.md](mdc:examples/security/SessionSecurityImplementation.md) - Session security implementation
+- [AuthBestPractices.md](mdc:examples/security/AuthBestPractices.md) - Authentication best practices
+
+**Important Note**: These reference implementations are provided as documentation examples only and are not meant to be imported or used directly in your codebase. They demonstrate the patterns and practices that should be followed when implementing API security.
+
+## Full Documentation Access
+
+To access the complete documentation including all examples, please refer to the original enterprise-cursor-rules repository. The examples directory in the repository contains detailed implementation guides that are referenced above.
+
+## Implementation Checklist
+
+- [ ] Authentication is required for all protected endpoints
+- [ ] Authorization checks for role-based access control
+- [ ] Input validation for all client-provided data
+- [ ] Output sanitization to remove sensitive information
+- [ ] CSRF protection for state-changing operations
+- [ ] XSS prevention through content sanitization
+- [ ] Injection prevention using parameterized queries
+- [ ] Transport security with HTTPS and proper TLS
+- [ ] Rate limiting for all public-facing APIs
+- [ ] Security headers in all responses
+- [ ] Logging of security-relevant events
+- [ ] Error handling that doesn't leak sensitive information

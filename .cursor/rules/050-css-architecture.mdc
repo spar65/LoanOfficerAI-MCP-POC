@@ -1,0 +1,605 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+___
+description: ORGANIZE CSS structure using ESTABLISHED patterns to ENSURE maintainable and consistent styling
+globs: "**/*.css, **/components/**/*.tsx, **/app/**/*.tsx, **/*.scss"
+___
+
+# CSS Structure and Organization 
+
+## Context
+- CSS organization is critical for maintainable applications
+- Inconsistent styling approaches lead to visual inconsistencies and harder maintenance
+- Global styles should follow a consistent pattern for reuse across components
+- Tailwind utility classes should be organized and consistent
+- CSS structure directly impacts the testability of components
+- Our design system depends on consistent CSS architecture across applications
+- Feature teams must adhere to established CSS patterns for cohesion
+- White labeling requires a structural approach to CSS variables
+
+## Requirements
+
+### Global CSS Variables
+
+- **REQUIRED**: Define a standard set of CSS variables for theming in globals.css
+- **REQUIRED**: Use semantic naming for variables (--sidebar-width, --header-height)
+- Include fallback values for all dynamic properties
+- Group variables by function (layout, colors, typography)
+- Apply CSS variables using Tailwind theme configuration
+- Keep root-level CSS variables to a minimum and organize by purpose
+
+<example>
+/* Good - CSS variables with semantic naming */
+:root {
+  /* Layout */
+  --sidebar-width: 16rem;
+  --header-height: 4rem;
+  
+  /* Colors */
+  --primary-color: #0070f3;
+  --secondary-color: #f5f5f5;
+  
+  /* Branding - with fallbacks */
+  --org-primary: var(--primary-color);
+  --org-secondary: var(--secondary-color);
+}
+</example>
+
+<example type="invalid">
+/* Bad - No semantic naming or organization */
+:root {
+  --blue: #0070f3;
+  --gray: #f5f5f5;
+  --width: 16rem;
+  --height: 4rem;
+}
+</example>
+
+### Layout Component Classes
+
+- **REQUIRED**: Create dedicated CSS classes for major layout sections
+- **REQUIRED**: Namespace classes by feature (dashboard-sidebar, dashboard-content)
+- Avoid nesting beyond 3 levels
+- Use consistent BEM-style naming (.component, .component__element, .component--modifier)
+- Document CSS classes with comments explaining their purpose
+- Extract repeated utility patterns into named classes
+
+<example>
+/* Good - Layout components with namespaced classes and BEM structure */
+.dashboard-layout {
+  display: grid;
+  grid-template-columns: var(--sidebar-width) 1fr;
+  min-height: 100vh;
+}
+
+.dashboard-layout__sidebar {
+  grid-column: 1;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+}
+
+.dashboard-layout__content {
+  grid-column: 2;
+  padding: var(--content-padding);
+}
+
+.dashboard-layout--compact {
+  grid-template-columns: var(--compact-sidebar-width) 1fr;
+}
+</example>
+
+<example type="invalid">
+/* Bad - Mixed approach with ambiguous naming and inline values */
+.sidebar {
+  width: 16rem;
+  position: fixed;
+}
+
+.content {
+  margin-left: 16rem;
+}
+
+/* Inconsistent naming and no structured approach */
+.main-area {
+  padding: 24px;
+}
+</example>
+
+### Responsive Breakpoints
+
+- Define and document standard breakpoints
+- **REQUIRED**: Test all views at each breakpoint during development
+- **REQUIRED**: Use mobile-first approach with min-width queries
+- Prefer Tailwind's responsive prefixes (sm:, md:, lg:) for consistency
+- Implement responsive strategy for each major component
+- Add breakpoint indicators to dev environment for easy testing
+
+<example>
+/* Good - Consistent breakpoint system */
+:root {
+  --breakpoint-sm: 640px;
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 1024px;
+  --breakpoint-xl: 1280px;
+  --breakpoint-2xl: 1536px;
+}
+
+/* Mobile-first Media Queries */
+@media (min-width: var(--breakpoint-sm)) {
+  .dashboard-layout {
+    grid-template-columns: var(--sidebar-width) 1fr;
+  }
+}
+
+/* Component with responsive strategy */
+.responsive-card {
+  width: 100%;
+}
+
+@media (min-width: var(--breakpoint-md)) {
+  .responsive-card {
+    width: 50%;
+  }
+}
+
+@media (min-width: var(--breakpoint-lg)) {
+  .responsive-card {
+    width: 33.33%;
+  }
+}
+</example>
+
+<example>
+/* Good - Tailwind responsive utilities */
+<div className="w-full md:w-1/2 lg:w-1/3 xl:w-1/4">
+  <Card />
+</div>
+</example>
+
+<example type="invalid">
+/* Bad - Desktop-first approach with max-width */
+.card {
+  width: 25%;
+}
+
+@media (max-width: 1280px) {
+  .card {
+    width: 33.33%;
+  }
+}
+
+@media (max-width: 1024px) {
+  .card {
+    width: 50%;
+  }
+}
+
+@media (max-width: 640px) {
+  .card {
+    width: 100%;
+  }
+}
+</example>
+
+### State-Based Styling
+
+- **REQUIRED**: Define clear states for components (default, hover, active, disabled)
+- Use CSS custom properties for state transitions
+- Create consistent hover/focus effects across interactive elements
+- Ensure sufficient color contrast for all states
+- Implement unique visual indicators for each state
+
+<example>
+/* Good - Consistent state-based styling with CSS variables */
+.button {
+  --button-bg: var(--primary-color);
+  --button-text: white;
+  background-color: var(--button-bg);
+  color: var(--button-text);
+  padding: 0.5rem 1rem;
+  border-radius: 0.25rem;
+  transition: background-color 0.2s ease;
+}
+
+.button:hover {
+  --button-bg: var(--primary-color-dark);
+}
+
+.button:focus-visible {
+  outline: 2px solid var(--focus-ring-color);
+  outline-offset: 2px;
+}
+
+.button:active {
+  transform: translateY(1px);
+}
+
+.button:disabled {
+  --button-bg: var(--disabled-bg);
+  --button-text: var(--disabled-text);
+  cursor: not-allowed;
+}
+</example>
+
+<example>
+/* Good - Tailwind-based state styling */
+<button 
+  className="
+    bg-blue-500 
+    hover:bg-blue-600 
+    active:bg-blue-700 
+    focus:ring-2 
+    focus:ring-blue-300 
+    disabled:bg-gray-300 
+    disabled:text-gray-500 
+    disabled:cursor-not-allowed
+  "
+  disabled={isLoading}
+>
+  {isLoading ? 'Processing...' : 'Submit'}
+</button>
+</example>
+
+<example type="invalid">
+/* Bad - Inconsistent state styling with duplicated values */
+.button {
+  background-color: #0070f3;
+  color: white;
+}
+
+.button:hover {
+  background-color: #005cc5;
+}
+
+.disabled-button {  /* Different class instead of a state */
+  background-color: #cccccc;
+  color: #666666;
+  cursor: not-allowed;
+}
+</example>
+
+### White-Label Styling
+
+- **REQUIRED**: Separate structure from theming using CSS variables
+- Implement dynamic branding through CSS variable overrides
+- Test components with multiple branding configurations
+- Default to system design tokens when organization values aren't available
+- Create fallback styles that gracefully handle missing branding values
+
+<example>
+/* Good - White-label styling with CSS variables and fallbacks */
+:root {
+  /* Base design system colors */
+  --color-primary-50: #f0f9ff;
+  --color-primary-100: #e0f2fe;
+  /* ... other base colors ... */
+  --color-primary-900: #0c4a6e;
+
+  /* Semantic tokens with fallbacks */
+  --brand-primary: var(--color-primary-600);
+  --brand-secondary: var(--color-gray-200);
+  --brand-accent: var(--color-cyan-500);
+  
+  /* Functional colors */
+  --text-primary: var(--color-gray-900);
+  --text-secondary: var(--color-gray-600);
+  --background-primary: white;
+}
+
+/* Organization-specific overrides */
+[data-organization="acme"] {
+  --brand-primary: #FF5733;
+  --brand-secondary: #33FF57;
+  --brand-accent: #3357FF;
+}
+
+[data-organization="globex"] {
+  --brand-primary: #8A2BE2;
+  --brand-secondary: #20B2AA;
+  --brand-accent: #FFA500;
+}
+</example>
+
+<example>
+/* Good - White-label components using CSS variables */
+function BrandedButton({ children, ...props }) {
+  return (
+    <button 
+      className="
+        bg-brand-primary 
+        text-white 
+        px-4 
+        py-2 
+        rounded 
+        hover:bg-brand-primary/90
+      "
+      {...props}
+    >
+      {children}
+    </button>
+  );
+}
+</example>
+
+<example type="invalid">
+/* Bad - Hard-coded branding values */
+.acme-button {
+  background-color: #FF5733;
+  color: white;
+}
+
+.globex-button {
+  background-color: #8A2BE2;
+  color: white;
+}
+</example>
+
+### CSS Module Usage
+
+- **REQUIRED**: Use CSS Modules for component-specific styles
+- Keep module files close to their component files
+- Export reusable class compositions
+- Avoid global selectors within modules
+- Use consistent naming between component and CSS module file
+
+<example>
+/* Good - CSS Module (Button.module.css) */
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem 1rem;
+  border-radius: 0.25rem;
+  font-weight: 500;
+}
+
+.primary {
+  background-color: var(--brand-primary);
+  color: white;
+}
+
+.secondary {
+  background-color: var(--brand-secondary);
+  color: var(--text-primary);
+}
+
+.icon {
+  margin-right: 0.5rem;
+}
+</example>
+
+<example>
+// Good - React component using CSS Module
+import styles from './Button.module.css';
+import cn from 'classnames';
+
+export function Button({ 
+  children, 
+  variant = 'primary',
+  icon,
+  className,
+  ...props 
+}) {
+  return (
+    <button
+      className={cn(
+        styles.button,
+        styles[variant],
+        className
+      )}
+      {...props}
+    >
+      {icon && <span className={styles.icon}>{icon}</span>}
+      {children}
+    </button>
+  );
+}
+</example>
+
+<example type="invalid">
+/* Bad - Global selector inside CSS Module */
+.button {
+  background-color: var(--brand-primary);
+}
+
+/* Global selector affecting other components */
+:global(button) {
+  border: none;
+  cursor: pointer;
+}
+</example>
+
+### Testing-Friendly CSS Patterns
+
+- Avoid style rules that target elements by HTML tag names
+- Group related styles into named utility classes
+- **REQUIRED**: Use predictable class names that indicate component purpose
+- Add data attributes for test selectors when needed
+- Ensure critical UI states have distinct visual characteristics
+- Maintain consistent class application across component states
+
+<example>
+/* Good - Testing-friendly CSS for loading states */
+/* Define clear visual states with descriptive classes */
+.loading-skeleton {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  background-color: var(--skeleton-color, #e5e7eb);
+  border-radius: 0.25rem;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* Component implementation */
+function CardSkeleton() {
+  return (
+    <div className="card loading-state" data-testid="card-loading">
+      <div className="loading-skeleton h-40 w-full"></div>
+      <div className="mt-2">
+        <div className="loading-skeleton h-4 w-3/4 mb-2"></div>
+        <div className="loading-skeleton h-4 w-1/2"></div>
+      </div>
+    </div>
+  );
+}
+</example>
+
+<example>
+/* Good - Consistent class patterns for different states */
+.form-input {
+  border: 1px solid var(--border-color);
+  border-radius: 0.25rem;
+  padding: 0.5rem 1rem;
+}
+
+.form-input--error {
+  border-color: var(--color-error);
+  background-color: var(--color-error-bg);
+}
+
+.form-input--success {
+  border-color: var(--color-success);
+  background-color: var(--color-success-bg);
+}
+
+/* Component usage */
+<input 
+  className={cn(
+    "form-input",
+    error && "form-input--error",
+    success && "form-input--success"
+  )}
+  data-testid="username-input"
+  data-state={error ? "error" : success ? "success" : "default"}
+/>
+</example>
+
+<example type="invalid">
+/* Bad - Targeting elements directly and using generic class names */
+input {
+  border: 1px solid #ccc;
+}
+
+.error {  /* Too generic */
+  border-color: red !important;
+}
+
+.active {  /* Too generic */
+  background-color: blue;
+}
+</example>
+
+### Tailwind Configuration
+
+- **REQUIRED**: Extend Tailwind theme with design tokens as CSS variables
+- Create consistent prefix for custom utilities
+- Implement standard plugin patterns for recurring design patterns
+- Limit custom utilities to those not easily composed from existing utilities
+- Document all customizations in the configuration file
+
+<example>
+// Good - Tailwind configuration extended with design tokens
+// tailwind.config.js
+module.exports = {
+  theme: {
+    extend: {
+      colors: {
+        // Map design token names to CSS variables
+        "brand": {
+          "primary": "var(--brand-primary)",
+          "secondary": "var(--brand-secondary)",
+          "accent": "var(--brand-accent)"
+        },
+        "text": {
+          "primary": "var(--text-primary)",
+          "secondary": "var(--text-secondary)",
+          "inverse": "var(--text-inverse)"
+        }
+      },
+      spacing: {
+        "sidebar": "var(--sidebar-width)",
+        "header": "var(--header-height)"
+      }
+    }
+  },
+  plugins: [
+    // Custom plugin for text styles
+    plugin(({ addUtilities }) => {
+      addUtilities({
+        '.text-heading-1': {
+          fontSize: 'var(--text-heading-1-size)',
+          lineHeight: 'var(--text-heading-1-line-height)',
+          fontWeight: 'var(--text-heading-1-weight)'
+        },
+        '.text-heading-2': {
+          fontSize: 'var(--text-heading-2-size)',
+          lineHeight: 'var(--text-heading-2-line-height)',
+          fontWeight: 'var(--text-heading-2-weight)'
+        },
+        // Additional text styles...
+      })
+    })
+  ]
+}
+</example>
+
+<example>
+// Good - Using Tailwind with extended theme properties
+function BrandHeader() {
+  return (
+    <header className="h-header bg-brand-primary text-white px-4 flex items-center">
+      <h1 className="text-heading-1">Dashboard</h1>
+    </header>
+  );
+}
+</example>
+
+<example type="invalid">
+// Bad - Hard-coded values instead of theme extensions
+<header className="h-[64px] bg-[#0070f3] text-white px-4 flex items-center">
+  <h1 className="text-2xl font-bold">Dashboard</h1>
+</header>
+</example>
+
+## Best Practices
+
+1. **Single Source of Truth**: Store all design tokens in one location with CSS variables
+2. **Component-First**: Write styles for components, not pages
+3. **Mobile-First**: Start with mobile layouts and progressively enhance for larger screens
+4. **Utility-First**: Favor composition of utility classes over custom CSS when possible
+5. **Semantic Structure**: Name classes based on purpose, not appearance
+6. **Isolation**: Keep component styles isolated to prevent side effects
+7. **Consistency**: Apply the same patterns across all components
+8. **Performance**: Be mindful of CSS specificity and selector complexity
+9. **Documentation**: Include comments for complex styling decisions
+10. **Maintainability**: Optimize for change and extensibility
+
+## Related Rules
+
+- [departments/product/030-visual-style-consolidated.mdc](mdc:departments/product/030-visual-style-consolidated.mdc) - Visual design system
+- [technologies/frameworks/042-ui-component-architecture.mdc](mdc:technologies/frameworks/042-ui-component-architecture.mdc) - UI component structure
+
+## Examples
+
+For detailed implementation examples, refer to:
+
+- [CSSArchitectureExamples.md](mdc:examples/styling/CSSArchitectureExamples.md) - Contains comprehensive CSS architecture examples
+- [TailwindConfigurationGuide.md](mdc:examples/styling/TailwindConfigurationGuide.md) - Detailed Tailwind configuration for our design system
+
+## Full Documentation Access
+
+To access the complete documentation including all examples, please refer to the original enterprise-cursor-rules repository. The examples directory in the repository contains detailed implementation guides that are referenced above.
+
+The flat structure of the Cursor rules deployment may not include these examples directly, but they remain available in the source repository.
+

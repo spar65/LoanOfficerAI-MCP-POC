@@ -1,0 +1,181 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Testing Environments
+
+**Cursor Rule**: 116-testing-environments
+**Priority**: P0 (Required)
+**Globs**: `**/test/**`, `**/*.test.*`, `**/*.spec.*`, `**/jest.config.*`, `**/cypress.config.*`, `**/.env.*`
+**Rule type**: Engineering Practice
+
+## Context
+
+Standardized testing environments are essential for ensuring reliable and consistent testing across the development lifecycle. This rule defines the required testing environments, their configuration, and usage patterns to maintain quality and security across all enterprise projects.
+
+## Requirements
+
+### REQUIRED:
+
+- All projects MUST implement at least four distinct testing environments:
+  - Development (DEV)
+  - Integration/QA (INT)
+  - Staging (STG)
+  - Production (PROD)
+
+- Each environment MUST have:
+  - Isolated data stores with appropriate security measures
+  - Separate infrastructure and deployment pipelines
+  - Environment-specific configuration in `.env.*` files
+  - Clearly documented access controls and usage guidelines
+
+- Test data MUST adhere to the following principles:
+  - No production data in non-production environments without proper anonymization
+  - Synthetic data generation for all sensitive information
+  - Data reset capabilities between test runs in lower environments
+
+- CI/CD pipelines MUST include:
+  - Automated environment provisioning and teardown
+  - Environment-aware test execution
+  - Parallel test execution where appropriate
+  - Clear separation of test types by environment
+
+- Security testing MUST be integrated across environments:
+  - SAST (Static Application Security Testing) in DEV
+  - DAST (Dynamic Application Security Testing) in INT
+  - Penetration testing in STG
+  - Security monitoring in all environments
+
+### RECOMMENDED:
+
+- Implement containerization for environment consistency
+- Use feature flags to manage feature availability across environments
+- Implement blue/green deployment capabilities in STG and PROD
+- Maintain environment parity for dependencies and configurations
+- Use temporary ephemeral environments for feature branches
+- Implement comprehensive environment health checks
+- Maintain separate monitoring stacks for each environment
+
+## Examples
+
+**Good**:
+```typescript
+// test-config.ts
+import { loadConfig } from '@enterprise/config';
+
+export async function setupTestEnvironment() {
+  const environment = process.env.TEST_ENV || 'dev';
+  
+  // Load environment-specific configuration
+  const config = await loadConfig(environment);
+  
+  // Setup environment-specific database connection
+  const db = await createDatabaseConnection({
+    host: config.database.host,
+    user: config.database.user,
+    password: config.database.password,
+    database: `test_${environment}_${generateUniqueId()}`,
+    reset: true // Clear previous test data
+  });
+  
+  // Setup environment-specific test data
+  if (environment === 'dev' || environment === 'int') {
+    await seedTestData(db, 'complete');
+  } else if (environment === 'stg') {
+    await seedMinimalTestData(db);
+  }
+  
+  // Configure security settings based on environment
+  const securityLevel = environment === 'prod' ? 'strict' : 'standard';
+  await configureSecurity(securityLevel);
+  
+  return { config, db };
+}
+```
+
+**Bad**:
+```typescript
+// Bad testing environment setup
+const db = connectToProdDatabase(); // NEVER connect to production DB in tests!
+
+// Hard-coded credentials
+const apiKey = 'sk_live_abc123'; // Don't use production credentials
+
+// No environment isolation
+async function runTests() {
+  // No environment-specific configuration
+  await testFeatureA();
+  await testFeatureB();
+}
+```
+
+## Implementation
+
+### Environment-Specific Files
+
+Create standardized environment files for each project:
+
+```
+project/
+├── .env.dev
+├── .env.int
+├── .env.stg
+├── .env.prod
+└── .env.test
+```
+
+### Environment Promotion Flow
+
+Follow the standard promotion flow for changes:
+
+```
+DEV → INT → STG → PROD
+```
+
+Each promotion should include appropriate testing and validation.
+
+### CI/CD Configuration
+
+Configure CI/CD workflows to run the appropriate tests in each environment:
+
+```yaml
+# Example CI/CD configuration
+stages:
+  - dev_tests
+  - int_tests
+  - stg_tests
+  - prod_validation
+
+dev_tests:
+  environment: dev
+  script:
+    - npm run test:unit
+    - npm run test:integration
+
+int_tests:
+  environment: int
+  script:
+    - npm run test:integration
+    - npm run test:e2e
+    - npm run test:security
+
+stg_tests:
+  environment: stg
+  script:
+    - npm run test:e2e:full
+    - npm run test:performance
+    - npm run test:security:full
+
+prod_validation:
+  environment: prod
+  script:
+    - npm run test:smoke
+    - npm run monitor:deploy
+```
+
+## Full Documentation Access
+
+- Testing Environment Architecture: mdc:examples/testing/TestingEnvironmentsArchitecture.md
+- Environment Configuration Guide: mdc:examples/testing/EnvironmentConfigurationGuide.md
+- Test Data Management: mdc:examples/testing/TestDataManagementGuide.md

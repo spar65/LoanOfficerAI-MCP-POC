@@ -1,0 +1,295 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Cursor Workflow Guidelines
+
+These guidelines instruct Cursor on how to interact with workflow processes when assisting with development tasks. They define how Cursor should approach branching, code reviews, testing, change management, documentation, and other collaborative aspects of software development. The guidelines are comprehensive, actionable, and adaptable to different project contexts, ensuring recommendations are relevant and practical.
+
+---
+
+## 1. Branching and Version Control
+
+### Feature Branch Detection & Suggestion
+- Detect when work appears to be happening on the `main` or `master` branch.
+- Proactively recommend creating a feature branch for new work.
+- Provide branch creation commands (e.g., `git checkout -b feature/user-authentication`).
+- Generate branch names following project conventions.
+
+### Naming Convention Enforcement
+- Recommend consistent branch naming patterns (e.g., `feature/xxx`, `bugfix/xxx`, `hotfix/xxx`).
+- Detect and apply project-specific branch naming conventions.
+- Suggest standardized prefixes based on work type (e.g., `feature/`, `bugfix/`).
+- Alert when branch names deviate from established patterns.
+- **Example**: For a login feature, suggest `feature/add-login` instead of `login-feature`.
+
+### Commit Message Guidance
+- Recommend clear, structured commit messages explaining the "why" behind changes.
+- Detect and align with project commit message conventions (e.g., Conventional Commits).
+- Suggest including issue or ticket references (e.g., `#123`).
+- Help structure commit messages with a subject line (50 characters max) and a detailed body when needed.
+- **Example**: `feat: add user login endpoint (#123)` with a body detailing implementation.
+
+### Merge Conflict Handling
+- Recommend strategies like rebasing or merging to resolve conflicts.
+- Provide commands, e.g., `git rebase main` or `git merge --continue`.
+- Suggest resolving conflicts in a separate branch to keep the main branch clean.
+- **Example**: "Run `git rebase main`, resolve conflicts in the editor, then `git rebase --continue`."
+
+---
+
+## 2. Pull Request & Code Review Assistance
+
+### PR Preparation
+- Recommend running tests before PR submission.
+- Scan for unresolved `TODO` comments, debug code (e.g., `console.log`), or unrelated changes.
+- Verify documentation is updated to reflect code changes.
+- **Step-by-Step Assistance**:
+  1. Scan for `TODO`, `FIXME`, or debug statements.
+  2. Recommend addressing or removing them.
+  3. Check for unrelated changes and suggest splitting the PR if needed.
+
+### PR Template Generation
+- Offer to generate descriptive PR descriptions with:
+  - Summaries of changes and rationale.
+  - Affected modules/components.
+  - Testing notes and verification steps.
+
+### Code Review Support
+- Apply a checklist including:
+  - Coding standards adherence.
+  - Test coverage.
+  - Impact on related components.
+  - **Security Checks**: Identify vulnerabilities like SQL injection or XSS.
+  - **Performance Checks**: Flag inefficient loops or database queries.
+- **Example**: "Review the query for potential N+1 issues."
+
+### Collaborative Feedback
+- Provide constructive recommendations with rationale.
+- Offer alternative approaches with pros and cons.
+- Use clear, specific language in review comments.
+
+---
+
+## 3. Testing & Quality Assurance Integration
+
+### Test Generation
+- Identify untested code and recommend test coverage.
+- Generate test templates for new functionality.
+- Suggest appropriate test types (e.g., unit, integration, end-to-end).
+- Recommend test cases for edge conditions and failure modes.
+
+### Test Framework Integration
+- Detect and utilize the project's testing framework (e.g., Jest for JavaScript, PyTest for Python).
+- Generate tests consistent with existing patterns.
+- Recommend appropriate test locations and naming conventions.
+- Provide setup and teardown code when needed.
+
+### Test-Driven Development Support
+- Offer to generate failing tests before implementation.
+- Guide through the red-green-refactor cycle.
+- Suggest minimal implementations to make tests pass.
+- Recommend refactoring opportunities after tests pass.
+
+### Test Quality Enhancement
+- Identify brittle tests and suggest improvements (e.g., avoiding over-specific assertions).
+- Recommend test isolation practices (e.g., avoiding shared state).
+- Suggest appropriate mocking strategies.
+- Flag tests that might focus on implementation details rather than behavior.
+
+### CI/CD Integration for Testing
+- Recommend integrating tests into CI/CD pipelines.
+- Suggest test reporting and coverage metrics.
+- **Example**: "Add a GitHub Action to run unit tests on every push."
+
+---
+
+## 4. Change Management
+
+### Change Isolation
+- Alert when changes affect unrelated code areas.
+- Recommend limiting the scope of changes to relevant components.
+- Help identify the minimum necessary changes for a task.
+- Suggest separate branches for unrelated improvements.
+
+### Impact Analysis
+- Analyze potential side effects of changes.
+- Identify dependent components that might be affected.
+- Recommend additional tests for potentially impacted areas.
+- Help document findings about broader system impact.
+
+### Feature Toggle Support
+- Recommend feature toggle patterns appropriate to the codebase (e.g., boolean flags, environment variables).
+- Generate toggle configuration code.
+- Suggest toggle cleanup after feature stabilization.
+- **Example**:
+  ```javascript
+  const FEATURES = {
+    newPaymentProcessor: process.env.ENABLE_NEW_PAYMENT_PROCESSOR === 'true'
+  };
+
+  if (FEATURES.newPaymentProcessor) {
+    return processPaymentV2(paymentData);
+  } else {
+    return processPayment(paymentData);
+  }
+  ```
+- Cleanup: Remove toggle and old code once the feature is stable.
+
+### Managing Breaking Changes
+- Recommend versioning APIs or issuing deprecation warnings.
+- Suggest migration guides or scripts.
+- **Example**: "Update API to /v2/ and provide a migration guide for users."
+
+---
+
+## 5. Documentation & Communication
+
+### Documentation Updates
+- Detect when code changes require documentation updates.
+- Recommend specific documentation changes to match code.
+- Generate or update technical documentation (e.g., API specs).
+- Auto-Generation: Use tools like JSDoc (JavaScript) or Sphinx (Python) to generate docs from comments.
+
+### README & Guide Management
+- Alert when significant changes should be reflected in the README.
+- Recommend updates to developer setup instructions when dependencies change.
+- Help maintain architecture diagrams and design documents.
+- Generate end-user documentation for new features.
+
+### Communication Support
+- Generate summaries of implemented changes.
+- Create release notes from commit history.
+- Prepare implementation notes for team communication.
+- Summarize breaking changes and migration steps.
+- **Template Example**:
+  ```
+  ### Release Notes
+  - **Feature**: Added user authentication.
+  - **Changes**: New login/registration endpoints.
+  - **Breaking Changes**: None.
+  - **Migration Steps**: Update frontend for new auth tokens.
+  ```
+
+### Knowledge Sharing
+- Recommend documenting non-obvious design decisions.
+- Help create explanations of complex algorithms or workflows.
+- Generate examples demonstrating usage of new features.
+- Prepare technical presentations or demonstrations when requested.
+
+---
+
+## 6. Server Management and Local Development
+
+### Server Lifecycle Management
+- After making changes, ALWAYS recommend starting up a new server for testing.
+- Always recommend killing all existing related servers before starting a new server.
+- Provide appropriate terminal commands for stopping and starting servers.
+- Example commands:
+  ```bash
+  # First kill existing servers
+  pkill -f "node server.js"  # For Node.js servers
+  # or
+  lsof -ti:3000 | xargs kill  # Kill process on specific port
+
+  # Then start the new server
+  npm run dev  # or appropriate start command
+  ```
+
+### Development Environment Verification
+- Recommend verifying that the correct environment variables are loaded.
+- Suggest checking server logs for startup issues.
+- Advise on common port conflicts and their resolution.
+- Recommend appropriate browser cache clearing when testing UI changes.
+
+### Server Cleanup
+- Remind to shut down development servers when switching branches or tasks.
+- Suggest cleaning up temporary files generated during development.
+- Recommend checking for orphaned processes that might interfere with testing.
+
+---
+
+## 7. Workflow Improvement
+
+### Process Enhancement
+- Identify repetitive tasks that could be automated.
+- Recommend improvements to the development workflow.
+- Detect common friction points in the development process.
+- Suggest tooling improvements.
+
+### Automation Opportunities
+- Generate scripts for common development tasks (e.g., build scripts).
+- Recommend static analysis and linting configurations (e.g., ESLint, Flake8).
+- Help set up automated quality checks.
+
+### CI/CD Pipeline Optimization
+- Recommend parallel testing, caching dependencies, or using faster runners.
+- **Example**:
+  ```yaml
+  jobs:
+    build:
+      runs-on: ubuntu-latest
+      steps:
+        - uses: actions/checkout@v2
+        - name: Cache node modules
+          uses: actions/cache@v2
+          with:
+            path: ~/.npm
+            key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+        - name: Install dependencies
+          run: npm ci
+        - name: Run tests
+          run: npm test -- --parallel
+  ```
+
+### Automating Repetitive Tasks
+- Suggest scripts for tasks like code formatting or linting.
+- **Example**: "Add a pre-commit hook to run prettier on staged files."
+
+### Learning & Adaptation
+- Analyze project workflow patterns and adapt recommendations.
+- Learn from accepted vs. rejected recommendations.
+- Adjust to team-specific processes and preferences.
+- Maintain awareness of project-specific conventions.
+
+### Continuous Enhancement
+- Recommend process improvements based on observed patterns.
+- Adapt to changing project requirements and structures.
+- Evolve recommendations based on project maturity.
+- Incorporate industry best practices appropriate to the project context.
+
+---
+
+## 8. Adaptations and Context-Awareness
+
+Cursor will adjust these workflow recommendations based on project context, including:
+
+### Repository Size and Structure
+- Simpler guidance for small projects (e.g., fewer branches, lightweight testing).
+- More formal processes for larger codebases (e.g., strict branching models, comprehensive testing).
+
+### Team Size Indicators
+- Structured approach for multi-contributor projects (e.g., detailed PR templates, code reviews).
+- Streamlined recommendations for solo development (e.g., simplified workflows).
+
+### Project Maturity
+- Progressive introduction of advanced practices for newer projects.
+- Full workflow support for established codebases.
+
+### Observed Patterns
+- Adaptation to the team's established workflows.
+- Respect for existing conventions and processes.
+
+### Framework-Specific Workflows
+- Tailored recommendations for specific frameworks (e.g., React, Django).
+- Framework-appropriate testing and deployment suggestions.
+
+---
+
+## 9. Final Notes
+
+- These guidelines are designed to enhance developer productivity and code quality through consistent workflow practices.
+- Cursor should prioritize these recommendations but adapt them to fit the specific context of each project.
+- The ultimate goal is to reduce friction in development processes while maintaining high quality standards.
+- When in doubt, Cursor should err on the side of clarity and simplicity in workflow recommendations.

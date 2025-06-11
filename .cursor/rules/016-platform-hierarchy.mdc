@@ -1,0 +1,237 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+description: Apply WHEN designing or implementing multi-tenant platform architectures to ensure proper data isolation and access control
+globs: "**/*.{js,ts,py,rb,java,go,sql}"
+
+# Platform Hierarchy Guidelines
+
+This document outlines the requirements and best practices for implementing proper data hierarchy and isolation in multi-tenant platform architectures.
+
+## Core Requirements
+
+- **REQUIRED**: Implement data isolation between platform-level and organization-level data
+- **REQUIRED**: Use clear field names to distinguish platform-level from org-level data
+- **REQUIRED**: Apply strict role-based access controls for platform-level operations
+- **REQUIRED**: Implement audit logging for all platform-level data access and modifications
+- **REQUIRED**: Test platform-level features with multiple organizations and users
+
+## Data Architecture
+
+### Data Isolation
+
+- Scope platform-level queries to exclude org-specific data unless explicitly requested
+- Store platform-level configurations separate from organization configurations
+- Use database schemas or collections to physically separate different data tiers
+- Implement row-level security where applicable for additional isolation
+- Clearly mark fields that contain cross-organizational data
+
+### Hierarchy Structure
+
+A typical multi-tenant platform hierarchy includes:
+- Platform (top level) - global settings, cross-org capabilities
+- Organizations/Tenants - customer/tenant specific data
+- Groups/Teams/Departments - subdivisions within organizations
+- Users - individual accounts belonging to organizations
+- Resources - content, data, or functionality created by users
+
+## Implementation Guidelines
+
+### Database Query Patterns
+
+```typescript
+// GOOD: Explicit platform scope
+const platformData = await db.find({ platformId: 'platform-global' });
+
+// BAD: No platform isolation
+const allData = await db.find({}); // Includes org-specific data
+
+// GOOD: Clear isolation with explicit joins
+const platformStats = await db.platformStats.aggregate([
+  { $match: { platformId: 'platform-global' }},
+  { $lookup: {
+      from: 'organizations',
+      localField: 'platformId',
+      foreignField: 'platformId',
+      as: 'organizations'
+    }
+  },
+  // Additional processing with clear boundaries
+  { $project: {
+      // Exclude sensitive organization data
+      'organizations.apiKeys': 0,
+      'organizations.billingDetails': 0
+    }
+  }
+]);
+
+// BAD: Mixing platform and org data
+const mixedData = await db.find({ 
+  $or: [
+    { platformId: 'platform-global' },
+    { orgId: someOrgId }
+  ]
+}); // Confuses boundaries
+```
+
+### API Security Implementation
+
+```typescript
+// GOOD: Platform-level security check
+export async function GET(request: Request) {
+  // Get authenticated session
+  const session = await getServerSession();
+  if (!session?.user) {
+    return new NextResponse(null, { status: 401 });
+  }
+  
+  // Check for platform access
+  if (!hasPlatformAccess(session.user)) {
+    return new NextResponse(null, { status: 403 });
+  }
+  
+  // Platform access logging
+  auditLogger.info('Platform data accessed', {
+    userId: session.user.id,
+    action: 'platform_data_read',
+    resource: 'platform_stats'
+  });
+  
+  // Now safe to return platform-level data
+  const platformStats = await getPlatformStats();
+  return NextResponse.json(platformStats);
+}
+
+// BAD: Missing platform-level checks
+export async function GET(request: Request) {
+  // Get authenticated session
+  const session = await getServerSession();
+  if (!session?.user) {
+    return new NextResponse(null, { status: 401 });
+  }
+  
+  // Immediate data return without platform role check
+  const platformStats = await getPlatformStats();
+  return NextResponse.json(platformStats);
+}
+```
+
+### Service Layer Implementation
+
+```typescript
+// GOOD: Service with clear platform boundary
+class PlatformService {
+  // Require explicit platform context for all operations
+  constructor(private readonly platformId: string) {
+    if (!platformId) {
+      throw new Error('Platform ID is required');
+    }
+  }
+  
+  async getStats() {
+    // Always scope to platform
+    return await this.db.platformStats.findOne({ platformId: this.platformId });
+  }
+  
+  async getOrganizations(options: { includeInactive?: boolean } = {}) {
+    const query: any = { platformId: this.platformId };
+    
+    if (!options.includeInactive) {
+      query.status = 'active';
+    }
+    
+    return await this.db.organizations.find(query);
+  }
+}
+```
+
+## Testing Guidelines
+
+### Multi-tenant Testing
+
+When testing platform-level features, ensure tests verify proper data isolation:
+
+```typescript
+// GOOD: Testing across multiple orgs
+describe('Platform API', () => {
+  beforeEach(async () => {
+    // Set up test data with multiple organizations
+    await setupTestOrg('org1', { name: 'First Org' });
+    await setupTestOrg('org2', { name: 'Second Org' });
+    await setupPlatformUser();
+  });
+  
+  test('platform stats aggregate across all orgs', async () => {
+    // Set up platform user context
+    const session = mockPlatformUserSession();
+    getServerSession.mockResolvedValue(session);
+    
+    const response = await GET(
+      new Request('https://example.com/api/platform/stats')
+    );
+    
+    expect(response.status).toBe(200);
+    const data = await response.json();
+    
+    // Verify data includes aggregated info from both orgs
+    expect(data.totalOrgs).toBe(2);
+    expect(data.totalUsers).toBe(
+      (await getOrgUsers('org1')).length + 
+      (await getOrgUsers('org2')).length
+    );
+  });
+  
+  test('org users cannot access platform data', async () => {
+    // Set up org user context (not platform admin)
+    const session = mockOrgUserSession('org1');
+    getServerSession.mockResolvedValue(session);
+    
+    const response = await GET(
+      new Request('https://example.com/api/platform/stats')
+    );
+    
+    // Verify access denied
+    expect(response.status).toBe(403);
+  });
+});
+```
+
+## Security Considerations
+
+### Data Access Control
+
+- Implement role-based access control (RBAC) for all platform-level operations
+- Create specific platform admin roles with clearly defined permissions
+- Check permissions at both API gateway and service levels
+- Log all permission failures with sufficient context for investigation
+- Consider implementing temporary elevated access with automatic expiration
+
+### Audit Logging
+
+- Record all platform-level data access with complete context
+- Include user ID, action, resource, and timestamp in all audit logs
+- Implement non-repudiation measures for critical platform operations
+- Consider separate storage for platform audit logs
+- Establish retention policies aligned with compliance requirements
+
+## Best Practices
+
+1. **Consistent Naming**: Use consistent naming patterns for platform-level resources
+2. **Access Validation**: Double-check role permissions at both API and service layers
+3. **Feature Flagging**: Add platform-specific feature flags for controlling rollout
+4. **Multi-tenant Awareness**: Always design with multi-tenancy in mind
+5. **Audit Trails**: Log all platform-level operations with detailed context
+6. **Data Aggregation**: Implement secure, privacy-respecting approaches to cross-org analytics
+7. **Rate Limiting**: Apply rate limits to platform-level API operations
+
+## Implementation Checklist
+
+- [ ] Define clear data hierarchy and ownership models
+- [ ] Implement database schemas with proper isolation
+- [ ] Create distinct platform admin roles and permissions
+- [ ] Establish comprehensive audit logging
+- [ ] Test with multiple organizations and user roles
+- [ ] Document platform operations and access patterns
+- [ ] Implement secure cross-organization analytics

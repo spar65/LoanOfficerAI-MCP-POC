@@ -1,0 +1,791 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+description: IMPLEMENT when designing complex workflows that require multiple MCP functions to work together
+globs: "server/**/*.{js,jsx,ts,tsx}"
+
+# 509: MCP Composition Patterns
+
+## Rule
+
+When implementing complex workflows, compose multiple atomic MCP functions together using standardized composition patterns rather than creating monolithic functions, enabling better reusability, maintenance, and performance.
+
+## Context
+
+As applications grow in complexity, there's a tendency to create large, monolithic MCP functions that handle entire workflows. This approach leads to reduced reusability, increased maintenance burden, and performance challenges. By composing smaller, focused MCP functions together, teams can build complex workflows while maintaining modularity and separation of concerns.
+
+Effective function composition enables:
+1. **Enhanced Reusability** - Atomic functions can be reused across multiple workflows
+2. **Simplified Testing** - Small, focused functions are easier to test in isolation
+3. **Performance Optimization** - Composition allows for parallel execution where appropriate
+4. **Incremental Enhancement** - Workflows can evolve by adding or replacing individual functions
+5. **Clearer Responsibilities** - Each function has a single, well-defined purpose
+
+## RuleDetails
+
+### Atomic Function Design
+
+1. **Single Responsibility Principle**
+   - Each MCP function should do exactly one thing
+   - Functions should be named according to their specific purpose
+   - Keep function parameter lists focused and minimal
+   - Ensure clear input/output contracts for each function
+   - Document dependencies between functions
+
+```javascript
+// GOOD: Atomic functions with single responsibilities
+const atomicFunctions = [
+  {
+    name: "getBorrowerById",
+    description: "Get basic information about a borrower",
+    parameters: {
+      type: "object",
+      properties: {
+        borrowerId: {
+          type: "string",
+          description: "The borrower ID"
+        }
+      },
+      required: ["borrowerId"]
+    }
+  },
+  {
+    name: "getLoansByBorrowerId",
+    description: "Get all loans for a specific borrower",
+    parameters: {
+      type: "object",
+      properties: {
+        borrowerId: {
+          type: "string",
+          description: "The borrower ID"
+        }
+      },
+      required: ["borrowerId"]
+    }
+  },
+  {
+    name: "calculateLoanToIncomeRatio",
+    description: "Calculate loan-to-income ratio for a borrower",
+    parameters: {
+      type: "object",
+      properties: {
+        loans: {
+          type: "array",
+          description: "Array of loan objects"
+        },
+        income: {
+          type: "number",
+          description: "Annual income"
+        }
+      },
+      required: ["loans", "income"]
+    }
+  }
+];
+
+// BAD: Monolithic function that does too much
+const monolithicFunction = {
+  name: "getBorrowerRiskProfile",
+  description: "Get complete borrower risk profile including all loans, payment history, and risk scores",
+  parameters: {
+    type: "object",
+    properties: {
+      borrowerId: {
+        type: "string",
+        description: "The borrower ID"
+      }
+    },
+    required: ["borrowerId"]
+  }
+};
+```
+
+### Composition Patterns
+
+1. **Sequential Composition**
+   - Chain functions where the output of one becomes input to another
+   - Handle errors appropriately at each step of the chain
+   - Maintain a clear data flow through the sequence
+   - Document the transformation of data through each step
+   - Consider performance implications of long chains
+
+```javascript
+// Server-side sequential composition
+async function assessBorrowerRisk(borrowerId) {
+  try {
+    // Step 1: Get borrower details
+    const borrower = await mcpExecute('getBorrowerById', { borrowerId });
+    
+    if (!borrower) {
+      throw new Error(`Borrower ${borrowerId} not found`);
+    }
+    
+    // Step 2: Get loans for this borrower
+    const loans = await mcpExecute('getLoansByBorrowerId', { borrowerId });
+    
+    // Step 3: Calculate loan-to-income ratio
+    const loanToIncomeRatio = await mcpExecute('calculateLoanToIncomeRatio', {
+      loans,
+      income: borrower.annual_income
+    });
+    
+    // Step 4: Get payment history
+    const paymentHistory = await mcpExecute('getBorrowerPaymentHistory', { borrowerId });
+    
+    // Step 5: Calculate risk score based on all collected data
+    const riskScore = await mcpExecute('calculateRiskScore', {
+      borrower,
+      loans,
+      loanToIncomeRatio,
+      paymentHistory
+    });
+    
+    // Combine all results into a comprehensive profile
+    return {
+      borrower,
+      loans,
+      risk: {
+        score: riskScore,
+        loanToIncomeRatio,
+        paymentHistory: {
+          onTimePayments: paymentHistory.onTimeCount,
+          latePayments: paymentHistory.lateCount
+        }
+      }
+    };
+  } catch (error) {
+    // Handle errors from any step in the chain
+    LogService.error(`Error in assessBorrowerRisk for ${borrowerId}:`, error);
+    throw error;
+  }
+}
+```
+
+2. **Parallel Composition**
+   - Execute independent functions simultaneously for better performance
+   - Collect and combine results appropriately
+   - Handle errors from any parallel execution
+   - Consider resource constraints when parallelizing
+   - Document dependencies between parallel operations
+
+```javascript
+// Parallel composition example
+async function getDashboardData(userId) {
+  try {
+    // Execute multiple independent queries in parallel
+    const [
+      userProfile,
+      activeLoans,
+      pendingApplications,
+      recentActivity
+    ] = await Promise.all([
+      mcpExecute('getUserProfile', { userId }),
+      mcpExecute('getActiveLoans', { userId, limit: 5 }),
+      mcpExecute('getPendingApplications', { userId }),
+      mcpExecute('getRecentActivity', { userId, days: 7 })
+    ]);
+    
+    // Combine the results
+    return {
+      profile: userProfile,
+      loans: activeLoans,
+      applications: pendingApplications,
+      activity: recentActivity,
+      timestamp: new Date().toISOString()
+    };
+  } catch (error) {
+    LogService.error(`Error getting dashboard data for user ${userId}:`, error);
+    throw error;
+  }
+}
+```
+
+3. **Conditional Composition**
+   - Select which functions to call based on runtime conditions
+   - Use conditions to determine execution paths
+   - Implement fallback strategies when primary paths fail
+   - Document decision points and criteria
+   - Handle different outcomes based on conditions
+
+```javascript
+// Conditional composition example
+async function processLoanApplication(applicationId, options = {}) {
+  try {
+    // Get the application
+    const application = await mcpExecute('getLoanApplication', { applicationId });
+    
+    // Different processing paths based on loan amount
+    if (application.amount > 1000000) {
+      // High-value loan processing path
+      const riskAnalysis = await mcpExecute('performDetailedRiskAnalysis', { 
+        application,
+        useAI: options.useAI !== false
+      });
+      
+      if (riskAnalysis.riskLevel === 'high') {
+        // For high-risk, high-value loans, require manual review
+        await mcpExecute('queueForManualReview', { 
+          applicationId,
+          riskAnalysis,
+          priority: 'high'
+        });
+        
+        return {
+          status: 'pending_review',
+          message: 'Application requires senior underwriter review',
+          estimatedCompletionTime: '48 hours'
+        };
+      } else {
+        // Automated processing for lower-risk large loans
+        return await mcpExecute('processStandardApplication', { 
+          applicationId,
+          expedite: true
+        });
+      }
+    } else {
+      // Standard processing path for normal-sized loans
+      return await mcpExecute('processStandardApplication', { 
+        applicationId 
+      });
+    }
+  } catch (error) {
+    LogService.error(`Error processing loan application ${applicationId}:`, error);
+    throw error;
+  }
+}
+```
+
+### Client-Side Composition
+
+1. **Orchestration Layer**
+   - Create a dedicated layer for function composition
+   - Separate business logic from API calls
+   - Implement caching and error handling in this layer
+   - Document the data flow through composed functions
+   - Consider UI state management during composition
+
+```javascript
+// Client-side orchestration layer
+class BorrowerAnalyticsService {
+  constructor(mcpClient) {
+    this.mcpClient = mcpClient;
+    this.cache = new Map();
+  }
+  
+  // Complex workflow using multiple MCP functions
+  async getBorrowerRiskProfile(borrowerId) {
+    // Check cache first
+    const cacheKey = `risk_profile_${borrowerId}`;
+    if (this.cache.has(cacheKey)) {
+      return this.cache.get(cacheKey);
+    }
+    
+    try {
+      // First, get borrower details
+      const borrower = await this.mcpClient.execute('getBorrowerById', { 
+        borrowerId 
+      });
+      
+      // In parallel, get loans and payment history
+      const [loans, paymentHistory] = await Promise.all([
+        this.mcpClient.execute('getLoansByBorrowerId', { borrowerId }),
+        this.mcpClient.execute('getPaymentHistory', { borrowerId })
+      ]);
+      
+      // Calculate loan-to-income ratio
+      const loanToIncomeRatio = this.calculateRatio(
+        loans.reduce((total, loan) => total + loan.amount, 0),
+        borrower.annual_income
+      );
+      
+      // Determine risk level based on multiple factors
+      const riskLevel = this.determineRiskLevel(
+        loanToIncomeRatio,
+        paymentHistory,
+        borrower.credit_score
+      );
+      
+      // Create the complete profile
+      const profile = {
+        borrower,
+        loans,
+        risk: {
+          level: riskLevel,
+          factors: this.getRiskFactors(loanToIncomeRatio, paymentHistory),
+          mitigations: this.getRiskMitigations(riskLevel)
+        },
+        generatedAt: new Date().toISOString()
+      };
+      
+      // Cache the result
+      this.cache.set(cacheKey, profile);
+      
+      return profile;
+    } catch (error) {
+      console.error(`Failed to get risk profile for borrower ${borrowerId}:`, error);
+      throw new CompositionError('Failed to create risk profile', error);
+    }
+  }
+  
+  // Helper methods
+  calculateRatio(totalLoanAmount, annualIncome) {
+    return annualIncome > 0 ? totalLoanAmount / annualIncome : Infinity;
+  }
+  
+  determineRiskLevel(loanToIncomeRatio, paymentHistory, creditScore) {
+    // Complex logic to determine risk level
+    if (loanToIncomeRatio > 0.6) return 'high';
+    if (paymentHistory.lateCount > 3) return 'high';
+    if (creditScore < 600) return 'high';
+    if (loanToIncomeRatio > 0.4) return 'medium';
+    if (paymentHistory.lateCount > 1) return 'medium';
+    if (creditScore < 680) return 'medium';
+    return 'low';
+  }
+  
+  getRiskFactors(loanToIncomeRatio, paymentHistory) {
+    const factors = [];
+    if (loanToIncomeRatio > 0.4) {
+      factors.push('High loan-to-income ratio');
+    }
+    if (paymentHistory.lateCount > 0) {
+      factors.push(`${paymentHistory.lateCount} late payments in history`);
+    }
+    return factors;
+  }
+  
+  getRiskMitigations(riskLevel) {
+    // Return appropriate mitigations based on risk level
+    switch (riskLevel) {
+      case 'high':
+        return ['Require additional collateral', 'Increase interest rate', 'Reduce loan amount'];
+      case 'medium':
+        return ['Consider additional references', 'Verify income sources'];
+      default:
+        return [];
+    }
+  }
+}
+
+// Usage example
+const analytics = new BorrowerAnalyticsService(mcpClient);
+async function showBorrowerRiskProfile(borrowerId) {
+  try {
+    setLoading(true);
+    const profile = await analytics.getBorrowerRiskProfile(borrowerId);
+    setRiskProfile(profile);
+  } catch (error) {
+    setError(error.message);
+  } finally {
+    setLoading(false);
+  }
+}
+```
+
+### Error Handling in Compositions
+
+1. **Composition-Level Error Handling**
+   - Implement error handling specific to the composition
+   - Distinguish between errors in different composition steps
+   - Implement appropriate fallback strategies
+   - Ensure proper cleanup when errors occur
+   - Provide context-aware error messages
+
+```javascript
+// Error handling in compositions
+async function processLoanApplication(applicationId) {
+  // Track each step for error context
+  const context = {
+    currentStep: 'initialization',
+    stepResults: {}
+  };
+  
+  try {
+    // Step 1: Validate application
+    context.currentStep = 'validation';
+    const application = await mcpExecute('getLoanApplication', { applicationId });
+    context.stepResults.application = { success: true, id: applicationId };
+    
+    // Step 2: Check eligibility
+    context.currentStep = 'eligibility';
+    const eligibility = await mcpExecute('checkEligibility', { 
+      borrowerId: application.borrower_id 
+    });
+    context.stepResults.eligibility = { success: true, isEligible: eligibility.isEligible };
+    
+    if (!eligibility.isEligible) {
+      return {
+        status: 'rejected',
+        reason: eligibility.reasons.join(', '),
+        application_id: applicationId
+      };
+    }
+    
+    // Step 3: Calculate terms
+    context.currentStep = 'terms_calculation';
+    const terms = await mcpExecute('calculateLoanTerms', {
+      application,
+      borrowerScore: eligibility.creditScore
+    });
+    context.stepResults.terms = { success: true };
+    
+    // Step 4: Generate documents
+    context.currentStep = 'document_generation';
+    const documents = await mcpExecute('generateLoanDocuments', {
+      application,
+      terms
+    });
+    context.stepResults.documents = { success: true, count: documents.length };
+    
+    // Step 5: Submit for approval
+    context.currentStep = 'approval_submission';
+    const approval = await mcpExecute('submitForApproval', {
+      applicationId,
+      eligibility,
+      terms,
+      documents
+    });
+    context.stepResults.approval = { success: true, status: approval.status };
+    
+    return {
+      status: approval.status,
+      application_id: applicationId,
+      estimated_completion: approval.estimatedCompletion,
+      next_steps: approval.nextSteps
+    };
+  } catch (error) {
+    // Log detailed context with the error
+    LogService.error(`Error in loan application processing at step: ${context.currentStep}`, {
+      applicationId,
+      error: error.message,
+      context: context.stepResults,
+      stack: error.stack
+    });
+    
+    // Determine appropriate error response based on the failed step
+    switch (context.currentStep) {
+      case 'validation':
+        throw new ApplicationError('Invalid application', error);
+      case 'eligibility':
+        return {
+          status: 'error',
+          message: 'Unable to verify eligibility. Please try again later.',
+          application_id: applicationId
+        };
+      case 'terms_calculation':
+        return {
+          status: 'pending_review',
+          message: 'We need additional information to proceed with your application.',
+          application_id: applicationId
+        };
+      case 'document_generation':
+      case 'approval_submission':
+        // For later steps, save progress and return partial success
+        await mcpExecute('saveApplicationProgress', {
+          applicationId,
+          context,
+          error: error.message
+        });
+        return {
+          status: 'processing',
+          message: 'Your application is being processed. We\'ll contact you for the next steps.',
+          application_id: applicationId
+        };
+      default:
+        throw new ApplicationError('Application processing failed', error);
+    }
+  }
+}
+```
+
+### Versioning and Evolution
+
+1. **Composition Versioning**
+   - Version compositions independently from atomic functions
+   - Document breaking changes in compositions
+   - Implement graceful migration strategies
+   - Support multiple versions during transition periods
+   - Provide migration tools for client implementations
+
+```javascript
+// Versioned composition example
+async function getBorrowerProfileV1(borrowerId) {
+  // Original implementation
+  const borrower = await mcpExecute('getBorrowerById', { borrowerId });
+  const loans = await mcpExecute('getLoansByBorrowerId', { borrowerId });
+  
+  return {
+    borrower,
+    loans,
+    version: 'v1'
+  };
+}
+
+async function getBorrowerProfileV2(borrowerId) {
+  // Enhanced version with additional data
+  const [borrower, loans, riskScore] = await Promise.all([
+    mcpExecute('getBorrowerById', { borrowerId }),
+    mcpExecute('getLoansByBorrowerId', { borrowerId }),
+    mcpExecute('calculateRiskScore', { borrowerId })
+  ]);
+  
+  return {
+    borrower,
+    loans,
+    risk_score: riskScore,
+    version: 'v2'
+  };
+}
+
+// Version routing
+async function getBorrowerProfile(borrowerId, options = {}) {
+  // Default to latest version, but allow clients to request specific version
+  const version = options.version || 'v2';
+  
+  switch (version) {
+    case 'v1':
+      return getBorrowerProfileV1(borrowerId);
+    case 'v2':
+      return getBorrowerProfileV2(borrowerId);
+    default:
+      throw new Error(`Unsupported version: ${version}`);
+  }
+}
+```
+
+## Examples
+
+### Example 1: Risk Assessment Workflow
+
+```javascript
+// Server-side implementation - Multiple functions composed together
+async function performLoanRiskAssessment(loanId) {
+  try {
+    // Step 1: Get loan details
+    const loan = await executeFunction('getLoanById', { loanId });
+    
+    if (!loan) {
+      return {
+        status: 'error',
+        message: `Loan ${loanId} not found`
+      };
+    }
+    
+    // Step 2: Get borrower details
+    const borrower = await executeFunction('getBorrowerById', { 
+      borrowerId: loan.borrower_id 
+    });
+    
+    // Step 3: Get payment history
+    const paymentHistory = await executeFunction('getLoanPaymentHistory', { 
+      loanId 
+    });
+    
+    // Step 4: Get collateral information
+    const collateral = await executeFunction('getLoanCollateral', { 
+      loanId 
+    });
+    
+    // Step 5: Calculate basic risk metrics
+    const basicRiskMetrics = calculateRiskMetrics(loan, borrower, paymentHistory);
+    
+    // Step 6: Enhance with AI if available
+    let enhancedRisk = basicRiskMetrics;
+    try {
+      enhancedRisk = await executeFunction('enhanceRiskAssessment', {
+        loan,
+        borrower,
+        paymentHistory,
+        collateral,
+        basicMetrics: basicRiskMetrics
+      });
+    } catch (aiError) {
+      // Log AI enhancement failure but continue with basic metrics
+      LogService.warn(`AI risk enhancement failed for loan ${loanId}:`, aiError);
+    }
+    
+    // Step 7: Generate recommendations based on risk
+    const recommendations = await executeFunction('generateRiskRecommendations', {
+      loanId,
+      borrowerId: loan.borrower_id,
+      riskLevel: enhancedRisk.riskLevel,
+      riskFactors: enhancedRisk.riskFactors
+    });
+    
+    // Return the complete risk assessment
+    return {
+      loan_id: loanId,
+      assessment_date: new Date().toISOString(),
+      risk_level: enhancedRisk.riskLevel,
+      risk_score: enhancedRisk.riskScore,
+      risk_factors: enhancedRisk.riskFactors,
+      ai_enhanced: enhancedRisk !== basicRiskMetrics,
+      collateral_assessment: {
+        total_value: collateral.reduce((sum, item) => sum + item.value, 0),
+        sufficient: enhancedRisk.collateralSufficient
+      },
+      recommendations
+    };
+  } catch (error) {
+    LogService.error(`Error in loan risk assessment for ${loanId}:`, error);
+    throw error;
+  }
+}
+```
+
+### Example 2: Client-Side Dashboard Data Loading
+
+```javascript
+// Client-side implementation - Composing multiple functions for dashboard
+class DashboardService {
+  constructor(mcpClient) {
+    this.mcpClient = mcpClient;
+  }
+  
+  async loadDashboardData(userId) {
+    const loadingStatus = {
+      profile: 'loading',
+      recentLoans: 'loading',
+      riskSummary: 'loading',
+      notifications: 'loading'
+    };
+    
+    // Update UI with loading state
+    this.updateLoadingState(loadingStatus);
+    
+    try {
+      // Load user profile first (critical)
+      const profile = await this.mcpClient.execute('getUserProfile', { userId });
+      loadingStatus.profile = 'loaded';
+      this.updateLoadingState(loadingStatus);
+      
+      // Load multiple data sets in parallel
+      const dataPromises = [
+        this.loadRecentLoans(userId).then(data => {
+          loadingStatus.recentLoans = 'loaded';
+          this.updateLoadingState(loadingStatus);
+          return data;
+        }),
+        this.loadRiskSummary(userId).then(data => {
+          loadingStatus.riskSummary = 'loaded';
+          this.updateLoadingState(loadingStatus);
+          return data;
+        }),
+        this.loadNotifications(userId).then(data => {
+          loadingStatus.notifications = 'loaded';
+          this.updateLoadingState(loadingStatus);
+          return data;
+        })
+      ];
+      
+      // Wait for all data loading to complete
+      const [recentLoans, riskSummary, notifications] = await Promise.all(dataPromises);
+      
+      // Combine all data into a unified dashboard model
+      const dashboardData = {
+        profile,
+        recentLoans,
+        riskSummary,
+        notifications,
+        lastUpdated: new Date().toISOString()
+      };
+      
+      return dashboardData;
+    } catch (error) {
+      // Handle errors gracefully
+      console.error('Error loading dashboard data:', error);
+      
+      // Update loading state for failed components
+      Object.keys(loadingStatus).forEach(key => {
+        if (loadingStatus[key] === 'loading') {
+          loadingStatus[key] = 'error';
+        }
+      });
+      this.updateLoadingState(loadingStatus);
+      
+      throw error;
+    }
+  }
+  
+  // Helper methods that compose multiple MCP functions
+  async loadRecentLoans(userId) {
+    try {
+      const activeLoans = await this.mcpClient.execute('getActiveLoans', { 
+        userId, 
+        limit: 5,
+        sort: 'last_payment_date:desc'
+      });
+      
+      // For each loan, get additional risk data
+      const loansWithRisk = await Promise.all(
+        activeLoans.map(async loan => {
+          try {
+            const risk = await this.mcpClient.execute('getLoanRiskSummary', {
+              loanId: loan.id
+            });
+            
+            return {
+              ...loan,
+              risk_level: risk.level,
+              risk_score: risk.score
+            };
+          } catch (error) {
+            // If risk data fails, return loan without risk info
+            console.warn(`Failed to get risk data for loan ${loan.id}:`, error);
+            return loan;
+          }
+        })
+      );
+      
+      return loansWithRisk;
+    } catch (error) {
+      console.error('Error loading recent loans:', error);
+      return [];  // Return empty array on error
+    }
+  }
+  
+  // More helper methods for other dashboard components
+  async loadRiskSummary(userId) { /* ... */ }
+  async loadNotifications(userId) { /* ... */ }
+  
+  // Update loading state in UI
+  updateLoadingState(state) {
+    // Publish loading state to UI components
+    eventBus.publish('dashboard.loading.changed', state);
+  }
+}
+```
+
+## Enforcement
+
+1. **Function Size Limits**
+   - MCP functions should have a clear, singular purpose
+   - Complex workflows should be broken down into multiple atomic functions
+   - Establish maximum size/complexity metrics for individual functions
+   - Review compositions for appropriate decomposition
+
+2. **Composition Documentation**
+   - Document the flow of data through composed functions
+   - Specify error handling strategies for each step
+   - Clearly identify dependencies between functions
+   - Document fallback mechanisms
+
+3. **Testing Requirements**
+   - Test individual functions in isolation
+   - Test compositions with mocked dependencies
+   - Test error handling and recovery paths
+   - Benchmark performance of composed functions
+
+4. **Code Review Guidelines**
+   - Review composition patterns for appropriate decomposition
+   - Verify error handling throughout the composition
+   - Check for proper separation of concerns
+   - Ensure clear responsibility boundaries between functions
+
+## Implementation Guide
+
+For detailed examples and implementation patterns, see the [MCP Composition Patterns guide](mdc:examples/mcp/03-mcp-composition-patterns.md).
+
+For a comprehensive overview of all MCP implementation approaches, start with the [MCP Implementation Guide](mdc:examples/mcp/01-mcp-implementation-guide.md).

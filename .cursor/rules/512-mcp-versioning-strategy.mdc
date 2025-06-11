@@ -1,0 +1,840 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+description: IMPLEMENT when managing MCP functions and schemas across multiple versions to ensure backward compatibility and smooth evolution
+globs: "**/*.{js,jsx,ts,tsx}"
+
+# 512: MCP Versioning Strategy
+
+## Rule
+
+When evolving MCP functions over time, implement a comprehensive versioning strategy that ensures backward compatibility, enables seamless upgrades, and provides clear migration paths for clients while maintaining a consistent developer experience.
+
+## Context
+
+As applications evolve, MCP functions need to adapt to new requirements without breaking existing integrations. A well-defined versioning strategy ensures that applications can upgrade at their own pace while maintaining system stability.
+
+Effective MCP versioning provides:
+1. **Backward Compatibility** - Newer servers can support older clients
+2. **Clear Upgrade Paths** - Developers understand how to migrate to new versions
+3. **Compatibility Testing** - Automated verification of version compatibility
+4. **Gradual Adoption** - Support for both old and new function versions during transition
+5. **Deprecation Process** - Structured approach to retiring obsolete functions
+
+## RuleDetails
+
+### Function Versioning Patterns
+
+1. **Explicit Version Numbering**
+   - Use explicit version numbers for MCP functions and schemas
+   - Follow semantic versioning principles (MAJOR.MINOR.PATCH)
+   - Increment MAJOR for breaking changes
+   - Increment MINOR for backward-compatible feature additions
+   - Increment PATCH for backward-compatible bug fixes
+
+```javascript
+// MCP function registry with versioning
+const mcpFunctions = [
+  // Version 1 of a function
+  {
+    name: "getLoanDetails",
+    version: "1.0.0",
+    description: "Get detailed information about a specific loan",
+    parameters: {
+      type: "object",
+      properties: {
+        id: {
+          type: "string",
+          description: "The ID of the loan to retrieve"
+        }
+      },
+      required: ["id"]
+    }
+  },
+  
+  // Version 2 with additional parameters (backward compatible)
+  {
+    name: "getLoanDetails",
+    version: "2.0.0",
+    description: "Get detailed information about a specific loan with customization options",
+    parameters: {
+      type: "object",
+      properties: {
+        id: {
+          type: "string",
+          description: "The ID of the loan to retrieve"
+        },
+        include: {
+          type: "array",
+          items: {
+            type: "string",
+            enum: ["borrower", "payments", "collateral"]
+          },
+          description: "Related entities to include in the response"
+        },
+        format: {
+          type: "string",
+          enum: ["detailed", "summary"],
+          description: "Response format preference",
+          default: "detailed"
+        }
+      },
+      required: ["id"]
+    }
+  }
+];
+```
+
+2. **Version Resolution Strategy**
+   - Define clear rules for resolving version conflicts
+   - Support explicit version selection in client requests
+   - Implement default version selection logic
+   - Document version compatibility matrices
+   - Track client versions for analytics and support
+
+```javascript
+// Version resolution in MCP router
+class VersionedMcpRouter {
+  constructor() {
+    this.functionVersions = new Map();
+  }
+  
+  // Register a function with version
+  registerFunction(functionDef) {
+    const { name, version } = functionDef;
+    
+    // Initialize map for this function name if needed
+    if (!this.functionVersions.has(name)) {
+      this.functionVersions.set(name, new Map());
+    }
+    
+    // Add this version to the function's version map
+    this.functionVersions.get(name).set(version, functionDef);
+    
+    return this;
+  }
+  
+  // Find the best version of a function based on client's request
+  resolveFunction(name, requestedVersion = null) {
+    // Get all versions of this function
+    const versions = this.functionVersions.get(name);
+    
+    if (!versions) {
+      throw new Error(`Unknown function: ${name}`);
+    }
+    
+    if (requestedVersion) {
+      // If specific version requested, try to get exactly that
+      if (versions.has(requestedVersion)) {
+        return versions.get(requestedVersion);
+      }
+      
+      // If exact version not found, try to find compatible version
+      // using semver resolution
+      const compatibleVersion = this.findCompatibleVersion(
+        Array.from(versions.keys()),
+        requestedVersion
+      );
+      
+      if (compatibleVersion) {
+        return versions.get(compatibleVersion);
+      }
+      
+      throw new Error(
+        `Incompatible version requested: ${name}@${requestedVersion}`
+      );
+    }
+    
+    // If no version specified, get latest stable version
+    return this.getLatestVersion(versions);
+  }
+  
+  // Find latest stable version from available versions
+  getLatestVersion(versionsMap) {
+    let latest = null;
+    let latestVersion = '0.0.0';
+    
+    for (const [version, funcDef] of versionsMap.entries()) {
+      // Skip pre-release versions when selecting default
+      if (version.includes('-')) continue;
+      
+      if (this.compareVersions(version, latestVersion) > 0) {
+        latest = funcDef;
+        latestVersion = version;
+      }
+    }
+    
+    if (!latest) {
+      // If no stable version, get latest pre-release
+      latest = Array.from(versionsMap.values()).pop();
+    }
+    
+    return latest;
+  }
+  
+  // Simplified semver comparison (only handles MAJOR.MINOR.PATCH)
+  compareVersions(a, b) {
+    const aParts = a.split('.').map(Number);
+    const bParts = b.split('.').map(Number);
+    
+    for (let i = 0; i < 3; i++) {
+      if (aParts[i] > bParts[i]) return 1;
+      if (aParts[i] < bParts[i]) return -1;
+    }
+    
+    return 0;
+  }
+  
+  // Find a compatible version based on semver rules
+  findCompatibleVersion(availableVersions, requestedVersion) {
+    const [reqMajor, reqMinor, reqPatch] = requestedVersion
+      .split('.').map(Number);
+    
+    // Find versions with same MAJOR component (semver compatibility)
+    const compatibleVersions = availableVersions.filter(v => {
+      const [major] = v.split('.').map(Number);
+      return major === reqMajor;
+    });
+    
+    // Sort versions descending
+    compatibleVersions.sort((a, b) => this.compareVersions(b, a));
+    
+    return compatibleVersions[0];
+  }
+}
+```
+
+### Schema Evolution
+
+1. **Schema Versioning**
+   - Design schemas to be extensible from the start
+   - Use optional fields for backward compatibility
+   - Implement schema versioning in the response payload
+   - Support schema validation across versions
+   - Maintain schema version history and compatibility documentation
+
+```javascript
+// Versioned response with schema version
+function createResponse(data, options = {}) {
+  return {
+    data,
+    meta: {
+      schema_version: options.schemaVersion || '1.0.0',
+      generated_at: new Date().toISOString(),
+      deprecated_fields: options.deprecatedFields || []
+    }
+  };
+}
+
+// Schema validation with version awareness
+function validateRequest(functionName, version, args) {
+  const functionDef = mcpRouter.resolveFunction(functionName, version);
+  const schema = functionDef.parameters;
+  
+  const validator = new JSONValidator();
+  const validation = validator.validate(args, schema);
+  
+  if (!validation.valid) {
+    throw new ValidationError(
+      `Invalid parameters for ${functionName}@${version}`,
+      validation.errors
+    );
+  }
+  
+  return {
+    valid: true,
+    warnings: detectDeprecatedUsage(args, functionDef)
+  };
+}
+
+// Detect usage of deprecated fields
+function detectDeprecatedUsage(args, functionDef) {
+  const warnings = [];
+  
+  if (functionDef.deprecated_fields) {
+    Object.keys(args).forEach(key => {
+      const deprecation = functionDef.deprecated_fields[key];
+      if (deprecation) {
+        warnings.push({
+          field: key,
+          message: deprecation.message,
+          removed_in: deprecation.removed_in
+        });
+      }
+    });
+  }
+  
+  return warnings;
+}
+```
+
+### Client Versioning Support
+
+1. **Client Version Specification**
+   - Allow clients to specify function version requirements
+   - Support version ranges for flexibility
+   - Provide version negotiation mechanisms
+   - Include version information in error responses
+   - Track version usage for deprecation planning
+
+```javascript
+// Client-side MCP client with version support
+class VersionedMcpClient {
+  constructor(options = {}) {
+    this.baseUrl = options.baseUrl || '/api/mcp';
+    this.defaultVersion = options.defaultVersion || 'latest';
+    this.versionRequirements = options.versionRequirements || {};
+  }
+  
+  // Execute a function with version specification
+  async execute(functionName, args = {}, options = {}) {
+    // Determine which version to request
+    const version = this.resolveVersion(functionName, options.version);
+    
+    const response = await fetch(this.baseUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-MCP-Version': version
+      },
+      body: JSON.stringify({
+        function: functionName,
+        arguments: args,
+        version: version !== 'latest' ? version : undefined
+      })
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      
+      // Handle version incompatibility specially
+      if (error.code === 'VERSION_INCOMPATIBLE') {
+        throw new VersionError(
+          `Incompatible version: ${error.details.requested} (server supports: ${error.details.available})`,
+          error.details
+        );
+      }
+      
+      throw new Error(error.message || 'MCP function execution failed');
+    }
+    
+    const result = await response.json();
+    
+    // Check for deprecation warnings
+    if (result.meta && result.meta.deprecation_warnings) {
+      result.meta.deprecation_warnings.forEach(warning => {
+        console.warn(`MCP Deprecation Warning: ${warning.message}`);
+      });
+    }
+    
+    return result.data;
+  }
+  
+  // Determine which version to use for a function call
+  resolveVersion(functionName, requestedVersion) {
+    // If version explicitly requested in this call, use that
+    if (requestedVersion) {
+      return requestedVersion;
+    }
+    
+    // If this function has a specific version requirement, use that
+    if (this.versionRequirements[functionName]) {
+      return this.versionRequirements[functionName];
+    }
+    
+    // Otherwise use the default
+    return this.defaultVersion;
+  }
+  
+  // Set a version requirement for a specific function
+  requireVersion(functionName, version) {
+    this.versionRequirements[functionName] = version;
+    return this;
+  }
+}
+```
+
+### Deprecation and Migration
+
+1. **Deprecation Process**
+   - Define a clear deprecation timeline and process
+   - Add deprecation notices to function documentation
+   - Emit deprecation warnings when deprecated features are used
+   - Provide migration guides for deprecated functions
+   - Support automated detection of deprecated usage
+
+```javascript
+// Function definition with deprecation information
+const deprecatedFunction = {
+  name: "getActiveLoansByBorrower",
+  version: "1.0.0",
+  description: "Get active loans for a borrower",
+  deprecated: true,
+  deprecated_since: "2023-06-15",
+  removal_date: "2024-06-15",
+  alternative: "getFilteredLoans",
+  migration_guide: "https://docs.example.com/migration/loans-api-v2",
+  parameters: {
+    type: "object",
+    properties: {
+      borrower_id: {
+        type: "string",
+        description: "Borrower ID"
+      }
+    },
+    required: ["borrower_id"]
+  }
+};
+
+// Handler with deprecation warning
+async function handleDeprecatedFunction(args, context) {
+  // Log deprecation usage
+  LogService.warn(`Deprecated function called: ${context.functionName}`, {
+    deprecated_since: context.functionDef.deprecated_since,
+    removal_date: context.functionDef.removal_date,
+    called_by: context.user?.id || 'anonymous',
+    alternative: context.functionDef.alternative
+  });
+  
+  // Add deprecation warning to the response
+  const result = await actualImplementation(args);
+  
+  return {
+    ...result,
+    _deprecated: true,
+    _removal_date: context.functionDef.removal_date,
+    _alternative: context.functionDef.alternative
+  };
+}
+
+// Server middleware for handling deprecation notices
+function deprecationMiddleware(req, res, next) {
+  const originalSend = res.send;
+  
+  res.send = function(body) {
+    let parsed;
+    try {
+      parsed = JSON.parse(body);
+    } catch (e) {
+      // Not JSON, pass through
+      return originalSend.call(this, body);
+    }
+    
+    // If this is a deprecated function response, add header
+    if (parsed._deprecated) {
+      res.set('X-API-Deprecated', 'true');
+      res.set('X-API-Removal-Date', parsed._removal_date);
+      res.set('X-API-Alternative', parsed._alternative);
+      
+      // Remove private fields before sending
+      delete parsed._deprecated;
+      delete parsed._removal_date;
+      delete parsed._alternative;
+      
+      // Re-serialize
+      return originalSend.call(this, JSON.stringify(parsed));
+    }
+    
+    return originalSend.call(this, body);
+  };
+  
+  next();
+}
+```
+
+2. **Function Aliasing**
+   - Support function aliases for smooth transitions
+   - Map old function names to new implementations
+   - Forward compatible parameter mapping
+   - Support automatic translation between versions
+   - Document aliases and their lifecycle
+
+```javascript
+// Function alias registry
+const functionAliases = {
+  "getLoansByCustomer": {
+    target: "getLoansByBorrower",
+    parameterMap: {
+      "customer_id": "borrower_id"
+    },
+    since: "2.0.0",
+    deprecated: true
+  },
+  
+  "getActiveBorrowers": {
+    target: "getBorrowers",
+    parameterMap: (args) => ({
+      ...args,
+      filters: {
+        ...(args.filters || {}),
+        status: "active"
+      }
+    }),
+    since: "3.0.0",
+    deprecated: false
+  }
+};
+
+// Handler for aliased functions
+async function handleAliasedFunction(functionName, args, context) {
+  const alias = functionAliases[functionName];
+  
+  if (!alias) {
+    throw new Error(`Unknown function: ${functionName}`);
+  }
+  
+  LogService.debug(`Function alias used: ${functionName} -> ${alias.target}`, {
+    user: context.user?.id,
+    deprecated: alias.deprecated
+  });
+  
+  // Map parameters based on the alias configuration
+  let mappedArgs;
+  if (typeof alias.parameterMap === 'function') {
+    mappedArgs = alias.parameterMap(args);
+  } else {
+    mappedArgs = { ...args };
+    
+    // Apply parameter mapping
+    Object.entries(alias.parameterMap || {}).forEach(([src, dest]) => {
+      if (args[src] !== undefined) {
+        mappedArgs[dest] = args[src];
+        delete mappedArgs[src];
+      }
+    });
+  }
+  
+  // Execute the target function
+  return await mcpRouter.executeFunction(alias.target, mappedArgs, context);
+}
+```
+
+## Examples
+
+### Example 1: Evolving a Loan API While Maintaining Compatibility
+
+```javascript
+// Version 1: Original simple function
+const getLoanDetailsV1 = {
+  name: "getLoanDetails",
+  version: "1.0.0",
+  description: "Get detailed information about a specific loan",
+  parameters: {
+    type: "object",
+    properties: {
+      id: {
+        type: "string", 
+        description: "Loan ID"
+      }
+    },
+    required: ["id"]
+  },
+  handler: async (args) => {
+    const { id } = args;
+    
+    // Implementation for v1
+    const loan = await db.loans.findOne({ id });
+    
+    if (!loan) {
+      throw new Error(`Loan ${id} not found`);
+    }
+    
+    return {
+      id: loan.id,
+      amount: loan.amount,
+      interest_rate: loan.interest_rate,
+      term_months: loan.term_months,
+      status: loan.status,
+      borrower_id: loan.borrower_id,
+      start_date: loan.start_date,
+      metadata: loan.metadata
+    };
+  }
+};
+
+// Version 2: Enhanced function with additional features
+const getLoanDetailsV2 = {
+  name: "getLoanDetails",
+  version: "2.0.0", 
+  description: "Get detailed information about a loan with related data",
+  parameters: {
+    type: "object",
+    properties: {
+      id: {
+        type: "string",
+        description: "Loan ID"
+      },
+      include: {
+        type: "array",
+        description: "Related data to include",
+        items: {
+          type: "string",
+          enum: ["borrower", "payments", "collateral"]
+        }
+      }
+    },
+    required: ["id"]
+  },
+  handler: async (args) => {
+    const { id, include = [] } = args;
+    
+    // Reuse v1 implementation for base data
+    const v1Handler = getLoanDetailsV1.handler;
+    const baseLoan = await v1Handler({ id });
+    
+    // Add enhancements
+    const enhancedLoan = { ...baseLoan };
+    
+    // Include related data if requested
+    if (include.includes('borrower') && baseLoan.borrower_id) {
+      const borrower = await db.borrowers.findOne({ id: baseLoan.borrower_id });
+      if (borrower) {
+        enhancedLoan.borrower = {
+          id: borrower.id,
+          name: borrower.name,
+          contact: borrower.contact
+        };
+      }
+    }
+    
+    if (include.includes('payments')) {
+      const payments = await db.payments.find({ loan_id: id });
+      enhancedLoan.payments = payments.map(p => ({
+        id: p.id,
+        amount: p.amount,
+        date: p.date,
+        status: p.status
+      }));
+    }
+    
+    if (include.includes('collateral')) {
+      const collateral = await db.collateral.find({ loan_id: id });
+      enhancedLoan.collateral = collateral.map(c => ({
+        id: c.id,
+        type: c.type,
+        value: c.value,
+        description: c.description
+      }));
+    }
+    
+    // Add schema version to the response
+    return {
+      ...enhancedLoan,
+      _schema: "2.0.0"
+    };
+  }
+};
+
+// Version 3: Deprecated field with guidance
+const getLoanDetailsV3 = {
+  name: "getLoanDetails",
+  version: "3.0.0",
+  description: "Get detailed information about a loan with enhanced data",
+  parameters: {
+    type: "object",
+    properties: {
+      id: {
+        type: "string",
+        description: "Loan ID"
+      },
+      include: {
+        type: "array",
+        description: "Related data to include",
+        items: {
+          type: "string",
+          enum: ["borrower", "payments", "collateral", "documents", "risk_assessment"]
+        }
+      },
+      format: {
+        type: "string",
+        description: "Response format preference",
+        enum: ["standard", "detailed", "summary"],
+        default: "standard"
+      }
+    },
+    required: ["id"]
+  },
+  deprecated_fields: {
+    "metadata": {
+      message: "The 'metadata' field is being split into structured fields in v4.0.0",
+      removed_in: "4.0.0",
+      replacement: "use specific fields instead"
+    }
+  },
+  handler: async (args) => {
+    const { id, include = [], format = 'standard' } = args;
+    
+    // Start with v2 implementation for backwards compatibility
+    const v2Handler = getLoanDetailsV2.handler;
+    const baseLoan = await v2Handler({ id, include });
+    
+    // Add v3 enhancements
+    const enhancedLoan = { ...baseLoan };
+    
+    // Add new includable relations
+    if (include.includes('documents')) {
+      const documents = await db.documents.find({ loan_id: id });
+      enhancedLoan.documents = documents.map(d => ({
+        id: d.id,
+        title: d.title,
+        type: d.type,
+        url: d.url,
+        date_added: d.date_added
+      }));
+    }
+    
+    if (include.includes('risk_assessment')) {
+      const risk = await riskService.assessLoan(id);
+      enhancedLoan.risk_assessment = risk;
+    }
+    
+    // Format response according to preference
+    let formattedResponse;
+    
+    switch (format) {
+      case 'detailed':
+        // Include everything
+        formattedResponse = enhancedLoan;
+        break;
+        
+      case 'summary':
+        // Only include essential fields
+        formattedResponse = {
+          id: enhancedLoan.id,
+          amount: enhancedLoan.amount,
+          status: enhancedLoan.status,
+          borrower_id: enhancedLoan.borrower_id,
+          borrower_name: enhancedLoan.borrower?.name
+        };
+        break;
+        
+      case 'standard':
+      default:
+        // Remove internal fields
+        formattedResponse = { ...enhancedLoan };
+        delete formattedResponse._internal_notes;
+        break;
+    }
+    
+    // Update schema version
+    formattedResponse._schema = "3.0.0";
+    
+    return formattedResponse;
+  }
+};
+```
+
+### Example 2: Client with Version Management
+
+```javascript
+// Client application using versioned MCP client
+function LoanManagementApp() {
+  // Create MCP client with version requirements
+  const mcpClient = useMemo(() => {
+    return new VersionedMcpClient({
+      baseUrl: '/api/mcp',
+      defaultVersion: 'latest',
+      // Specific version requirements for certain functions
+      versionRequirements: {
+        // We need v2+ for borrower inclusion
+        'getLoanDetails': '>=2.0.0',
+        // We depend on a feature in v3
+        'assessDefaultRisk': '3.x'
+      }
+    });
+  }, []);
+  
+  // Fetch loan details with specific requirements
+  const fetchLoanDetails = async (loanId) => {
+    try {
+      // Use the versioned client to get loan details
+      // This will automatically use version 2.0.0 or greater
+      return await mcpClient.execute('getLoanDetails', {
+        id: loanId,
+        include: ['borrower', 'payments']
+      });
+    } catch (error) {
+      if (error.name === 'VersionError') {
+        // Handle version incompatibility
+        console.error('Version incompatibility:', error.message);
+        
+        // Fall back to basic details without includes
+        return await mcpClient.execute('getLoanDetails', {
+          id: loanId
+        }, {
+          // Force version 1 as fallback
+          version: '1.0.0'
+        });
+      }
+      
+      throw error;
+    }
+  };
+  
+  // Application UI components and event handlers...
+  
+  // Example of version-aware function call
+  const handleRiskAssessment = async (loanId) => {
+    try {
+      const result = await mcpClient.execute('assessDefaultRisk', {
+        loan_id: loanId,
+        use_enhanced_model: true
+      });
+      
+      // Handle result...
+      
+    } catch (error) {
+      if (error.name === 'VersionError') {
+        // The server doesn't support the required version
+        showMessage('Enhanced risk assessment not available');
+        
+        // Try basic assessment instead
+        try {
+          const basicResult = await mcpClient.execute('getLoanRiskScore', {
+            id: loanId
+          });
+          
+          // Handle basic result...
+          
+        } catch (basicError) {
+          // Handle error...
+        }
+      }
+    }
+  };
+}
+```
+
+## Enforcement
+
+1. **Version Management**
+   - Require explicit versioning for all MCP functions
+   - Create compatibility matrices for major versions
+   - Test functions across multiple versions
+   - Monitor version usage metrics
+
+2. **Deprecation Policy**
+   - Define standard deprecation periods (typically 12 months)
+   - Require migration guides for all deprecated functions
+   - Add validation for usage of deprecated features
+   - Track deprecated function usage for prioritizing removals
+
+3. **Documentation Requirements**
+   - Document version history for all functions
+   - Highlight breaking changes in release notes
+   - Include migration examples in documentation
+   - Update client libraries to reflect versioning support
+
+4. **Version Testing**
+   - Create automated tests for version compatibility
+   - Test backward compatibility for all new versions
+   - Verify correct behavior of deprecated features
+   - Test version negotiation edge cases
+
+## Implementation Guide
+
+While there is no dedicated guide for versioning strategies yet, you can find related patterns in the [MCP as Service Protocol guide](mdc:examples/mcp/02-mcp-service-protocol.md).
+
+For a comprehensive overview of all MCP implementation approaches, start with the [MCP Implementation Guide](mdc:examples/mcp/01-mcp-implementation-guide.md).

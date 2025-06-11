@@ -1,0 +1,359 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+description: IMPLEMENT when creating applications that need to function offline while maintaining MCP function capabilities
+globs: "**/*.{js,jsx,ts,tsx}"
+
+# 511: MCP Offline Operations
+
+## Rule
+
+When implementing applications that need to function offline, extend the Model Completion Protocol (MCP) framework with standardized patterns for local storage, operation queueing, and data synchronization to enable consistent user experiences regardless of network availability.
+
+## Context
+
+Modern applications often need to function without continuous network connectivity. By extending MCP with offline capabilities, applications can maintain a consistent interaction model regardless of network state, enabling users to continue working seamlessly during connectivity interruptions.
+
+Offline MCP capabilities provide:
+1. **Continuous Functionality** - Users can continue working during network interruptions
+2. **Data Persistence** - Critical data remains available offline
+3. **Operation Queueing** - Actions performed offline are preserved for later execution
+4. **Conflict Resolution** - Systematic handling of conflicts during synchronization
+5. **Seamless Transitions** - Smooth experience when moving between online and offline states
+
+## RuleDetails
+
+### Offline Storage Architecture
+
+1. **Local Data Storage**
+   - Implement a structured storage mechanism for MCP function results
+   - Define caching policies for different data types
+   - Implement expiration and invalidation strategies
+   - Ensure secure storage of sensitive information
+   - Support partial storage for large data sets
+
+```javascript
+// Offline storage manager for MCP data
+class McpOfflineStore {
+  constructor(options = {}) {
+    this.storeName = options.storeName || 'mcp_offline_store';
+    this.version = options.version || 1;
+    this.maxAge = options.maxAge || {
+      loan: 24 * 60 * 60 * 1000,        // 1 day
+      borrower: 7 * 24 * 60 * 60 * 1000, // 7 days
+      payment: 12 * 60 * 60 * 1000      // 12 hours
+    };
+    this.ready = this.initStore();
+  }
+
+  // Initialize IndexedDB store
+  async initStore() {
+    // Implementation for initializing IndexedDB storage
+    // with stores for entities, operations queue, and metadata
+  }
+
+  // Store entity data for offline use
+  async storeEntity(type, id, data) {
+    // Implementation for storing entity data with expiration
+  }
+
+  // Retrieve entity data from offline store
+  async getEntity(type, id) {
+    // Implementation for retrieving cached entity data
+    // with expiration checking
+  }
+}
+```
+
+### Operation Queueing
+
+1. **Offline Operation Queue**
+   - Implement a queue for operations performed while offline
+   - Store operation details including function name, arguments, and context
+   - Support replay and synchronization when connectivity is restored
+   - Implement conflict resolution strategies
+   - Provide visibility into queue status
+
+```javascript
+// Offline-capable MCP client
+class OfflineMcpClient extends McpClient {
+  constructor(options = {}) {
+    super(options);
+    
+    // Initialize the offline store
+    this.offlineStore = new McpOfflineStore(options.offlineStore);
+    
+    // Track network status
+    this.isOnline = navigator.onLine;
+    window.addEventListener('online', () => {
+      this.isOnline = true;
+      this.emit('network:online');
+      this.syncOfflineOperations();
+    });
+    
+    window.addEventListener('offline', () => {
+      this.isOnline = false;
+      this.emit('network:offline');
+    });
+  }
+  
+  // Override execute method to support offline operation
+  async execute(functionName, args, options = {}) {
+    // Check if read or write operation
+    const isReadOperation = this.isReadOperation(functionName);
+    
+    if (isReadOperation) {
+      // Try offline store first, then online if available
+      // Return cached data when offline
+    } else {
+      // Execute online if possible, otherwise queue
+      if (this.isOnline) {
+        // Try direct execution, queue on failure if needed
+      } else {
+        // Queue for later with optimistic updates
+      }
+    }
+  }
+  
+  // Queue operation for later execution
+  async queueOperation(functionName, args, options = {}) {
+    // Implementation for storing operations
+    // Return optimistic result if provided
+  }
+  
+  // Process queued operations when back online
+  async syncOfflineOperations() {
+    // Implementation for executing queued operations
+    // Handle conflicts during synchronization
+  }
+}
+```
+
+### Client Integration
+
+1. **React Integration with Offline Support**
+   - Implement React hooks for offline-aware data fetching
+   - Handle optimistic updates for pending operations
+   - Display appropriate offline status indicators
+   - Support manual retry mechanisms for failed operations
+   - Track and display synchronization status
+
+```jsx
+// React hook for offline-aware MCP data
+function useOfflineMcp(functionName, args, options = {}) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [source, setSource] = useState(null);
+  const [pendingOperations, setPendingOperations] = useState([]);
+  
+  const mcpClient = useOfflineMcpClient();
+  const isOnline = useNetworkStatus();
+  
+  useEffect(() => {
+    let isMounted = true;
+    
+    async function fetchData() {
+      try {
+        // Execute with offline fallback
+        const result = await mcpClient.execute(functionName, args, options);
+        
+        if (isMounted) {
+          setData(result);
+          setSource(result._source || 'online');
+        }
+      } catch (error) {
+        if (isMounted) setError(error);
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    }
+    
+    fetchData();
+    
+    // Set up listeners for network changes and operations
+    
+    return () => { /* cleanup */ };
+  }, [functionName, JSON.stringify(args)]);
+  
+  return {
+    data,
+    loading,
+    error,
+    isOfflineData: source === 'offline',
+    isOutdated: !!data?._outdated,
+    pendingOperations,
+    isOnline
+  };
+}
+```
+
+### Conflict Resolution
+
+1. **Conflict Detection and Resolution Strategies**
+   - Implement timestamp-based conflict detection
+   - Support multiple resolution strategies:
+     - Client wins - use local changes
+     - Server wins - discard local changes
+     - Merge changes if possible
+     - Present conflict for manual resolution
+   - Track version history for critical entities
+   - Support rollback for failed conflict resolutions
+
+```javascript
+// Conflict resolution strategies
+const CONFLICT_STRATEGIES = {
+  CLIENT_WINS: 'client_wins',
+  SERVER_WINS: 'server_wins',
+  MERGE: 'merge',
+  MANUAL: 'manual'
+};
+
+// Example of entity-specific merge strategy
+function mergeLoanData(serverData, clientData) {
+  // For loans, keep server status but client notes and tags
+  return {
+    ...serverData,
+    notes: clientData.notes || serverData.notes,
+    tags: clientData.tags || serverData.tags,
+    lastModified: new Date().toISOString(),
+    _merged: true
+  };
+}
+```
+
+## Examples
+
+### Example 1: Offline-Capable Loan Review
+
+```jsx
+// Component for reviewing loans with offline support
+function LoanReviewForm({ loanId }) {
+  // Use offline-aware MCP hook
+  const {
+    data: loan,
+    loading,
+    error,
+    isOfflineData,
+    isOnline
+  } = useOfflineMcp('getLoanDetails', { id: loanId }, {
+    entityType: 'loan',
+    entityId: loanId,
+    refreshOnReconnect: true
+  });
+  
+  const [notes, setNotes] = useState('');
+  const [status, setStatus] = useState('');
+  
+  // Initialize form with loan data when available
+  useEffect(() => {
+    if (loan) {
+      setNotes(loan.notes || '');
+      setStatus(loan.status || '');
+    }
+  }, [loan]);
+  
+  // Save loan updates - works online or offline
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    try {
+      const updates = { notes, status };
+      
+      // Execute with optimistic updates and queueing
+      await mcpClient.execute('updateLoan', {
+        id: loanId,
+        updates
+      }, {
+        optimisticResult: {
+          ...loan,
+          ...updates,
+          lastModified: new Date().toISOString()
+        },
+        entityType: 'loan',
+        entityId: loanId,
+        queueOnFailure: true
+      });
+      
+      showNotification('Loan updated successfully');
+    } catch (error) {
+      showNotification('Error updating loan: ' + error.message, 'error');
+    }
+  };
+  
+  if (loading) return <LoadingSpinner />;
+  if (error) return <ErrorMessage message={error.message} />;
+  
+  return (
+    <div className="loan-review-form">
+      {isOfflineData && (
+        <OfflineBanner message="You are viewing offline data." />
+      )}
+      
+      {!isOnline && (
+        <OfflineBanner message="You are offline. Changes will sync later." />
+      )}
+      
+      <h2>Loan Review: {loan.loan_number}</h2>
+      
+      <form onSubmit={handleSubmit}>
+        <div className="form-group">
+          <label htmlFor="status">Loan Status</label>
+          <select
+            id="status"
+            value={status}
+            onChange={e => setStatus(e.target.value)}
+          >
+            <option value="pending">Pending</option>
+            <option value="active">Active</option>
+            <option value="closed">Closed</option>
+            <option value="defaulted">Defaulted</option>
+          </select>
+        </div>
+        
+        <div className="form-group">
+          <label htmlFor="notes">Notes</label>
+          <textarea
+            id="notes"
+            value={notes}
+            onChange={e => setNotes(e.target.value)}
+            rows={5}
+          />
+        </div>
+        
+        <button type="submit" className="primary">
+          Save Review
+        </button>
+      </form>
+    </div>
+  );
+}
+```
+
+## Enforcement
+
+1. **Offline Storage Requirements**
+   - Implement proper data encryption for sensitive offline data
+   - Set appropriate storage quotas and handle quota exceeded errors
+   - Document data retention policies for offline storage
+   - Test offline storage with various quota conditions
+
+2. **Synchronization Testing**
+   - Test operation replay with network interruptions
+   - Verify conflict detection and resolution mechanisms
+   - Test with various network conditions and latencies
+   - Validate offline-to-online transitions
+
+3. **User Experience Requirements**
+   - Provide clear offline indicators
+   - Communicate sync status to users
+   - Document offline operation limitations
+   - Test offline functionality on target devices
+
+## Implementation Guide
+
+While there is no dedicated guide for offline operations yet, you can find related patterns in the [MCP Composition Patterns guide](mdc:examples/mcp/03-mcp-composition-patterns.md).
+
+For a comprehensive overview of all MCP implementation approaches, start with the [MCP Implementation Guide](mdc:examples/mcp/01-mcp-implementation-guide.md).

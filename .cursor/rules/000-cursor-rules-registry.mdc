@@ -1,0 +1,227 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+description: Complete registry of all cursor rules available in the enterprise architecture
+globs: "**/*"
+
+# Enterprise Cursor Rules Registry
+
+A comprehensive index of all rules available in the Enterprise Cursor Rules Management Framework, organized by domain and purpose.
+
+## How to Use This Registry
+
+This registry helps you find the right rule for your current task:
+
+1. **Browse by category** to find relevant rules
+2. **Click on rule links** to view complete documentation
+3. **Reference rules in conversations** using the `@rule-name` syntax (e.g., `@core/001-security.mdc`)
+4. **Apply multiple rules** by referencing them in sequence
+
+## Rule Priority System
+
+Rules are categorized by priority to indicate their importance:
+
+- **P0 (Required)**: Must be followed for all code changes. Violations are not acceptable without explicit team approval.
+- **P1 (Important)**: Should be followed for most code changes. Temporary exceptions are allowed with proper documentation.
+- **P2 (Nice to Have)**: Recommended practices to follow when time permits. Should be considered for mature features.
+
+Refer to [002-rule-application.mdc](mdc:002-rule-application.mdc) for detailed guidance on applying rules based on their priority.
+
+## Rule Categories
+
+### Core Rules
+| Rule | Priority | Purpose | When to Apply | Status |
+| ---- | -------- | ------- | ------------- | ------ |
+| [core/000-meta-rules.mdc](mdc:core/000-meta-rules.mdc) | P0 | Rules about rules | When creating or updating rules | ✅ Active |
+| [core/000-core-guidelines.mdc](mdc:core/000-core-guidelines.mdc) | P0 | Central entry point | All development | ✅ Active |
+| [core/001-security.mdc](mdc:core/001-security.mdc) | P0 | Security principles | Security-related implementations | ✅ Active |
+| [core/002-compliance.mdc](mdc:core/002-compliance.mdc) | P0 | Regulatory compliance | Handling sensitive data | ✅ Active |
+| [core/003-examples-guide.mdc](mdc:core/003-examples-guide.mdc) | P2 | Implementation examples | When you need example patterns | ✅ Active |
+
+### Platform Architecture
+| Rule | Priority | Purpose | When to Apply | Status |
+| ---- | -------- | ------- | ------------- | ------ |
+| [departments/engineering/architecture/016-platform-hierarchy.mdc](mdc:departments/engineering/architecture/016-platform-hierarchy.mdc) | P0 | Platform data hierarchy | Handling platform-level data | ✅ Active |
+| [departments/engineering/architecture/025-multi-tenancy.mdc](mdc:departments/engineering/architecture/025-multi-tenancy.mdc) | P0 | Multi-tenant isolation | Building features across org boundaries | ✅ Active |
+| [departments/engineering/architecture/017-platform-user-features.mdc](mdc:departments/engineering/architecture/017-platform-user-features.mdc) | P1 | Platform user management | Working with user permissions | ✅ Active |
+| [departments/engineering/architecture/150-technical-debt-prevention.mdc](mdc:departments/engineering/architecture/150-technical-debt-prevention.mdc) | P0 | Technical debt management | Handling & preventing technical debt | ✅ Active |
+
+### Security & Compliance
+| Rule | Priority | Purpose | When to Apply | Status |
+| ---- | -------- | ------- | ------------- | ------ |
+| [departments/engineering/security/012-api-security.mdc](mdc:departments/engineering/security/012-api-security.mdc) | P0 | API security measures | Designing or implementing API endpoints | ✅ Active |
+| [departments/engineering/security/020-payment-security.mdc](mdc:departments/engineering/security/020-payment-security.mdc) | P0 | Payment processing security | Handling payment information | ✅ Active |
+| [departments/engineering/security/046-session-validation.mdc](mdc:departments/engineering/security/046-session-validation.mdc) | P0 | User session security | Auth flows and session handling | ✅ Active |
+| [departments/engineering/security/047-security-design-system.mdc](mdc:departments/engineering/security/047-security-design-system.mdc) | P1 | Security UI components | Implementing security-related interfaces | ✅ Active |
+| [departments/engineering/security/011-env-var-security.mdc](mdc:departments/engineering/security/011-env-var-security.mdc) | P0 | Environment variable protection | Managing configuration and secrets | ✅ Active |
+| [departments/engineering/security/013-dependency-auditing.mdc](mdc:departments/engineering/security/013-dependency-auditing.mdc) | P1 | Security vulnerability scanning | Before deployments and regularly | ✅ Active |
+| [departments/engineering/security/014-third-party-auth.mdc](mdc:departments/engineering/security/014-third-party-auth.mdc) | P0 | Authentication implementation | Implementing auth systems | ✅ Active |
+| [technologies/frameworks/auth/018-clerk-authentication-standards.mdc](mdc:technologies/frameworks/auth/018-clerk-authentication-standards.mdc) | P0 | Clerk auth implementation | Implementing Clerk-based authentication | ✅ Active |
+
+### UI/UX Standards
+| Rule | Priority | Purpose | When to Apply | Status |
+| ---- | -------- | ------- | ------------- | ------ |
+| [departments/product/030-visual-style-consolidated.mdc](mdc:departments/product/030-visual-style-consolidated.mdc) | P1 | Visual design system | Implementing UI components | ✅ Active |
+| [departments/product/040-ux-stability.mdc](mdc:departments/product/040-ux-stability.mdc) | P1 | UX stability | Preventing disruptive UX changes | ✅ Active |
+| [technologies/frameworks/042-ui-component-architecture.mdc](mdc:technologies/frameworks/042-ui-component-architecture.mdc) | P1 | UI component structure | Building or extending UI components | ✅ Active |
+| [departments/product/045-ux-enhancements.mdc](mdc:departments/product/045-ux-enhancements.mdc) | P2 | UX improvements | Adding UX refinements | ✅ Active |
+| [departments/product/050-css-architecture.mdc](mdc:departments/product/050-css-architecture.mdc) | P1 | CSS organization | Styling components and layouts | ✅ Active |
+
+### Frontend Implementation
+| Rule | Priority | Purpose | When to Apply | Status |
+| ---- | -------- | ------- | ------------- | ------ |
+| [departments/engineering/frontend/045-browser-state-management.mdc](mdc:departments/engineering/frontend/045-browser-state-management.mdc) | P1 | Browser history & cross-tab coordination | Navigation and tab synchronization | ✅ Active |
+| [technologies/languages/javascript/054-accessibility-requirements.mdc](mdc:technologies/languages/javascript/054-accessibility-requirements.mdc) | P0 | Accessibility | A11y compliance standards | ✅ Active |
+| [technologies/frameworks/055-form-validation.mdc](mdc:technologies/frameworks/055-form-validation.mdc) | P1 | Form validation | Input validation patterns | 📅 Planned |
+
+### Testing Standards
+| Rule | Priority | Purpose | When to Apply | Status |
+| ---- | -------- | ------- | ------------- | ------ |
+| [departments/engineering/testing/300-test-first-mandate.mdc](mdc:departments/engineering/testing/300-test-first-mandate.mdc) | P0 | Test-first development | Starting new features | ✅ Active |
+| [departments/engineering/testing/310-component-visual-testing.mdc](mdc:departments/engineering/testing/310-component-visual-testing.mdc) | P1 | Visual testing | UI component tests | ✅ Active |
+| [departments/engineering/testing/320-test-resilience.mdc](mdc:departments/engineering/testing/320-test-resilience.mdc) | P1 | Test reliability | Creating robust tests | ✅ Active |
+| [departments/engineering/testing/330-third-party-integration-testing.mdc](mdc:departments/engineering/testing/330-third-party-integration-testing.mdc) | P1 | Integration testing | External services | ✅ Active |
+| [departments/engineering/testing/331-high-risk-feature-testing.mdc](mdc:departments/engineering/testing/331-high-risk-feature-testing.mdc) | P0 | Risk-based testing | High-risk features | ✅ Active |
+| [departments/engineering/testing/116-testing-environments.mdc](mdc:departments/engineering/testing/116-testing-environments.mdc) | P1 | Environment standards | Setting up test environments | ✅ Active |
+
+### Performance & Optimization
+| Rule | Priority | Purpose | When to Apply | Status |
+| ---- | -------- | ------- | ------------- | ------ |
+| [departments/engineering/performance/060-performance-metrics.mdc](mdc:departments/engineering/performance/060-performance-metrics.mdc) | P1 | Performance KPIs | Measuring performance | ✅ Active |
+| [departments/engineering/performance/061-code-splitting.mdc](mdc:departments/engineering/performance/061-code-splitting.mdc) | P1 | Code splitting | Bundle size optimization | ✅ Active |
+| [departments/engineering/performance/062-optimization.mdc](mdc:departments/engineering/performance/062-optimization.mdc) | P2 | General optimization | Performance improvements | ✅ Active |
+
+### Development Practices
+| Rule | Priority | Purpose | When to Apply | Status |
+| ---- | -------- | ------- | ------------- | ------ |
+| [departments/engineering/coding-standards/100-coding-patterns.mdc](mdc:departments/engineering/coding-standards/100-coding-patterns.mdc) | P0 | Code patterns | General coding standards | ✅ Active |
+| [departments/engineering/coding-standards/103-do-no-harm.mdc](mdc:departments/engineering/coding-standards/103-do-no-harm.mdc) | P0 | File & code protection | File operations & protected code | ✅ Active |
+| [departments/engineering/coding-standards/104-stable-interfaces.mdc](mdc:departments/engineering/coding-standards/104-stable-interfaces.mdc) | P0 | Interface stability | APIs, UI components & contracts | ✅ Active |
+| [departments/engineering/coding-standards/105-typescript-linter-standards.mdc](mdc:departments/engineering/coding-standards/105-typescript-linter-standards.mdc) | P0 | TypeScript linting | Writing or modifying TypeScript code | ⚠️ REQUIRED |
+| [departments/engineering/coding-standards/135-code-documentation-standards.mdc](mdc:departments/engineering/coding-standards/135-code-documentation-standards.mdc) | P0 | Code documentation | Writing maintainable and understandable code | ✅ Active |
+| [technologies/frameworks/110-integration-dependencies.mdc](mdc:technologies/frameworks/110-integration-dependencies.mdc) | P1 | Dependencies | Using external libraries | ✅ Active |
+| [technologies/platforms/mindstudio/115-mindstudio-integration.mdc](mdc:technologies/platforms/mindstudio/115-mindstudio-integration.mdc) | P1 | MindStudio | Integrating MindStudio AI platform | ✅ Active |
+| [technologies/frameworks/120-technical-stack.mdc](mdc:technologies/frameworks/120-technical-stack.mdc) | P0 | Technology evaluation & selection | Technology choices and migrations | ✅ Active |
+
+### Operations & Maintenance
+| Rule | Priority | Purpose | When to Apply | Status |
+| ---- | -------- | ------- | ------------- | ------ |
+| [departments/engineering/operations/130-logging-standards.mdc](mdc:departments/engineering/operations/130-logging-standards.mdc) | P0 | Logging standards | All applications | ✅ Active |
+| [departments/engineering/operations/131-error-handling.mdc](mdc:departments/engineering/operations/131-error-handling.mdc) | P0 | Error handling patterns | Error management | ✅ Active |
+| [departments/engineering/operations/140-troubleshooting-standards.mdc](mdc:departments/engineering/operations/140-troubleshooting-standards.mdc) | P1 | Troubleshooting methodology | Issue diagnosis & resolution | ✅ Active |
+
+### DevOps & Infrastructure
+| Rule | Priority | Purpose | When to Apply | Status |
+| ---- | -------- | ------- | ------------- | ------ |
+| [technologies/platforms/200-deployment-infrastructure.mdc](mdc:technologies/platforms/200-deployment-infrastructure.mdc) | P0 | Deployment | CI/CD and deployments | ✅ Active |
+| [technologies/platforms/210-operations-incidents.mdc](mdc:technologies/platforms/210-operations-incidents.mdc) | P1 | Incidents | Handling production issues | ✅ Active |
+| [technologies/platforms/220-security-monitoring.mdc](mdc:technologies/platforms/220-security-monitoring.mdc) | P0 | Security monitoring | Setting up WAF and security controls | ✅ Active |
+
+### Workflows & Processes
+| Rule | Priority | Purpose | When to Apply | Status |
+| ---- | -------- | ------- | ------------- | ------ |
+| [departments/engineering/workflow/800-workflow-guidelines.mdc](mdc:departments/engineering/workflow/800-workflow-guidelines.mdc) | P1 | Workflows | Development workflows | ✅ Active |
+| [departments/engineering/workflow/801-implementation-plan.mdc](mdc:departments/engineering/workflow/801-implementation-plan.mdc) | P1 | Feature implementation planning | Building new features or making significant changes | ✅ Active |
+
+## Combined Rule Applications
+
+Some tasks benefit from applying multiple rules together:
+
+### UI Development
+- **Creating new UI components:**
+  - @departments/product/030-visual-style-consolidated.mdc + @technologies/frameworks/042-ui-component-architecture.mdc + @technologies/languages/javascript/054-accessibility-requirements.mdc
+
+- **Building forms:**
+  - @technologies/frameworks/042-ui-component-architecture.mdc + @technologies/languages/javascript/054-accessibility-requirements.mdc + @departments/engineering/operations/131-error-handling.mdc
+
+### Security & Authentication
+- **Implementing security features:**
+  - @core/001-security.mdc + @departments/engineering/security/012-api-security.mdc + @departments/engineering/security/046-session-validation.mdc
+
+- **Building secure APIs:**
+  - @departments/engineering/security/012-api-security.mdc + @departments/engineering/architecture/025-multi-tenancy.mdc + @core/001-security.mdc
+
+- **Handling sensitive configuration:**
+  - @core/001-security.mdc + @departments/engineering/security/011-env-var-security.mdc + @departments/engineering/security/013-dependency-auditing.mdc
+
+- **Implementing Clerk authentication:**
+  - @technologies/frameworks/auth/018-clerk-authentication-standards.mdc + @departments/engineering/security/014-third-party-auth.mdc + @departments/engineering/security/046-session-validation.mdc
+
+### Platform & Data
+- **Working with platform features:**
+  - @departments/engineering/architecture/016-platform-hierarchy.mdc + @departments/engineering/architecture/025-multi-tenancy.mdc
+
+- **Implementing payment features:**
+  - @departments/engineering/security/020-payment-security.mdc + @departments/engineering/testing/330-third-party-integration-testing.mdc + @departments/engineering/testing/331-high-risk-feature-testing.mdc
+
+### Technology Selection & Migration
+- **Evaluating new technologies:**
+  - @technologies/frameworks/120-technical-stack.mdc + @technologies/frameworks/110-integration-dependencies.mdc
+
+- **Planning technology migrations:**
+  - @technologies/frameworks/120-technical-stack.mdc + @departments/engineering/architecture/150-technical-debt-prevention.mdc + @departments/engineering/workflow/801-implementation-plan.mdc
+
+- **Managing legacy code:**
+  - @departments/engineering/architecture/150-technical-debt-prevention.mdc + @departments/engineering/coding-standards/135-code-documentation-standards.mdc + @departments/engineering/coding-standards/104-stable-interfaces.mdc
+
+### Performance & Operations
+- **Optimizing application performance:**
+  - @departments/engineering/performance/060-performance-metrics.mdc + @departments/engineering/performance/061-code-splitting.mdc + @departments/engineering/performance/062-optimization.mdc
+
+- **Setting up deployment security:**
+  - @departments/engineering/security/013-dependency-auditing.mdc + @technologies/platforms/220-security-monitoring.mdc + @technologies/platforms/200-deployment-infrastructure.mdc
+
+### Development & Testing
+- **Testing critical features:**
+  - @departments/engineering/testing/300-test-first-mandate.mdc + @departments/engineering/testing/331-high-risk-feature-testing.mdc + @departments/engineering/testing/116-testing-environments.mdc
+
+- **Error handling & debugging:**
+  - @departments/engineering/operations/131-error-handling.mdc + @departments/engineering/operations/130-logging-standards.mdc + @departments/engineering/operations/140-troubleshooting-standards.mdc
+
+- **Component testing:**
+  - @departments/engineering/testing/310-component-visual-testing.mdc + @technologies/languages/javascript/054-accessibility-requirements.mdc + @departments/engineering/testing/320-test-resilience.mdc
+
+- **Environment setup & management:**
+  - @departments/engineering/testing/116-testing-environments.mdc + @departments/engineering/security/011-env-var-security.mdc + @technologies/platforms/200-deployment-infrastructure.mdc
+
+- **Test-first development:**
+  - @departments/engineering/testing/300-test-first-mandate.mdc + @departments/engineering/workflow/800-workflow-guidelines.mdc
+
+- **Code quality & maintainability:**
+  - @departments/engineering/coding-standards/135-code-documentation-standards.mdc + @departments/engineering/architecture/150-technical-debt-prevention.mdc + @departments/engineering/coding-standards/105-typescript-linter-standards.mdc
+
+### Operations & Monitoring
+- **Implementing comprehensive monitoring:**
+  - @departments/engineering/operations/130-logging-standards.mdc + @departments/engineering/operations/131-error-handling.mdc
+  
+- **Implementing observability:**
+  - @departments/engineering/operations/130-logging-standards.mdc + @technologies/frameworks/110-integration-dependencies.mdc
+
+- **Troubleshooting production issues:**
+  - @departments/engineering/operations/140-troubleshooting-standards.mdc + @departments/engineering/operations/130-logging-standards.mdc + @departments/engineering/coding-standards/103-do-no-harm.mdc
+
+### Frequently Combined Rules
+
+The following rules are often applied together to create comprehensive solutions:
+
+- **Testing Framework**: A complete testing strategy combining mandatory test-first methodology, visual component testing, reliable tests, third-party integration testing, high-risk feature testing, and standardized environments
+  - @departments/engineering/testing/300-test-first-mandate.mdc
+  - @departments/engineering/testing/310-component-visual-testing.mdc
+  - @departments/engineering/testing/320-test-resilience.mdc
+  - @departments/engineering/testing/330-third-party-integration-testing.mdc
+  - @departments/engineering/testing/331-high-risk-feature-testing.mdc
+  - @departments/engineering/testing/116-testing-environments.mdc
+
+- **Technology Governance**: A comprehensive approach to technology selection, integration, and evolution
+  - @technologies/frameworks/120-technical-stack.mdc
+  - @technologies/frameworks/110-integration-dependencies.mdc
+  - @departments/engineering/coding-standards/104-stable-interfaces.mdc
+  - @departments/engineering/architecture/150-technical-debt-prevention.mdc
+
+- **Code Maintenance Strategy**: A structured approach to maintaining code quality over time
+  - @departments/engineering/architecture/150-technical-debt-prevention.mdc
+  - @departments/engineering/coding-standards/135-code-documentation-standards.mdc
+  - @departments/engineering/coding-standards/100-coding-patterns.mdc
+  - @departments/engineering/operations/140-troubleshooting-standards.mdc

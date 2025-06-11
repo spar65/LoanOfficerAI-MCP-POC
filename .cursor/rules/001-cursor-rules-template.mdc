@@ -1,0 +1,120 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+description: Use ONLY when creating or updating rules. For general development guidelines, refer to core/000-core-guidelines.mdc
+globs: "**/*.mdc"
+
+# Enterprise Cursor Rules Format & Management
+
+This template defines the standard format for all cursor rules in the enterprise architecture.
+
+## Core Structure Template
+
+```mdc
+___
+description: ACTION when TRIGGER to OUTCOME
+globs: "file_pattern_to_match"
+___
+
+# Rule Title
+- Use active title to summarize the rule purpose
+
+## Context
+- When to apply this rule
+- Prerequisites or conditions
+- Business justification
+
+## Requirements
+- Concise, actionable items
+- Each requirement must be testable
+- Clear implementation guidance
+
+## Examples
+<example>
+Good concise example with explanation
+</example>
+
+<example type="invalid">
+Invalid concise example with explanation
+</example>
+```
+
+## Rule Creation Guidelines
+
+When creating new rules:
+
+1. **Select the appropriate location** based on the rule's domain and purpose
+2. **Follow the naming convention** with the correct prefix and descriptive name
+3. **Use the standard structure** as outlined in this template
+4. **Add the rule to the registry** in core/000-cursor-rules-registry.mdc
+5. **Reference related rules** where appropriate
+
+## File Organization in Enterprise Architecture
+
+### Directory Structure
+```
+enterprise-cursor-rules/
+├── core/                           # Core rules that apply everywhere
+├── departments/                    # Department-specific rules
+│   ├── engineering/                # Engineering department rules
+│   │   ├── architecture/           # Architectural standards
+│   │   ├── coding-standards/       # General coding guidelines
+│   │   ├── frontend/               # Frontend-specific practices
+│   │   ├── operations/             # Operations procedures
+│   │   ├── performance/            # Performance guidelines
+│   │   ├── security/               # Security-specific rules
+│   │   ├── testing/                # Testing guidelines
+│   │   └── workflow/               # Workflow procedures
+│   ├── data-science/               # Data Science rules
+│   └── product/                    # Product and design rules
+├── technologies/                   # Technology-specific rules
+│   ├── frameworks/                 # Framework-specific guidelines
+│   ├── languages/                  # Language-specific rules
+│   │   ├── javascript/             # JavaScript-specific rules
+│   │   ├── python/                 # Python-specific rules
+│   │   └── ...                     # Other languages
+│   └── platforms/                  # Platform-specific guidelines
+├── templates/                      # Rule templates
+└── tools/                          # Rule management tools
+```
+
+### Naming Convention
+Rules follow the pattern: `NNN-descriptive-name.mdc` where:
+- `NNN` is a numeric prefix indicating category:
+  - 000-099: Core and meta rules
+  - 100-199: Development standards
+  - 200-299: Infrastructure and operations
+  - 300-399: Testing and quality
+  - 800-899: Workflows and processes
+  - 900-999: Templates and examples
+
+### Glob Pattern Examples
+Common glob patterns for different rule types:
+- Core standards: `**/*`
+- Language-specific rules: `**/*.{js,ts}` or `src/**/*.py`
+- Testing standards: `**/*.test.{js,ts}`
+- React components: `src/components/**/*.tsx`
+- Documentation: `docs/**/*.md`
+- Configuration files: `*.config.{js,json}`
+- Build artifacts: `dist/**/*`
+- Multiple extensions: `src/**/*.{js,jsx,ts,tsx}`
+
+## Deployment Process
+
+When ready to use in Cursor:
+
+1. Rules are maintained in the hierarchical enterprise structure for organization
+2. The deployment script `tools/deploy_cursor_rules.sh` flattens the structure
+3. Flattened rules are deployed to `.cursor/rules/` with prefixed names to maintain organization
+
+## Relationship with Core Guidelines
+
+This template file is specifically for:
+- Creating new Cursor rules
+- Updating existing Cursor rules
+- Managing the rules system itself
+
+For general development guidelines and best practices, refer to `core/000-core-guidelines.mdc`.
+For a complete registry of all rules, refer to `core/000-cursor-rules-registry.mdc`.
