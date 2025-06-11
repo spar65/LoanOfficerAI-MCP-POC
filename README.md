@@ -1,12 +1,14 @@
-# Loan Officer AI - MCP Proof of Concept
+# Loan Officer AI - MCP Proof of Concept - Updated June 2025
 
 A proof-of-concept application demonstrating AI-powered agricultural lending intelligence with Model Completion Protocol (MCP) integration.
 
+## Latest Updates
+
+- **June 11, 2025**: Successfully sanitized repository and secured GitHub integration
+- **May 30, 2025**: Enhanced logging system with comprehensive tests
+- **May 19, 2025**: Added OpenAI integration with proper API key management
+
 ## What is MCP?
-
-Model Completion Protocol (MCP) is a structured way for AI applications to communicate with backend services. Instead of having the AI model generate unstructured text that might contain hallucinations, MCP enables:
-
-- **Type-safe function calling**: The AI model can call specific functions with validated parameters
 - **Structured data retrieval**: Backend functions return standardized JSON data
 - **Better context management**: Functions can provide additional context to the AI model
 
