@@ -220,11 +220,12 @@ async function runTests() {
       console.log(chalk.green(`✅ Server is running (health check took ${healthCheckDuration.toFixed(1)}ms)`));
     } else {
       console.log(chalk.red(`❌ Server returned unexpected status: ${healthCheck.status}`));
+      return { success: false, passed: 0, total: performanceTests.length };
     }
   } catch (error) {
     console.log(chalk.red(`❌ Server not available: ${error.message}`));
     console.log(chalk.yellow('Please start the server before running tests'));
-    return;
+    return { success: false, passed: 0, total: performanceTests.length };
   }
   
   console.log(''); // Empty line for spacing
@@ -274,12 +275,22 @@ async function runTests() {
   
   if (passed === performanceTests.length) {
     console.log(chalk.green.bold('\n🎉 All tests passed! Performance is within acceptable ranges.'));
+    return { success: true, passed, total: performanceTests.length };
   } else {
     console.log(chalk.yellow.bold('\n⚠️ Some tests failed. Performance may need improvement.'));
+    return { success: false, passed, total: performanceTests.length };
   }
 }
 
-// Run the tests
-runTests().catch(error => {
-  console.error(chalk.red('Error running tests:'), error);
-}); 
+// Run the tests when called directly
+if (require.main === module) {
+  runTests().then(result => {
+    process.exit(result.success ? 0 : 1);
+  }).catch(error => {
+    console.error(chalk.red('Error running tests:'), error);
+    process.exit(1);
+  });
+} else {
+  // Export for use in test harness
+  module.exports = runTests;
+} 

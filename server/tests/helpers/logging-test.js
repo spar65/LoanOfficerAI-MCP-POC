@@ -226,18 +226,19 @@ async function runTests() {
       console.log(chalk.green('✅ Server is running'));
     } else {
       console.log(chalk.red(`❌ Server returned unexpected status: ${healthCheck.status}`));
+      return { success: false, passed: 0, total: testCases.length };
     }
   } catch (error) {
     console.log(chalk.red(`❌ Server not available: ${error.message}`));
     console.log(chalk.yellow('Please start the server before running tests'));
-    return;
+    return { success: false, passed: 0, total: testCases.length };
   }
   
   // Check if log file exists
   if (!fs.existsSync(LOG_FILE)) {
     console.log(chalk.red(`❌ Log file not found: ${LOG_FILE}`));
     console.log(chalk.yellow('Please make sure logging is enabled and the file path is correct'));
-    return;
+    return { success: false, passed: 0, total: testCases.length };
   } else {
     console.log(chalk.green(`✅ Log file found: ${LOG_FILE}`));
   }
@@ -283,12 +284,22 @@ async function runTests() {
   
   if (passed === testCases.length) {
     console.log(chalk.green.bold('\n🎉 All tests passed! The logging system is working correctly.'));
+    return { success: true, passed, total: testCases.length };
   } else {
     console.log(chalk.yellow.bold('\n⚠️ Some tests failed. Please check the issues above.'));
+    return { success: false, passed, total: testCases.length };
   }
 }
 
-// Run the tests
-runTests().catch(error => {
-  console.error(chalk.red('Error running tests:'), error);
-}); 
+// Run the tests when called directly
+if (require.main === module) {
+  runTests().then(result => {
+    process.exit(result.success ? 0 : 1);
+  }).catch(error => {
+    console.error(chalk.red('Error running tests:'), error);
+    process.exit(1);
+  });
+} else {
+  // Export for use in test harness
+  module.exports = runTests;
+} 
