@@ -112,7 +112,7 @@ async function executeTest(test, verbose = false) {
           duration: Date.now() - startTime,
           error: "Server not running. These tests need an active server to pass."
         };
-      }
+        }
     } else {
       // For other tests
       result = typeof testModule === 'function' ? await testModule() :
@@ -122,8 +122,8 @@ async function executeTest(test, verbose = false) {
                { success: true };
     }
     
-    const duration = Date.now() - startTime;
-    
+      const duration = Date.now() - startTime;
+      
     // Check result structure or default to success if no clear indication
     const success = result?.success ?? 
                    (typeof result === 'boolean' ? result : true);
@@ -138,9 +138,9 @@ async function executeTest(test, verbose = false) {
       console.log(`     ❌ Test failed: ${result?.error || 'Unknown error'}`);
       if (result?.passed !== undefined) {
         console.log(`     Summary: ${result.passed} passed, ${result.total - result.passed} failed`);
+        }
       }
-    }
-    
+      
     return { success, duration, result };
   } catch (error) {
     console.log(`     └─ ERROR: 💥 Test script error: ${error.message}`);

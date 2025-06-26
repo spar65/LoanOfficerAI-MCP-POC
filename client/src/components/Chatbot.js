@@ -112,6 +112,48 @@ const MCP_FUNCTIONS = [
     name: "getLoanSummary",
     description: "Get summary statistics about all loans",
     parameters: { type: "object", properties: {}, required: [] },
+  },
+  {
+    name: "getBorrowerDefaultRisk",
+    description: "Calculate the probability of default for an agricultural borrower based on credit score, farm financials, and agricultural risk factors. Returns risk score, risk level, and contributing factors.",
+    parameters: {
+      type: "object",
+      properties: {
+        borrower_id: {
+          type: "string",
+          description: "The ID of the borrower to assess for default risk",
+        },
+      },
+      required: ["borrower_id"],
+    },
+  },
+  {
+    name: "evaluateCollateralSufficiency",
+    description: "Determine if the collateral value is sufficient for a loan based on loan-to-value ratio, market conditions, and collateral type. Returns sufficiency assessment and recommendations.",
+    parameters: {
+      type: "object",
+      properties: {
+        loan_id: {
+          type: "string",
+          description: "The ID of the loan to evaluate collateral sufficiency for",
+        },
+      },
+      required: ["loan_id"],
+    },
+  },
+  {
+    name: "getBorrowerNonAccrualRisk",
+    description: "Evaluate the risk of a borrower's loans moving to non-accrual status based on payment history, credit profile, and agricultural factors. Returns risk level and recovery probability.",
+    parameters: {
+      type: "object",
+      properties: {
+        borrower_id: {
+          type: "string",
+          description: "The ID of the borrower to assess for non-accrual risk",
+        },
+      },
+      required: ["borrower_id"],
+    },
   }
 ];
 
@@ -173,13 +215,28 @@ const Chatbot = ({ onClose }) => {
           case 'getLoanDetails':
           case 'getLoanPayments':
           case 'getLoanCollateral':
+          case 'evaluateCollateralSufficiency':
             // These functions take loan_id
+            if (name === 'evaluateCollateralSufficiency') {
+              console.log(`Calling collateral sufficiency evaluation for loan ${args.loan_id}`);
+            }
             result = await mcpClient[name](args.loan_id);
+            if (name === 'evaluateCollateralSufficiency') {
+              console.log(`Collateral evaluation result:`, result);
+            }
             break;
             
           case 'getLoansByBorrower':
             // Takes borrower name
             result = await mcpClient[name](args.borrower);
+            break;
+            
+          case 'getBorrowerDefaultRisk':
+          case 'getBorrowerNonAccrualRisk':
+            // These functions take borrower_id
+            console.log(`Calling risk assessment function: ${name} for borrower ${args.borrower_id}`);
+            result = await mcpClient[name](args.borrower_id);
+            console.log(`Risk assessment result:`, result);
             break;
             
           default:

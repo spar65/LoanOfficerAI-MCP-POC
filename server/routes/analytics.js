@@ -788,538 +788,359 @@ router.get('/recommendations/refinance/:loan_id', (req, res) => {
 });
 
 // Forecast equipment maintenance costs
-router.get('/equipment/forecast/:borrower_id', (req, res) => {
+router.get('/equipment-forecast/:borrower_id', (req, res) => {
   const borrowerId = req.params.borrower_id;
-  const timeHorizon = req.query.time_horizon || '1y';
+  const year = req.query.year || new Date().getFullYear() + 1;
   
-  LogService.info(`Forecasting equipment maintenance costs for borrower ${borrowerId} with time horizon: ${timeHorizon}`);
+  LogService.info(`Forecasting equipment maintenance costs for borrower ${borrowerId} for year ${year}`);
   
   try {
     // Load data
     const borrowers = dataService.loadData(dataService.paths.borrowers);
-    const equipment = dataService.loadData(dataService.paths.mockEquipment);
     
-    // Find borrower
+    // Find the borrower
     const borrower = borrowers.find(b => b.borrower_id === borrowerId);
     if (!borrower) {
       LogService.warn(`Borrower not found with ID: ${borrowerId}`);
       return res.status(404).json({ error: 'Borrower not found' });
     }
     
-    // Find borrower's equipment (or use defaults if not found)
-    let borrowerEquipment = equipment.filter(e => e.borrower_id === borrowerId);
-    if (borrowerEquipment.length === 0) {
-      // Create some default equipment for the borrower
-      borrowerEquipment = [
-        {
-          id: `EQ-${borrowerId}-1`,
-          borrower_id: borrowerId,
-          type: "Tractor",
-          model: "John Deere 8R",
-          year: 2020,
-          purchase_date: "2020-03-15",
-          purchase_price: 350000,
-          condition: "Good",
-          hours_used: 1200
-        },
-        {
-          id: `EQ-${borrowerId}-2`,
-          borrower_id: borrowerId,
-          type: "Harvester",
-          model: "Case IH 8250",
-          year: 2019,
-          purchase_date: "2019-05-20",
-          purchase_price: 425000,
-          condition: "Good",
-          hours_used: 900
-        }
-      ];
+    // Simplified equipment maintenance cost model
+    // In a real system, this would use more sophisticated modeling and historical data
+    const farmSize = borrower.farm_size || 100; // Default to 100 acres if not specified
+    const farmType = borrower.farm_type || 'Crop';
+    
+    // Base costs by farm type
+    let baseCostPerAcre = 0;
+    if (farmType === 'Crop') {
+      baseCostPerAcre = 25; // $25 per acre for crop farms
+    } else if (farmType === 'Livestock') {
+      baseCostPerAcre = 15; // $15 per acre for livestock farms
+    } else if (farmType === 'Dairy') {
+      baseCostPerAcre = 30; // $30 per acre for dairy farms
+    } else {
+      baseCostPerAcre = 20; // Default for other farm types
     }
     
-    // Calculate base maintenance costs based on equipment type, age, and condition
-    const maintenanceCosts = borrowerEquipment.map(equip => {
-      const age = new Date().getFullYear() - equip.year;
-      const hoursPerYear = equip.hours_used / Math.max(1, age);
-      
-      // Base maintenance cost as percentage of value 
-      let maintenanceRate = 0.02; // 2% for new equipment
-      
-      // Adjust for age
-      if (age > 5) maintenanceRate += 0.01 * (age - 5); // Add 1% per year over 5
-      
-      // Adjust for usage intensity
-      if (hoursPerYear > 300) maintenanceRate += 0.01; // Heavy usage
-      
-      // Adjust for condition
-      if (equip.condition === "Excellent") maintenanceRate *= 0.8;
-      else if (equip.condition === "Poor") maintenanceRate *= 1.5;
-      
-      // Calculate annual cost
-      const annualCost = Math.round(equip.purchase_price * maintenanceRate);
-      
-      // Factor in major maintenance events
-      let majorRepair = false;
-      let majorRepairDesc = "";
-      
-      if (age >= 3 && age % 3 === 0) {
-        // Major service required every 3 years
-        majorRepair = true;
-        majorRepairDesc = "Major service interval";
-      } else if (equip.hours_used > 2000 && equip.hours_used % 1000 < 200) {
-        // Major repair around every 1000 hours
-        majorRepair = true;
-        majorRepairDesc = "Usage threshold service";
-      }
-      
-      // Add major repair cost if needed
-      const majorRepairCost = majorRepair ? Math.round(equip.purchase_price * 0.05) : 0;
-      
-      return {
-        equipment_id: equip.id,
-        type: equip.type,
-        model: equip.model,
-        age_years: age,
-        annual_maintenance_cost: annualCost,
-        major_repair_needed: majorRepair,
-        major_repair_description: majorRepairDesc,
-        major_repair_cost: majorRepairCost,
-        total_annual_cost: annualCost + majorRepairCost
-      };
-    });
+    // Adjust for farm size (economies of scale)
+    let sizeMultiplier = 1.0;
+    if (farmSize > 500) {
+      sizeMultiplier = 0.8; // 20% discount for large farms
+    } else if (farmSize > 200) {
+      sizeMultiplier = 0.9; // 10% discount for medium farms
+    }
     
-    // Calculate total costs
-    const totalAnnualCost = maintenanceCosts.reduce((sum, item) => sum + item.total_annual_cost, 0);
-    const totalMajorRepairCost = maintenanceCosts.reduce((sum, item) => sum + item.major_repair_cost, 0);
+    // Calculate equipment age factor (using borrower age as proxy)
+    // In a real system, would use actual equipment age and condition
+    const borrowerAge = borrower.age || 45; // Default to 45 if not specified
+    let equipmentAgeFactor = 1.0;
+    if (borrowerAge > 60) {
+      equipmentAgeFactor = 1.3; // Older farmers might have older equipment
+    } else if (borrowerAge < 35) {
+      equipmentAgeFactor = 0.9; // Younger farmers might have newer equipment
+    }
     
-    // Prepare forecast
+    // Calculate estimated costs
+    const totalAcres = farmSize;
+    const annualMaintenanceCost = Math.round(totalAcres * baseCostPerAcre * sizeMultiplier * equipmentAgeFactor);
+    
+    // Add equipment categories with estimated costs
+    const equipmentCategories = [];
+    
+    if (farmType === 'Crop') {
+      equipmentCategories.push({
+        category: 'Tractors',
+        estimated_cost: Math.round(annualMaintenanceCost * 0.4),
+        maintenance_items: ['Oil changes', 'Filter replacements', 'Hydraulic repairs']
+      });
+      equipmentCategories.push({
+        category: 'Combines/Harvesters',
+        estimated_cost: Math.round(annualMaintenanceCost * 0.3),
+        maintenance_items: ['Rotor maintenance', 'Cutting mechanisms', 'Belts and chains']
+      });
+      equipmentCategories.push({
+        category: 'Implements',
+        estimated_cost: Math.round(annualMaintenanceCost * 0.2),
+        maintenance_items: ['Blade sharpening', 'Bearings', 'Structural repairs']
+      });
+      equipmentCategories.push({
+        category: 'Irrigation',
+        estimated_cost: Math.round(annualMaintenanceCost * 0.1),
+        maintenance_items: ['Pump maintenance', 'Pipe repairs', 'Sprinkler heads']
+      });
+    } else if (farmType === 'Livestock') {
+      equipmentCategories.push({
+        category: 'Feeding Equipment',
+        estimated_cost: Math.round(annualMaintenanceCost * 0.35),
+        maintenance_items: ['Feed mixer repairs', 'Conveyor maintenance', 'Motor replacements']
+      });
+      equipmentCategories.push({
+        category: 'Tractors',
+        estimated_cost: Math.round(annualMaintenanceCost * 0.3),
+        maintenance_items: ['Oil changes', 'Filter replacements', 'Hydraulic repairs']
+      });
+      equipmentCategories.push({
+        category: 'Handling Equipment',
+        estimated_cost: Math.round(annualMaintenanceCost * 0.25),
+        maintenance_items: ['Gate repairs', 'Chute maintenance', 'Hydraulic cylinder replacement']
+      });
+      equipmentCategories.push({
+        category: 'Fencing Equipment',
+        estimated_cost: Math.round(annualMaintenanceCost * 0.1),
+        maintenance_items: ['Post drivers', 'Wire stretchers', 'Electric fence components']
+      });
+    }
+    
+    // Cost reduction recommendations
+    const recommendations = [];
+    if (annualMaintenanceCost > 10000) {
+      recommendations.push('Consider preventative maintenance schedule to reduce overall costs');
+      recommendations.push('Evaluate equipment replacement versus repair for high-maintenance items');
+    }
+    if (farmSize > 200) {
+      recommendations.push('Bulk purchase of common replacement parts may reduce costs');
+    }
+    recommendations.push('Regular equipment inspections can identify issues before they become costly repairs');
+    
     const result = {
       borrower_id: borrowerId,
       borrower_name: `${borrower.first_name} ${borrower.last_name}`,
-      time_horizon: timeHorizon,
-      equipment_count: borrowerEquipment.length,
-      equipment_details: maintenanceCosts,
-      annual_maintenance_budget: totalAnnualCost,
-      immediate_major_repairs_cost: totalMajorRepairCost,
-      total_annual_budget: totalAnnualCost,
-      maintenance_recommendations: []
+      forecast_year: year,
+      farm_type: farmType,
+      farm_size: farmSize,
+      total_maintenance_forecast: annualMaintenanceCost,
+      equipment_categories: equipmentCategories,
+      cost_reduction_recommendations: recommendations
     };
     
-    // Add recommendations based on analysis
-    if (totalMajorRepairCost > 0) {
-      result.maintenance_recommendations.push(`Budget ${totalMajorRepairCost} for major repairs in the coming year.`);
-    }
-    
-    // Add recommendation for very old equipment
-    const oldEquipment = borrowerEquipment.filter(e => new Date().getFullYear() - e.year > 7);
-    if (oldEquipment.length > 0) {
-      result.maintenance_recommendations.push(`Consider replacing ${oldEquipment.length} equipment items over 7 years old to reduce maintenance costs.`);
-    }
-    
-    // Add recommendation for preventive maintenance
-    result.maintenance_recommendations.push(`Schedule regular preventive maintenance to avoid unexpected repairs.`);
-    
-    LogService.info(`Equipment maintenance forecast completed for borrower ${borrowerId}`);
+    LogService.info(`Equipment maintenance forecast completed for borrower ${borrowerId}: $${annualMaintenanceCost}`);
     res.json(result);
   } catch (error) {
     LogService.error(`Error forecasting equipment maintenance for borrower ${borrowerId}`, { error: error.message });
-    res.status(500).json({ error: 'Failed to generate equipment maintenance forecast', details: error.message });
+    res.status(500).json({ 
+      error: 'Failed to forecast equipment maintenance costs', 
+      details: error.message 
+    });
   }
 });
 
 // Assess crop yield risk
-router.get('/crop-yield/:borrower_id', (req, res) => {
+router.get('/crop-yield-risk/:borrower_id', (req, res) => {
   const borrowerId = req.params.borrower_id;
-  const cropType = req.query.crop_type;
   const season = req.query.season || 'current';
   
-  LogService.info(`Assessing crop yield risk for borrower ${borrowerId}, crop: ${cropType || 'all'}, season: ${season}`);
+  LogService.info(`Assessing crop yield risk for borrower ${borrowerId} for ${season} season`);
   
   try {
     // Load data
     const borrowers = dataService.loadData(dataService.paths.borrowers);
     
-    // Find borrower
+    // Find the borrower
     const borrower = borrowers.find(b => b.borrower_id === borrowerId);
     if (!borrower) {
       LogService.warn(`Borrower not found with ID: ${borrowerId}`);
       return res.status(404).json({ error: 'Borrower not found' });
     }
     
-    // Determine crop types based on farm type
-    const farmCrops = [];
-    if (borrower.farm_type === 'Crop' || borrower.farm_type === 'Mixed') {
-      // Default crops based on farm type
-      farmCrops.push({ 
-        crop: "Corn", 
-        acres: Math.round(borrower.farm_size * 0.4),
-        yield_per_acre: 175,
-        historical_yield_avg: 165,
-        yield_variability: 0.15
-      });
-      
-      farmCrops.push({ 
-        crop: "Soybeans", 
-        acres: Math.round(borrower.farm_size * 0.3),
-        yield_per_acre: 55,
-        historical_yield_avg: 50,
-        yield_variability: 0.12
-      });
-      
-      if (borrower.farm_type === 'Mixed') {
-        farmCrops.push({ 
-          crop: "Wheat", 
-          acres: Math.round(borrower.farm_size * 0.15),
-          yield_per_acre: 65,
-          historical_yield_avg: 60,
-          yield_variability: 0.10
-        });
-      }
-    }
-    
-    if (borrower.farm_type === 'Livestock' || borrower.farm_type === 'Mixed') {
-      farmCrops.push({ 
-        crop: "Hay", 
-        acres: Math.round(borrower.farm_size * (borrower.farm_type === 'Livestock' ? 0.5 : 0.15)),
-        yield_per_acre: 4.5,
-        historical_yield_avg: 4.2,
-        yield_variability: 0.08
+    // Only applicable for crop farmers
+    if (borrower.farm_type !== 'Crop' && borrower.farm_type !== 'Mixed') {
+      return res.json({
+        borrower_id: borrowerId,
+        borrower_name: `${borrower.first_name} ${borrower.last_name}`,
+        assessment: "Not applicable - borrower does not primarily grow crops",
+        risk_level: "not_applicable"
       });
     }
     
-    // Filter by crop type if specified
-    let assessedCrops = farmCrops;
-    if (cropType) {
-      assessedCrops = farmCrops.filter(c => c.crop.toLowerCase() === cropType.toLowerCase());
+    // Simplified crop yield risk model
+    // In a real system, would use weather data, soil conditions, historical yields, etc.
+    const farmSize = borrower.farm_size || 100;
+      
+    // Base risk factors
+    let baseRiskScore = 50; // Medium base risk
+      
+    // Adjust for farm size (larger farms typically have more diversification)
+    if (farmSize > 500) {
+      baseRiskScore -= 10;
+    } else if (farmSize < 100) {
+      baseRiskScore += 10;
+        }
+    
+    // Adjust for borrower experience (using age as proxy)
+    const borrowerAge = borrower.age || 45;
+    if (borrowerAge > 60) {
+      baseRiskScore -= 5; // More experienced
+    } else if (borrowerAge < 35) {
+      baseRiskScore += 5; // Less experienced
     }
     
-    // Analyze yield risks for each crop
-    const cropRisks = assessedCrops.map(crop => {
-      // Calculate risk factors
-      
-      // Historical yield variance
-      const yieldVariance = crop.yield_variability;
-      
-      // Weather risk factor (simplified)
-      let weatherRiskFactor = 0.1; // Base risk
-      
-      // Add seasonal factors
-      if (season === 'current') {
-        const currentMonth = new Date().getMonth();
-        
-        // Spring planting risk (March-May)
-        if (currentMonth >= 2 && currentMonth <= 4) {
-          weatherRiskFactor = 0.18;
-        }
-        // Summer drought risk (June-August)
-        else if (currentMonth >= 5 && currentMonth <= 7) {
-          weatherRiskFactor = 0.22;
-        }
-        // Harvest risk (September-November)
-        else if (currentMonth >= 8 && currentMonth <= 10) {
-          weatherRiskFactor = 0.15;
-        }
-        // Winter (minimal risk for most crops)
-        else {
-          weatherRiskFactor = 0.05;
-        }
-      }
-      
-      // Calculate break-even yield
-      const productionCostsPerAcre = crop.crop === "Corn" ? 750 : 
-                                    crop.crop === "Soybeans" ? 550 : 
-                                    crop.crop === "Wheat" ? 450 : 400;
-      
-      const cropPricePerUnit = crop.crop === "Corn" ? 5.60 : 
-                              crop.crop === "Soybeans" ? 13.20 : 
-                              crop.crop === "Wheat" ? 7.50 : 180;
-      
-      const breakEvenYield = productionCostsPerAcre / cropPricePerUnit;
-      
-      // Calculate overall risk
-      const yieldRisk = yieldVariance + weatherRiskFactor;
-      
-      // Calculate risk of falling below break-even
-      const standardDeviations = (crop.yield_per_acre - breakEvenYield) / (crop.historical_yield_avg * crop.yield_variability);
-      
-      // Convert to probability using simplified approach
-      // Negative SD means yield is already below break-even
-      let belowBreakEvenRisk = 0;
-      if (standardDeviations < 0) {
-        belowBreakEvenRisk = 0.95; // Already below break-even
-      } else if (standardDeviations < 0.5) {
-        belowBreakEvenRisk = 0.7; // High risk
-      } else if (standardDeviations < 1) {
-        belowBreakEvenRisk = 0.5; // Moderate risk
-      } else if (standardDeviations < 2) {
-        belowBreakEvenRisk = 0.2; // Lower risk
+    // Generate risk assessment
+    let riskLevel = '';
+    if (baseRiskScore >= 70) {
+      riskLevel = 'high';
+    } else if (baseRiskScore >= 40) {
+      riskLevel = 'medium';
       } else {
-        belowBreakEvenRisk = 0.05; // Low risk
+      riskLevel = 'low';
       }
       
-      // Risk level based on probability
-      let riskLevel = "low";
-      if (belowBreakEvenRisk > 0.7) riskLevel = "high";
-      else if (belowBreakEvenRisk > 0.3) riskLevel = "medium";
-      
-      return {
-        crop: crop.crop,
-        acres: crop.acres,
-        expected_yield: crop.yield_per_acre,
-        break_even_yield: Math.round(breakEvenYield * 100) / 100,
-        yield_risk_score: Math.round(yieldRisk * 100) / 100,
-        below_break_even_probability: Math.round(belowBreakEvenRisk * 100) / 100,
-        risk_level: riskLevel,
-        estimated_profit_per_acre: Math.round((crop.yield_per_acre * cropPricePerUnit - productionCostsPerAcre) * 100) / 100
-      };
-    });
-    
-    // Calculate weighted average risk
-    const totalAcres = cropRisks.reduce((sum, crop) => sum + crop.acres, 0);
-    const weightedRiskSum = cropRisks.reduce((sum, crop) => sum + (crop.below_break_even_probability * crop.acres), 0);
-    const averageRisk = totalAcres > 0 ? weightedRiskSum / totalAcres : 0;
-    
-    // Determine overall risk level
-    let overallRiskLevel = "low";
-    if (averageRisk > 0.7) overallRiskLevel = "high";
-    else if (averageRisk > 0.3) overallRiskLevel = "medium";
-    
-    // Generate recommendations
-    const recommendations = [];
-    
-    // High risk crops recommendations
-    const highRiskCrops = cropRisks.filter(c => c.risk_level === 'high');
-    if (highRiskCrops.length > 0) {
-      const cropNames = highRiskCrops.map(c => c.crop).join(', ');
-      recommendations.push(`Consider crop insurance for ${cropNames} to mitigate high yield risk.`);
+    // Risk factors
+    const riskFactors = [];
+    if (farmSize < 100) {
+      riskFactors.push('Small farm size limits crop diversification');
+    }
+    if (borrowerAge < 35) {
+      riskFactors.push('Less farming experience may impact crop management decisions');
     }
     
-    // Diversification recommendation
-    if (cropRisks.length < 2) {
-      recommendations.push("Consider diversifying crops to reduce overall yield risk.");
+    // Add weather related factors (simplified)
+    if (season === 'spring') {
+      riskFactors.push('Spring planting conditions can impact crop establishment');
+    } else if (season === 'summer') {
+      riskFactors.push('Summer drought risk can impact yield potential');
+    } else if (season === 'fall') {
+      riskFactors.push('Fall harvest conditions can impact crop quality');
     }
     
-    // Add recommendation based on season
-    if (season === 'current') {
-      const currentMonth = new Date().getMonth();
-      if (currentMonth >= 2 && currentMonth <= 4) {
-        recommendations.push("Monitor spring planting conditions closely to adjust as needed.");
-      } else if (currentMonth >= 5 && currentMonth <= 7) {
-        recommendations.push("Consider irrigation strategies to mitigate potential drought impacts.");
-      }
+    // Mitigation strategies
+    const mitigationStrategies = [];
+    if (riskLevel === 'high') {
+      mitigationStrategies.push('Consider crop insurance to protect against yield losses');
+      mitigationStrategies.push('Implement drought-resistant crop varieties where applicable');
     }
+    mitigationStrategies.push('Diversify crop rotations to spread risk');
+    mitigationStrategies.push('Implement soil moisture conservation practices');
     
-    // Prepare result
     const result = {
       borrower_id: borrowerId,
       borrower_name: `${borrower.first_name} ${borrower.last_name}`,
-      season: season,
       farm_type: borrower.farm_type,
-      total_acres: borrower.farm_size,
-      crop_risk_assessments: cropRisks,
-      overall_risk_level: overallRiskLevel,
-      overall_break_even_risk: Math.round(averageRisk * 100) / 100,
-      recommendations: recommendations
+      farm_size: farmSize,
+      season: season,
+      risk_score: baseRiskScore,
+      risk_level: riskLevel,
+      risk_factors: riskFactors,
+      mitigation_strategies: mitigationStrategies
     };
     
-    LogService.info(`Crop yield risk assessment completed for borrower ${borrowerId}`);
+    LogService.info(`Crop yield risk assessment completed for borrower ${borrowerId}: ${riskLevel} risk`);
     res.json(result);
   } catch (error) {
     LogService.error(`Error assessing crop yield risk for borrower ${borrowerId}`, { error: error.message });
-    res.status(500).json({ error: 'Failed to assess crop yield risk', details: error.message });
+    res.status(500).json({ 
+      error: 'Failed to assess crop yield risk', 
+      details: error.message 
+    });
   }
 });
 
 // Analyze market price impact
 router.get('/market-impact/:borrower_id', (req, res) => {
   const borrowerId = req.params.borrower_id;
-  const commoditiesParam = req.query.commodities;
   
-  // Parse commodities if provided
-  let specificCommodities = [];
-  if (commoditiesParam) {
-    specificCommodities = commoditiesParam.split(',').map(c => c.trim().toLowerCase());
-  }
-  
-  LogService.info(`Analyzing market price impact for borrower ${borrowerId}, commodities: ${specificCommodities.length > 0 ? specificCommodities.join(', ') : 'all'}`);
+  LogService.info(`Analyzing market price impact for borrower ${borrowerId}`);
   
   try {
     // Load data
     const borrowers = dataService.loadData(dataService.paths.borrowers);
     
-    // Find borrower
+    // Find the borrower
     const borrower = borrowers.find(b => b.borrower_id === borrowerId);
     if (!borrower) {
       LogService.warn(`Borrower not found with ID: ${borrowerId}`);
       return res.status(404).json({ error: 'Borrower not found' });
     }
     
-    // Determine commodities based on farm type
-    const commodities = [];
-    if (borrower.farm_type === 'Crop' || borrower.farm_type === 'Mixed') {
-      commodities.push({
-        name: "Corn",
-        production_units: Math.round(borrower.farm_size * 0.4 * 175), // acres * yield
-        unit_type: "bushels",
-        current_price: 5.60,
-        price_trend: -0.10, // 10% downward trend
-        historical_volatility: 0.22,
-        price_sensitivity: 0.85 // correlation with borrower income
-      });
-      
-      commodities.push({
-        name: "Soybeans",
-        production_units: Math.round(borrower.farm_size * 0.3 * 55), // acres * yield
-        unit_type: "bushels",
-        current_price: 13.20,
-        price_trend: 0.05, // 5% upward trend
-        historical_volatility: 0.19,
-        price_sensitivity: 0.80
-      });
+    // Determine primary commodities based on farm type
+    let primaryCommodities = [];
+    if (borrower.farm_type === 'Crop') {
+      primaryCommodities = ['Corn', 'Soybeans', 'Wheat'];
+    } else if (borrower.farm_type === 'Livestock') {
+      primaryCommodities = ['Cattle', 'Hogs'];
+    } else if (borrower.farm_type === 'Dairy') {
+      primaryCommodities = ['Milk', 'Dairy products'];
+    } else {
+      primaryCommodities = ['Mixed agricultural products'];
     }
     
-    if (borrower.farm_type === 'Livestock' || borrower.farm_type === 'Mixed') {
-      commodities.push({
-        name: "Cattle",
-        production_units: Math.round(borrower.farm_size * 0.5), // simplified unit calculation
-        unit_type: "head",
-        current_price: 1350.00,
-        price_trend: 0.08, // 8% upward trend
-        historical_volatility: 0.15,
-        price_sensitivity: 0.90
-      });
+    // Simplified market impact analysis
+    // In a real system, would use actual market data and price forecasts
+    const marketImpacts = primaryCommodities.map(commodity => {
+      // Generate a random price change between -10% and +10%
+      const priceChangePercent = Math.round((Math.random() * 20 - 10) * 10) / 10;
       
-      // Add feed as input cost for livestock
-      commodities.push({
-        name: "Feed",
-        production_units: Math.round(borrower.farm_size * 2), // simplified feed requirements
-        unit_type: "tons",
-        current_price: 225.00,
-        price_trend: 0.03, // 3% upward trend
-        historical_volatility: 0.18,
-        price_sensitivity: -0.75, // negative because it's an input cost
-        is_input_cost: true
-      });
-    }
-    
-    // Filter commodities if specific ones requested
-    let relevantCommodities = commodities;
-    if (specificCommodities.length > 0) {
-      relevantCommodities = commodities.filter(c => 
-        specificCommodities.includes(c.name.toLowerCase())
-      );
-    }
-    
-    // Analyze price impacts
-    const priceImpacts = relevantCommodities.map(commodity => {
-      // Current revenue or cost
-      const currentValue = commodity.production_units * commodity.current_price;
+      let impact = 'neutral';
+      if (priceChangePercent > 3) impact = 'positive';
+      else if (priceChangePercent < -3) impact = 'negative';
       
-      // Projected price changes
-      const projectedPrice = commodity.current_price * (1 + commodity.price_trend);
-      const projectedValue = commodity.production_units * projectedPrice;
-      
-      // Impact on borrower's income
-      const financialImpact = (projectedValue - currentValue) * 
-                              (commodity.is_input_cost ? -1 : 1); // Reverse for input costs
-      
-      // Sensitivity-adjusted impact (how much it affects borrower's income)
-      const adjustedImpact = financialImpact * Math.abs(commodity.price_sensitivity);
-      
-      // Impact as percentage of income
-      const incomeImpactPercent = (adjustedImpact / borrower.income) * 100;
-      
-      // Risk scenarios
-      const downside10Percent = -0.1 * currentValue * Math.abs(commodity.price_sensitivity);
-      const downside20Percent = -0.2 * currentValue * Math.abs(commodity.price_sensitivity);
+      let projectedRevenue = null;
+      if (commodity === 'Corn' && borrower.farm_type === 'Crop') {
+        // Simple revenue calculation for corn
+        const estimatedYield = 180; // bushels per acre
+        const basePrice = 5.75; // dollars per bushel
+        const acres = borrower.farm_size * 0.4; // Assume 40% of farm is corn
+        const newPrice = basePrice * (1 + priceChangePercent / 100);
+        projectedRevenue = Math.round(acres * estimatedYield * newPrice);
+      }
       
       return {
-        commodity: commodity.name,
-        is_input_cost: commodity.is_input_cost || false,
-        current_price: commodity.current_price,
-        price_trend_percent: Math.round(commodity.price_trend * 100),
-        projected_price: Math.round(projectedPrice * 100) / 100,
-        current_value: Math.round(currentValue),
-        projected_value: Math.round(projectedValue),
-        financial_impact: Math.round(financialImpact),
-        income_impact_percent: Math.round(incomeImpactPercent * 10) / 10,
-        downside_risk_10percent: Math.round(downside10Percent),
-        downside_risk_20percent: Math.round(downside20Percent),
-        market_volatility: commodity.historical_volatility,
-        price_risk_level: commodity.historical_volatility > 0.2 ? "high" : 
-                          commodity.historical_volatility > 0.1 ? "medium" : "low"
+        commodity,
+        price_change_percent: priceChangePercent,
+        impact,
+        projected_revenue: projectedRevenue
       };
     });
     
     // Calculate overall impact
-    const totalImpact = priceImpacts.reduce((sum, impact) => sum + impact.financial_impact, 0);
-    const totalIncomeImpact = totalImpact / borrower.income * 100;
+    const positiveImpacts = marketImpacts.filter(i => i.impact === 'positive').length;
+    const negativeImpacts = marketImpacts.filter(i => i.impact === 'negative').length;
     
-    // Calculate worst-case scenario
-    const worstCaseImpact = priceImpacts.reduce((sum, impact) => sum + impact.downside_risk_20percent, 0);
-    const worstCaseIncomeImpact = worstCaseImpact / borrower.income * 100;
-    
-    // Determine overall risk level
-    let overallRiskLevel = "low";
-    if (Math.abs(worstCaseIncomeImpact) > 30) overallRiskLevel = "high";
-    else if (Math.abs(worstCaseIncomeImpact) > 15) overallRiskLevel = "medium";
+    let overallImpact = 'neutral';
+    if (positiveImpacts > negativeImpacts) overallImpact = 'positive';
+    else if (negativeImpacts > positiveImpacts) overallImpact = 'negative';
     
     // Generate recommendations
     const recommendations = [];
-    
-    // Look for high-volatility commodities
-    const volatileCommodities = priceImpacts.filter(i => i.market_volatility > 0.2);
-    if (volatileCommodities.length > 0) {
-      const commodityNames = volatileCommodities.map(i => i.commodity).join(', ');
-      recommendations.push(`Consider price hedging strategies for ${commodityNames} due to high price volatility.`);
+    if (overallImpact === 'negative') {
+      recommendations.push('Consider hedging strategies to protect against further price declines');
+      recommendations.push('Explore diversification options to reduce commodity price exposure');
+    } else if (overallImpact === 'positive') {
+      recommendations.push('Consider forward contracting to lock in favorable prices');
+      recommendations.push('Review marketing plan to capitalize on price strength');
+    } else {
+      recommendations.push('Maintain balanced marketing approach with combination of cash sales and hedging');
     }
     
-    // Significant downside risk
-    if (Math.abs(worstCaseIncomeImpact) > 20) {
-      recommendations.push("Develop contingency plan for market price drops to protect farm income.");
-    }
-    
-    // Add recommendation based on overall impact
-    if (totalIncomeImpact < -5) {
-      recommendations.push("Current market trends suggest negative impact on income. Consider diversifying production.");
-    } else if (totalIncomeImpact > 5) {
-      recommendations.push("Current market trends favorable. Consider locking in forward contracts at current prices.");
-    }
-    
-    // Prepare result
     const result = {
       borrower_id: borrowerId,
       borrower_name: `${borrower.first_name} ${borrower.last_name}`,
       farm_type: borrower.farm_type,
-      annual_income: borrower.income,
-      commodity_impacts: priceImpacts,
-      projected_income_change: Math.round(totalImpact),
-      projected_income_change_percent: Math.round(totalIncomeImpact * 10) / 10,
-      worst_case_impact: Math.round(worstCaseImpact),
-      worst_case_impact_percent: Math.round(worstCaseIncomeImpact * 10) / 10,
-      market_risk_level: overallRiskLevel,
-      recommendations: recommendations
+      overall_market_impact: overallImpact,
+      commodity_impacts: marketImpacts,
+      recommendations
     };
     
-    LogService.info(`Market price impact analysis completed for borrower ${borrowerId}`);
+    LogService.info(`Market price impact analysis completed for borrower ${borrowerId}: ${overallImpact} overall impact`);
     res.json(result);
   } catch (error) {
     LogService.error(`Error analyzing market price impact for borrower ${borrowerId}`, { error: error.message });
-    res.status(500).json({ error: 'Failed to analyze market price impact', details: error.message });
+    res.status(500).json({ 
+      error: 'Failed to analyze market price impact', 
+      details: error.message 
+    });
   }
 });
 
-// Recommend loan restructuring options
-router.get('/restructure/:loan_id', (req, res) => {
+// Get refinancing options
+router.get('/refinancing-options/:loan_id', (req, res) => {
   const loanId = req.params.loan_id;
-  const optimizationGoal = req.query.goal || 'lower_payments';
   
-  LogService.info(`Generating loan restructuring options for loan ${loanId} with goal: ${optimizationGoal}`);
+  LogService.info(`Getting refinancing options for loan ${loanId}`);
   
   try {
     // Load data
     const loans = dataService.loadData(dataService.paths.loans);
     const borrowers = dataService.loadData(dataService.paths.borrowers);
-    const payments = dataService.loadData(dataService.paths.payments);
     
     // Find the loan
     const loan = loans.find(l => l.loan_id === loanId);
@@ -1328,210 +1149,173 @@ router.get('/restructure/:loan_id', (req, res) => {
       return res.status(404).json({ error: 'Loan not found' });
     }
     
-    // Find borrower
+    // Get borrower information
     const borrower = borrowers.find(b => b.borrower_id === loan.borrower_id);
     if (!borrower) {
       LogService.warn(`Borrower not found for loan ${loanId}`);
       return res.status(404).json({ error: 'Borrower not found for this loan' });
     }
     
-    // Get payment history
-    const loanPayments = payments.filter(p => p.loan_id === loanId);
-    const latePayments = loanPayments.filter(p => p.status === 'Late').length;
-    const paymentPerformance = latePayments > 0 ? 
-                              (latePayments / loanPayments.length) > 0.25 ? "poor" : "fair" : 
-                              "good";
-    
-    // Calculate current loan details
+    // Current loan details
     const currentRate = loan.interest_rate;
-    const originalTerm = loan.term_length;
-    const startDate = new Date(loan.start_date);
-    const endDate = new Date(loan.end_date);
+    const remainingPrincipal = loan.loan_amount; // Simplified - in reality would be calculated based on payments
+    const remainingTerm = loan.term; // Simplified - in reality would be calculated based on start date
     
-    // Calculate elapsed time in months
-    const now = new Date();
-    const elapsedMonths = (now.getFullYear() - startDate.getFullYear()) * 12 + 
-                         (now.getMonth() - startDate.getMonth());
-    
-    // Calculate remaining term in months
-    const remainingMonths = Math.max(0, originalTerm - elapsedMonths);
-    
-    // Estimate remaining balance (simplified calculation)
-    const monthlyRate = currentRate / 100 / 12;
-    const monthlyPayment = (loan.loan_amount * monthlyRate * Math.pow(1 + monthlyRate, originalTerm)) / 
-                          (Math.pow(1 + monthlyRate, originalTerm) - 1);
-    
-    // Simplified remaining balance calculation
-    let remainingBalance = loan.loan_amount;
-    if (elapsedMonths > 0 && elapsedMonths < originalTerm) {
-      const amortizationFactor = (Math.pow(1 + monthlyRate, originalTerm) - Math.pow(1 + monthlyRate, elapsedMonths)) / 
-                                (Math.pow(1 + monthlyRate, originalTerm) - 1);
-      remainingBalance = loan.loan_amount * amortizationFactor;
-    }
-    
-    // Generate restructuring options
+    // Generate refinancing options
     const options = [];
     
-    // Option 1: Lower interest rate
-    // Rate reduction depends on payment performance and credit score
-    let rateReduction = 0;
-    if (paymentPerformance === "good" && borrower.credit_score >= 700) {
-      rateReduction = 0.75; // 0.75% reduction for good payment history and credit
-    } else if (paymentPerformance === "fair" && borrower.credit_score >= 650) {
-      rateReduction = 0.5; // 0.5% reduction for fair payment history
-    } else if (borrower.credit_score >= 600) {
-      rateReduction = 0.25; // 0.25% reduction based just on credit score
-    }
-    
-    if (rateReduction > 0) {
-      const newRate = Math.max(currentRate - rateReduction, 3.0); // Floor at 3%
-      
-      // Calculate new payment
-      const newMonthlyRate = newRate / 100 / 12;
-      const newMonthlyPayment = (remainingBalance * newMonthlyRate * Math.pow(1 + newMonthlyRate, remainingMonths)) / 
-                              (Math.pow(1 + newMonthlyRate, remainingMonths) - 1);
-      
-      // Calculate savings
-      const monthlySavings = monthlyPayment - newMonthlyPayment;
-      const totalSavings = monthlySavings * remainingMonths;
+    // Lower rate, same term
+    if (currentRate > 4.0) {
+      const newRate = Math.max(currentRate - 0.5, 3.5);
+      const monthlySavings = calculateMonthlySavings(remainingPrincipal, currentRate, newRate, remainingTerm);
       
       options.push({
-        option_id: "RESTRUCTURE-1",
-        description: "Rate reduction",
-        current_rate: currentRate,
+        option_type: 'Lower Rate',
         new_rate: newRate,
-        rate_reduction: rateReduction,
-        term_months: remainingMonths,
-        current_payment: Math.round(monthlyPayment * 100) / 100,
-        new_payment: Math.round(newMonthlyPayment * 100) / 100,
-        monthly_savings: Math.round(monthlySavings * 100) / 100,
-        total_savings: Math.round(totalSavings * 100) / 100,
-        closing_costs: Math.round(remainingBalance * 0.01), // 1% closing cost
-        break_even_months: Math.ceil((remainingBalance * 0.01) / monthlySavings)
+        term_years: remainingTerm,
+        monthly_savings: monthlySavings,
+        total_savings: monthlySavings * 12 * remainingTerm,
+        closing_costs: Math.round(remainingPrincipal * 0.01), // Assume 1% closing costs
+        break_even_months: Math.ceil((remainingPrincipal * 0.01) / monthlySavings)
       });
     }
     
-    // Option 2: Term extension
-    if (remainingMonths >= 24) {
-      // Extend by 25% of remaining term (rounded to nearest year)
-      const extensionMonths = Math.round(remainingMonths * 0.25 / 12) * 12;
-      const newTerm = remainingMonths + extensionMonths;
-      
-      // Calculate new payment
-      const newMonthlyPayment = (remainingBalance * monthlyRate * Math.pow(1 + monthlyRate, newTerm)) / 
-                              (Math.pow(1 + monthlyRate, newTerm) - 1);
-      
-      // Calculate impact
-      const monthlySavings = monthlyPayment - newMonthlyPayment;
-      const additionalInterest = (newMonthlyPayment * newTerm) - (monthlyPayment * remainingMonths);
+    // Lower rate, longer term
+    if (remainingTerm < 25) {
+      const newTerm = Math.min(remainingTerm + 5, 30);
+      const newRate = currentRate - 0.25;
+      const monthlySavings = calculateMonthlySavingsLongerTerm(remainingPrincipal, currentRate, newRate, remainingTerm, newTerm);
       
       options.push({
-        option_id: "RESTRUCTURE-2",
-        description: "Term extension",
-        current_rate: currentRate,
-        new_rate: currentRate,
-        current_term_remaining: remainingMonths,
-        extension_months: extensionMonths,
-        new_term: newTerm,
-        current_payment: Math.round(monthlyPayment * 100) / 100,
-        new_payment: Math.round(newMonthlyPayment * 100) / 100,
-        monthly_payment_reduction: Math.round(monthlySavings * 100) / 100,
-        payment_reduction_percent: Math.round((monthlySavings / monthlyPayment) * 100 * 10) / 10,
-        additional_interest_cost: Math.round(additionalInterest * 100) / 100,
-        closing_costs: Math.round(remainingBalance * 0.005) // 0.5% closing cost
+        option_type: 'Lower Rate & Extended Term',
+        new_rate: newRate,
+        term_years: newTerm,
+        monthly_savings: monthlySavings,
+        total_interest_cost_change: (remainingPrincipal * newRate / 100 * newTerm) - (remainingPrincipal * currentRate / 100 * remainingTerm),
+        closing_costs: Math.round(remainingPrincipal * 0.015), // Assume 1.5% closing costs for term change
+        break_even_months: Math.ceil((remainingPrincipal * 0.015) / monthlySavings)
       });
     }
     
-    // Option 3: Combined rate reduction and term adjustment
-    if (rateReduction > 0 && remainingMonths >= 24) {
-      // Optimize based on goal
-      let newTerm = remainingMonths;
-      let newRate = Math.max(currentRate - rateReduction, 3.0);
+    // Shorter term, higher rate
+    if (remainingTerm > 15) {
+      const newTerm = remainingTerm - 5;
+      const newRate = currentRate + 0.125;
+      const monthlyCost = calculateMonthlyIncrease(remainingPrincipal, currentRate, newRate, remainingTerm, newTerm);
       
-      if (optimizationGoal === 'lower_payments') {
-        // Extend term slightly
-        newTerm = remainingMonths + Math.min(12, Math.round(remainingMonths * 0.1));
-      } else if (optimizationGoal === 'reduce_interest') {
-        // Shorten term if possible
-        newTerm = Math.max(remainingMonths - Math.min(12, Math.round(remainingMonths * 0.1)), 12);
-      } else if (optimizationGoal === 'shorter_term') {
-        // Shorten term more aggressively
-        newTerm = Math.max(remainingMonths - Math.min(24, Math.round(remainingMonths * 0.2)), 12);
+      options.push({
+        option_type: 'Accelerated Payoff',
+        new_rate: newRate,
+        term_years: newTerm,
+        monthly_cost_increase: monthlyCost,
+        total_interest_savings: (remainingPrincipal * currentRate / 100 * remainingTerm) - (remainingPrincipal * newRate / 100 * newTerm),
+        closing_costs: Math.round(remainingPrincipal * 0.01), // Assume 1% closing costs
+        years_saved: remainingTerm - newTerm
+      });
       }
       
-      // Calculate new payment
-      const newMonthlyRate = newRate / 100 / 12;
-      const newMonthlyPayment = (remainingBalance * newMonthlyRate * Math.pow(1 + newMonthlyRate, newTerm)) / 
-                              (Math.pow(1 + newMonthlyRate, newTerm) - 1);
-      
-      // Calculate current total cost and new total cost
-      const currentTotalCost = monthlyPayment * remainingMonths;
-      const newTotalCost = newMonthlyPayment * newTerm;
-      const totalSavings = currentTotalCost - newTotalCost;
+    // Cash-out option
+    if (loan.loan_type === 'Farm Mortgage' && borrower.credit_score > 680) {
+      const maxCashOut = remainingPrincipal * 0.15;
+      const newPrincipal = remainingPrincipal + maxCashOut;
+      const newRate = currentRate + 0.375;
+      const monthlyCost = calculateMonthlyWithCashout(remainingPrincipal, newPrincipal, currentRate, newRate, remainingTerm);
       
       options.push({
-        option_id: "RESTRUCTURE-3",
-        description: "Optimized restructuring",
-        optimization_goal: optimizationGoal,
-        current_rate: currentRate,
+        option_type: 'Cash-Out Refinance',
         new_rate: newRate,
-        rate_reduction: rateReduction,
-        current_term_remaining: remainingMonths,
-        new_term: newTerm,
-        term_change_months: newTerm - remainingMonths,
-        current_payment: Math.round(monthlyPayment * 100) / 100,
-        new_payment: Math.round(newMonthlyPayment * 100) / 100,
-        monthly_impact: Math.round((monthlyPayment - newMonthlyPayment) * 100) / 100,
-        total_cost_savings: Math.round(totalSavings * 100) / 100,
-        closing_costs: Math.round(remainingBalance * 0.015) // 1.5% closing cost
+        term_years: remainingTerm,
+        max_cash_out: Math.round(maxCashOut),
+        new_loan_amount: Math.round(newPrincipal),
+        monthly_payment_increase: monthlyCost,
+        closing_costs: Math.round(newPrincipal * 0.02) // Assume 2% closing costs for cash-out
       });
     }
     
-    // Generate recommendations
-    const recommendations = [];
-    
-    // Recommend based on payment history
-    if (paymentPerformance === "poor") {
-      recommendations.push("Focus on payment history improvement before refinancing for better terms.");
-    } else if (options.length > 0) {
-      if (optimizationGoal === 'lower_payments') {
-        recommendations.push("Option 2 (Term Extension) provides the largest monthly payment reduction.");
-      } else if (optimizationGoal === 'reduce_interest') {
-        recommendations.push("Option 1 (Rate Reduction) offers the best interest savings over the loan term.");
-      } else if (optimizationGoal === 'shorter_term') {
-        recommendations.push("Option 3 with shorter term will increase monthly payments but reduce overall interest cost.");
+    // Sort options by total savings
+    options.sort((a, b) => {
+      if (a.total_savings && b.total_savings) {
+        return b.total_savings - a.total_savings;
       }
-    }
+      if (a.total_interest_savings && b.total_interest_savings) {
+        return b.total_interest_savings - a.total_interest_savings;
+      }
+      return 0;
+    });
     
-    // Add recommendation based on credit score
-    if (borrower.credit_score < 650) {
-      recommendations.push("Consider credit improvement strategies to qualify for better rates in the future.");
-    } else if (borrower.credit_score >= 750) {
-      recommendations.push("Excellent credit profile may qualify for additional rate discounts or premium products.");
-    }
-    
-    // Prepare result
     const result = {
       loan_id: loanId,
       borrower_id: borrower.borrower_id,
       borrower_name: `${borrower.first_name} ${borrower.last_name}`,
-      loan_type: loan.loan_type,
-      original_amount: loan.loan_amount,
-      current_balance: Math.round(remainingBalance * 100) / 100,
-      current_rate: currentRate,
-      remaining_term_months: remainingMonths,
-      payment_performance: paymentPerformance,
-      restructuring_options: options,
-      recommendations: recommendations,
-      optimization_goal: optimizationGoal
+      current_loan: {
+        principal: remainingPrincipal,
+        interest_rate: currentRate,
+        remaining_term: remainingTerm,
+        loan_type: loan.loan_type
+      },
+      refinancing_options: options,
+      market_conditions: "Rates are historically low, favorable for refinancing."
     };
     
-    LogService.info(`Loan restructuring options generated for loan ${loanId}: ${options.length} options available`);
+    LogService.info(`Refinancing options generated for loan ${loanId}: ${options.length} options`);
     res.json(result);
   } catch (error) {
-    LogService.error(`Error generating loan restructuring options for loan ${loanId}`, { error: error.message });
-    res.status(500).json({ error: 'Failed to generate loan restructuring options', details: error.message });
+    LogService.error(`Error getting refinancing options for loan ${loanId}`, { error: error.message });
+    res.status(500).json({ 
+      error: 'Failed to get refinancing options', 
+      details: error.message 
+    });
   }
 });
+
+// Helper function to calculate monthly savings with a lower rate
+function calculateMonthlySavings(principal, oldRate, newRate, termYears) {
+  const oldMonthlyRate = oldRate / 100 / 12;
+  const newMonthlyRate = newRate / 100 / 12;
+  const months = termYears * 12;
+  
+  const oldPayment = principal * (oldMonthlyRate * Math.pow(1 + oldMonthlyRate, months)) / (Math.pow(1 + oldMonthlyRate, months) - 1);
+  const newPayment = principal * (newMonthlyRate * Math.pow(1 + newMonthlyRate, months)) / (Math.pow(1 + newMonthlyRate, months) - 1);
+  
+  return Math.round(oldPayment - newPayment);
+}
+
+// Helper function to calculate monthly savings with longer term
+function calculateMonthlySavingsLongerTerm(principal, oldRate, newRate, oldTermYears, newTermYears) {
+  const oldMonthlyRate = oldRate / 100 / 12;
+  const newMonthlyRate = newRate / 100 / 12;
+  const oldMonths = oldTermYears * 12;
+  const newMonths = newTermYears * 12;
+  
+  const oldPayment = principal * (oldMonthlyRate * Math.pow(1 + oldMonthlyRate, oldMonths)) / (Math.pow(1 + oldMonthlyRate, oldMonths) - 1);
+  const newPayment = principal * (newMonthlyRate * Math.pow(1 + newMonthlyRate, newMonths)) / (Math.pow(1 + newMonthlyRate, newMonths) - 1);
+  
+  return Math.round(oldPayment - newPayment);
+}
+
+// Helper function to calculate monthly cost increase with shorter term
+function calculateMonthlyIncrease(principal, oldRate, newRate, oldTermYears, newTermYears) {
+  const oldMonthlyRate = oldRate / 100 / 12;
+  const newMonthlyRate = newRate / 100 / 12;
+  const oldMonths = oldTermYears * 12;
+  const newMonths = newTermYears * 12;
+  
+  const oldPayment = principal * (oldMonthlyRate * Math.pow(1 + oldMonthlyRate, oldMonths)) / (Math.pow(1 + oldMonthlyRate, oldMonths) - 1);
+  const newPayment = principal * (newMonthlyRate * Math.pow(1 + newMonthlyRate, newMonths)) / (Math.pow(1 + newMonthlyRate, newMonths) - 1);
+  
+  return Math.round(newPayment - oldPayment);
+  }
+
+// Helper function to calculate monthly cost with cash-out
+function calculateMonthlyWithCashout(oldPrincipal, newPrincipal, oldRate, newRate, termYears) {
+  const oldMonthlyRate = oldRate / 100 / 12;
+  const newMonthlyRate = newRate / 100 / 12;
+  const months = termYears * 12;
+  
+  const oldPayment = oldPrincipal * (oldMonthlyRate * Math.pow(1 + oldMonthlyRate, months)) / (Math.pow(1 + oldMonthlyRate, months) - 1);
+  const newPayment = newPrincipal * (newMonthlyRate * Math.pow(1 + newMonthlyRate, months)) / (Math.pow(1 + newMonthlyRate, months) - 1);
+  
+  return Math.round(newPayment - oldPayment);
+}
 
 module.exports = router; 

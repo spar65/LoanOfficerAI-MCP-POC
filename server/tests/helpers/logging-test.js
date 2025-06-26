@@ -296,9 +296,9 @@ if (require.main === module) {
   runTests().then(result => {
     process.exit(result.success ? 0 : 1);
   }).catch(error => {
-    console.error(chalk.red('Error running tests:'), error);
+  console.error(chalk.red('Error running tests:'), error);
     process.exit(1);
-  });
+}); 
 } else {
   // Export for use in test harness
   module.exports = runTests;

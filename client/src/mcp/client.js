@@ -40,10 +40,15 @@ const mcpClient = {
         headers: error.response.headers
       });
       
-      // If unauthorized, maybe token expired
+      // If unauthorized, maybe token expired - try to refresh
       if (error.response.status === 401) {
-        console.log('Authentication error - token may have expired');
-        // Redirect to login or refresh token logic could be added here
+        console.log('Authentication error - attempting to refresh token');
+        
+        // We'll return a special error object that indicates token refresh is needed
+        error.tokenExpired = true;
+        
+        // Let the calling function handle the refresh flow
+        return error;
       }
     } else if (error.request) {
       // The request was made but no response was received
@@ -399,15 +404,26 @@ const mcpClient = {
   // =================== RISK ASSESSMENT FUNCTIONS ===================
   
   async evaluateCollateralSufficiency(loanId, marketConditions = 'stable') {
-    try {
-      console.log(`Evaluating collateral sufficiency for loan ${loanId} under ${marketConditions} market conditions...`);
-      const response = await axios.get(`${this.baseURL}/risk/collateral-sufficiency/${loanId}?market_conditions=${marketConditions}`, this.getConfig());
-      console.log('Collateral evaluation result:', response.data);
-      return response.data;
-    } catch (error) {
-      this.handleApiError(error, 'evaluateCollateralSufficiency');
-      return null;
-    }
+    return this.retryRequestWithRefresh(async function(loanId, marketConditions) {
+      try {
+        console.log(`Evaluating collateral sufficiency for loan ${loanId} under ${marketConditions} market conditions...`);
+        const response = await axios.get(`${this.baseURL}/risk/collateral-sufficiency/${loanId}?market_conditions=${marketConditions}`, this.getConfig());
+        console.log('Collateral evaluation result:', response.data);
+        return response.data;
+      } catch (error) {
+        this.handleApiError(error, 'evaluateCollateralSufficiency');
+        
+        // Return a graceful fallback with error information
+        return {
+          loan_id: loanId,
+          is_sufficient: false,
+          error: true,
+          message: `Unable to evaluate collateral: ${error.message}`,
+          sufficiency_ratio: 0,
+          assessment: "Could not evaluate collateral due to data limitations or connectivity issues."
+        };
+      }
+    }, loanId, marketConditions);
   },
   
   async analyzePaymentPatterns(borrowerId, period = '1y') {
@@ -445,28 +461,83 @@ const mcpClient = {
   },
   
   async getBorrowerNonAccrualRisk(borrowerId) {
-    try {
-      console.log(`Evaluating non-accrual risk for borrower ${borrowerId}...`);
-      const response = await axios.get(`${this.baseURL}/risk/non-accrual/${borrowerId}`, this.getConfig());
-      console.log('Non-accrual risk evaluation result:', response.data);
-      return response.data;
-    } catch (error) {
-      this.handleApiError(error, 'getBorrowerNonAccrualRisk');
-      return null;
-    }
+    return this.retryRequestWithRefresh(async function(borrowerId) {
+      try {
+        console.log(`Evaluating non-accrual risk for borrower ${borrowerId}...`);
+        const response = await axios.get(`${this.baseURL}/risk/non-accrual/${borrowerId}`, this.getConfig());
+        console.log('Non-accrual risk evaluation result:', response.data);
+        return response.data;
+      } catch (error) {
+        this.handleApiError(error, 'getBorrowerNonAccrualRisk');
+        
+        // Return a graceful fallback with error information
+        return {
+          borrower_id: borrowerId,
+          non_accrual_risk: "unknown",
+          risk_score: 50,
+          error: true,
+          message: `Unable to assess non-accrual risk: ${error.message}`,
+          risk_factors: ["Assessment unavailable due to data limitations or connectivity issues"],
+          recommendations: ["Contact loan officer for manual risk assessment"]
+        };
+      }
+    }, borrowerId);
   },
   
   async getBorrowerDefaultRisk(borrowerId, timeHorizon = 'medium_term') {
+    return this.retryRequestWithRefresh(async function(borrowerId, timeHorizon) {
+      try {
+        console.log(`Evaluating default risk for borrower ${borrowerId} with time horizon ${timeHorizon}...`);
+        const response = await axios.get(`${this.baseURL}/risk/default/${borrowerId}?time_horizon=${timeHorizon}`, this.getConfig());
+        console.log('Default risk evaluation result:', response.data);
+        return response.data;
+      } catch (error) {
+        this.handleApiError(error, 'getBorrowerDefaultRisk');
+        
+        // Return a graceful fallback with error information
+        return {
+          borrower_id: borrowerId,
+          risk_score: 50, // Default to medium risk when we can't calculate
+          risk_level: "unknown",
+          error: true,
+          message: `Unable to assess default risk: ${error.message}`,
+          time_horizon: timeHorizon,
+          key_factors: ["Risk assessment unavailable due to data limitations or connectivity issues"],
+          recommendation: "Contact loan officer for manual risk assessment"
+        };
+      }
+    }, borrowerId, timeHorizon);
+  },
+  
+  // Method to handle retrying requests after token refresh
+  async retryRequestWithRefresh(requestFunction, ...args) {
     try {
-      console.log(`Evaluating default risk for borrower ${borrowerId} with time horizon ${timeHorizon}...`);
-      const response = await axios.get(`${this.baseURL}/risk/default/${borrowerId}?time_horizon=${timeHorizon}`, this.getConfig());
-      console.log('Default risk evaluation result:', response.data);
-      return response.data;
+      // Try the request first
+      return await requestFunction.apply(this, args);
     } catch (error) {
-      this.handleApiError(error, 'getBorrowerDefaultRisk');
-      return null;
+      // If it's a token expiration error, try to refresh the token
+      if (error.tokenExpired) {
+        console.log('Token expired, attempting to refresh before retrying request');
+        
+        // Try to refresh the token
+        const refreshSuccess = await authService.refreshToken();
+        
+        if (refreshSuccess) {
+          console.log('Token refreshed successfully, retrying original request');
+          // Retry the original request with the new token
+          return await requestFunction.apply(this, args);
+        } else {
+          console.error('Token refresh failed');
+          // Redirect to login page or show an error to the user
+          // For now, just throw the error
+          throw new Error('Authentication failed. Please log in again.');
+        }
+      }
+      
+      // If it's any other error, just throw it
+      throw error;
     }
-  }
+  },
 };
 
 export default mcpClient; 

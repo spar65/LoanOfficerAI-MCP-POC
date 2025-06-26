@@ -2,8 +2,13 @@
  * Main server file for the Loan Officer AI API
  */
 
-// Load environment variables
+// Load environment variables from .env file if present
+if (process.env.NODE_ENV !== 'production') {
 require('dotenv').config();
+}
+
+// Enable test authentication for development
+process.env.ALLOW_TEST_AUTH = 'true';
 
 // Import dependencies
 const express = require('express');

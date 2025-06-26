@@ -474,4 +474,193 @@ router.get('/non-accrual/:borrower_id', (req, res) => {
   }
 });
 
+// Get high risk farmers
+router.get('/high-risk-farmers', (req, res) => {
+  LogService.info('Fetching high-risk farmers');
+  
+  try {
+    // Load data
+    const borrowers = dataService.loadData(dataService.paths.borrowers);
+    const loans = dataService.loadData(dataService.paths.loans);
+    const payments = dataService.loadData(dataService.paths.payments);
+    
+    // Calculate risk for each borrower (simplified algorithm)
+    const borrowersWithRisk = borrowers.map(borrower => {
+      // Get borrower's loans
+      const borrowerLoans = loans.filter(l => l.borrower_id === borrower.borrower_id);
+      
+      // Skip borrowers with no loans
+      if (borrowerLoans.length === 0) {
+        return {
+          ...borrower,
+          risk_score: 0,
+          risk_level: 'low',
+          risk_factors: []
+        };
+      }
+      
+      // Get payment history
+      const allPayments = [];
+      borrowerLoans.forEach(loan => {
+        const loanPayments = payments.filter(p => p.loan_id === loan.loan_id);
+        allPayments.push(...loanPayments);
+      });
+      
+      // Calculate risk score (simplified)
+      let riskScore = 50; // Base score
+      
+      // Credit score factor
+      if (borrower.credit_score >= 750) riskScore -= 15;
+      else if (borrower.credit_score >= 700) riskScore -= 10;
+      else if (borrower.credit_score >= 650) riskScore -= 5;
+      else if (borrower.credit_score < 600) riskScore += 20;
+      
+      // Late payments factor
+      const latePayments = allPayments.filter(p => p.status === 'Late');
+      if (latePayments.length > 3) riskScore += 25;
+      else if (latePayments.length > 0) riskScore += latePayments.length * 5;
+      
+      // Loan to income ratio
+      const totalLoanAmount = borrowerLoans.reduce((sum, loan) => sum + loan.loan_amount, 0);
+      const loanToIncomeRatio = totalLoanAmount / borrower.income;
+      if (loanToIncomeRatio > 5) riskScore += 25;
+      else if (loanToIncomeRatio > 3) riskScore += 15;
+      else if (loanToIncomeRatio > 2) riskScore += 5;
+      
+      // Cap risk score between 0-100
+      riskScore = Math.max(0, Math.min(100, riskScore));
+      
+      // Risk level
+      let riskLevel = 'low';
+      if (riskScore > 70) riskLevel = 'high';
+      else if (riskScore > 40) riskLevel = 'medium';
+      
+      // Risk factors
+      const riskFactors = [];
+      if (latePayments.length > 0) {
+        riskFactors.push(`${latePayments.length} late payment(s) in history`);
+      }
+      if (loanToIncomeRatio > 2) {
+        riskFactors.push(`High loan-to-income ratio: ${loanToIncomeRatio.toFixed(1)}`);
+      }
+      if (borrower.credit_score < 650) {
+        riskFactors.push(`Below average credit score: ${borrower.credit_score}`);
+      }
+      
+      return {
+        borrower_id: borrower.borrower_id,
+        name: `${borrower.first_name} ${borrower.last_name}`,
+        farm_type: borrower.farm_type,
+        farm_size: borrower.farm_size,
+        risk_score: riskScore,
+        risk_level: riskLevel,
+        risk_factors: riskFactors
+      };
+    });
+    
+    // Filter for high risk farmers
+    const highRiskFarmers = borrowersWithRisk.filter(b => b.risk_level === 'high');
+    
+    // Sort by risk score (highest first)
+    highRiskFarmers.sort((a, b) => b.risk_score - a.risk_score);
+    
+    // Log result
+    LogService.info(`Found ${highRiskFarmers.length} high risk farmers`);
+    
+    res.json({
+      count: highRiskFarmers.length,
+      farmers: highRiskFarmers,
+      risk_level: 'high'
+    });
+  } catch (error) {
+    LogService.error('Error fetching high-risk farmers', { error: error.message });
+    res.status(500).json({ 
+      error: 'Failed to retrieve high-risk farmers', 
+      details: error.message 
+    });
+  }
+});
+
+// Evaluate collateral sufficiency
+router.get('/collateral-sufficiency/:loan_id', (req, res) => {
+  const loanId = req.params.loan_id;
+  const marketConditions = req.query.market_conditions || 'stable';
+  
+  LogService.info(`Evaluating collateral sufficiency for loan ${loanId} with market conditions: ${marketConditions}`);
+  
+  try {
+    // Load data
+    const loans = dataService.loadData(dataService.paths.loans);
+    const collaterals = dataService.loadData(dataService.paths.collateral);
+    
+    // Find the loan
+    const loan = loans.find(l => l.loan_id === loanId);
+    if (!loan) {
+      LogService.warn(`Loan not found with ID: ${loanId}`);
+      return res.status(404).json({ error: 'Loan not found' });
+    }
+    
+    // Get collateral for this loan
+    const loanCollateral = collaterals.filter(c => c.loan_id === loanId);
+    
+    if (loanCollateral.length === 0) {
+      LogService.warn(`No collateral found for loan ${loanId}`);
+      return res.json({
+        loan_id: loanId,
+        is_sufficient: false,
+        loan_amount: loan.loan_amount,
+        collateral_value: 0,
+        sufficiency_ratio: 0,
+        assessment: "No collateral found for this loan."
+      });
+    }
+    
+    // Calculate total collateral value
+    const collateralValue = loanCollateral.reduce((sum, c) => sum + c.value, 0);
+    
+    // Calculate sufficiency ratio (collateral value / loan amount)
+    const sufficiencyRatio = collateralValue / loan.loan_amount;
+    
+    // Determine if collateral is sufficient (typically 1.0 or greater is considered sufficient)
+    const isSufficient = sufficiencyRatio >= 1.0;
+    
+    // Generate assessment
+    let assessment = '';
+    if (sufficiencyRatio >= 1.5) {
+      assessment = "Collateral is highly sufficient with significant equity buffer.";
+    } else if (sufficiencyRatio >= 1.2) {
+      assessment = "Collateral is adequate with reasonable equity margin.";
+    } else if (sufficiencyRatio >= 1.0) {
+      assessment = "Collateral is minimally sufficient. Consider monitoring valuations.";
+    } else if (sufficiencyRatio >= 0.8) {
+      assessment = "Collateral is below recommended levels but close to loan value. Consider requesting additional security.";
+    } else {
+      assessment = "Insufficient collateral. Loan is under-secured based on current valuations.";
+    }
+    
+    const result = {
+      loan_id: loanId,
+      is_sufficient: isSufficient,
+      loan_amount: loan.loan_amount,
+      collateral_value: collateralValue,
+      sufficiency_ratio: Number(sufficiencyRatio.toFixed(2)),
+      collateral_items: loanCollateral.map(c => ({
+        id: c.collateral_id,
+        description: c.description,
+        value: c.value
+      })),
+      assessment: assessment
+    };
+    
+    LogService.info(`Collateral sufficiency evaluated for loan ${loanId}: ${isSufficient ? 'Sufficient' : 'Insufficient'} with ratio ${sufficiencyRatio.toFixed(2)}`);
+    res.json(result);
+  } catch (error) {
+    LogService.error(`Error evaluating collateral sufficiency for loan ${loanId}`, { error: error.message });
+    res.status(500).json({ 
+      error: 'Failed to evaluate collateral sufficiency', 
+      details: error.message 
+    });
+  }
+});
+
 module.exports = router; 
