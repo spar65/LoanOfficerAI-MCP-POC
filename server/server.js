@@ -78,6 +78,21 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// Add system status endpoint for backward compatibility
+app.get('/api/system/status', (req, res) => {
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    service: 'loan-officer-ai',
+    version: '1.0.0',
+    environment: process.env.NODE_ENV || 'development',
+    memory: {
+      used: `${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)} MB`,
+      total: `${Math.round(process.memoryUsage().heapTotal / 1024 / 1024)} MB`
+    }
+  });
+});
+
 // Server initialization function (extracted for testing)
 function init() {
   LogService.info('Initializing server...');
