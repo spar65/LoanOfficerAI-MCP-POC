@@ -5,7 +5,7 @@ require('dotenv').config();
 const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
-const LogService = require('./services/logService');
+const LogService = require('../../services/logService');
 
 // Base URL - default to localhost:3001 if not provided in .env
 const BASE_URL = process.env.API_BASE_URL || 'http://localhost:3001';
@@ -25,7 +25,7 @@ async function verifyRequiredData() {
   // 1. Check if borrower B001 exists
   LogService.info('Step 1: Checking if borrower B001 exists...');
   try {
-    const borrowersPath = path.join(__dirname, 'data', 'borrowers.json');
+    const borrowersPath = path.join(__dirname, '../../data', 'borrowers.json');
     const borrowersData = JSON.parse(fs.readFileSync(borrowersPath, 'utf8'));
     const b001 = borrowersData.find(b => b.borrower_id === 'B001');
     
@@ -47,7 +47,7 @@ async function verifyRequiredData() {
   // 2. Check if B001 has loans
   LogService.info('Step 2: Checking if B001 has loans...');
   try {
-    const loansPath = path.join(__dirname, 'data', 'loans.json');
+    const loansPath = path.join(__dirname, '../../data', 'loans.json');
     const loansData = JSON.parse(fs.readFileSync(loansPath, 'utf8'));
     const b001Loans = loansData.filter(l => l.borrower_id === 'B001');
     
@@ -67,11 +67,11 @@ async function verifyRequiredData() {
   // 3. Check if there are payments for B001's loans
   LogService.info('Step 3: Checking if B001 has payment history...');
   try {
-    const loansPath = path.join(__dirname, 'data', 'loans.json');
+    const loansPath = path.join(__dirname, '../../data', 'loans.json');
     const loansData = JSON.parse(fs.readFileSync(loansPath, 'utf8'));
     const b001Loans = loansData.filter(l => l.borrower_id === 'B001');
     
-    const paymentsPath = path.join(__dirname, 'data', 'payments.json');
+    const paymentsPath = path.join(__dirname, '../../data', 'payments.json');
     const paymentsData = JSON.parse(fs.readFileSync(paymentsPath, 'utf8'));
     
     // Get all payment IDs for B001's loans

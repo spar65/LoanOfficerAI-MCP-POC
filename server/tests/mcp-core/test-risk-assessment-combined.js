@@ -8,7 +8,7 @@
  * 4. Collateral sufficiency evaluation
  */
 const axios = require('axios');
-const LogService = require('./services/logService');
+const LogService = require('../../services/logService');
 
 // Configuration
 const BASE_URL = 'http://localhost:3001/api';

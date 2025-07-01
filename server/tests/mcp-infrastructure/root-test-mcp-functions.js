@@ -1,7 +1,7 @@
 /**
  * Simple test script to verify MCP functions
  */
-const mcpFunctionRegistry = require('./server/services/mcpFunctionRegistry');
+const mcpFunctionRegistry = require('../../services/mcpFunctionRegistry');
 
 // Test helper function
 async function testMcpFunction(functionName, args) {

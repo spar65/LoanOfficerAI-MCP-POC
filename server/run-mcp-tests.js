@@ -83,13 +83,8 @@ async function runAllTests() {
   // Get all test files
   const coreTests = getTestFiles(MCP_CORE_DIR);
   const infraTests = getTestFiles(MCP_INFRA_DIR);
-  const manualTests = [
-    path.join(__dirname, 'test-basic-loan-info.js'),
-    path.join(__dirname, 'test-risk-assessment-combined.js'),
-    path.join(__dirname, 'test-risk-simple.js')
-  ].filter(file => fs.existsSync(file));
   
-  const allTests = [...manualTests, ...coreTests, ...infraTests];
+  const allTests = [...coreTests, ...infraTests];
   
   if (allTests.length === 0) {
     console.log(`${colors.yellow}No test files found!${colors.reset}`);
@@ -97,6 +92,7 @@ async function runAllTests() {
   }
   
   console.log(`${colors.bright}${colors.magenta}Running MCP Tests (${allTests.length} files)${colors.reset}`);
+  console.log(`${colors.cyan}Core Tests: ${coreTests.length} | Infrastructure Tests: ${infraTests.length}${colors.reset}`);
   console.log(`${colors.dim}${'='.repeat(50)}${colors.reset}\n`);
   
   // Run all tests

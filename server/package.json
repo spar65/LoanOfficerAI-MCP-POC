@@ -24,7 +24,8 @@
     "test:unified:integration": "node run-unified-tests-improved.js integration",
     "test:unified:e2e": "node run-unified-tests-improved.js e2e",
     "test:unified:quick": "node run-unified-tests-improved.js quick",
-    "test:logging:advanced": "chmod +x run-logging-tests.sh && ./run-logging-tests.sh"
+    "test:logging:advanced": "chmod +x run-logging-tests.sh && ./run-logging-tests.sh",
+    "test:mcp": "node run-mcp-tests.js"
   },
   "keywords": [],
   "author": "",

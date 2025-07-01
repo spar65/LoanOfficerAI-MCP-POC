@@ -1,66 +1,66 @@
-# Testing for LoanOfficer MCP POC
+# LoanOfficerAI-MCP-POC Test Structure
 
-## Overview
+This directory contains tests for the LoanOfficerAI-MCP-POC project. The tests are organized into the following directories:
 
-This project contains both skipped tests (from the original implementation) and working tests that have been created specifically for the POC. The skipped tests are kept for reference but are not intended to run as part of the POC validation.
+## Test Organization
 
-## Test Categories
+### MCP Core Tests (`/mcp-core`)
 
-- **Simple Tests**: Basic tests that validate the testing framework itself
-- **Mock Data Tests**: Tests that validate data structures and simple operations using mock data
-- **Utility Tests**: Tests for pure utility functions that don't rely on external dependencies
-- **Skipped Tests**: More complex tests (integration, auth, etc.) that are kept for reference but skipped for the POC
+These tests focus on the core MCP functions that provide business functionality:
+
+- **Basic Loan Information**: Tests for loan details, borrower details, active loans, etc.
+- **Risk Assessment**: Tests for default risk, non-accrual risk, high-risk farmers, etc.
+- **Predictive Analytics**: Tests for loan restructuring, crop yield risk, market price impact, etc.
+
+### MCP Infrastructure Tests (`/mcp-infrastructure`)
+
+These tests focus on the infrastructure components that support MCP functions:
+
+- **MCP Function Registry**: Tests for function registration, validation, and execution
+- **MCP Service**: Tests for the MCP service with logging
+- **OpenAI Integration**: Tests for function calling, response handling, and schema validation
+- **Logging**: Tests for enhanced MCP logging
+
+### Deprecated Tests (`/deprecated`)
+
+These tests have been deprecated as part of the test restructuring effort:
+
+- **API Tests**: Direct API endpoint tests that have been replaced by MCP-driven tests
+- **Data Loading Tests**: Tests for loading data from JSON files
+- **Edge Case Tests**: Tests for edge cases in the API
+- **Coverage Tests**: Tests designed primarily to increase code coverage
 
 ## Running Tests
 
-To run only the tests that are designed to work in the POC:
+### Running All MCP Tests
 
 ```bash
-npm run test:poc
+cd server
+node run-mcp-tests.js
 ```
 
-Other test commands:
+### Running Individual Tests
 
 ```bash
-# Run all tests (many will be skipped or fail)
-npm test
+# Run a core test
+node tests/mcp-core/test-basic-loan-info.js
 
-# Run unit tests only
-npm run test:unit
-
-# Run integration tests only
-npm run test:integration
+# Run an infrastructure test
+node tests/mcp-infrastructure/test-logging.js
 ```
 
-## Test Files
+## Test Requirements
 
-### Working Tests (POC)
+- The server must be running for most tests to work
+- Some tests require an OpenAI API key to be set in the environment
 
-- `tests/unit/simple.test.js`: Basic tests to verify the test framework is working
-- `tests/unit/mock-data.test.js`: Tests for data structures using mocks
-- `tests/unit/utils.test.js`: Tests for utility functions without external dependencies
+## Recent Changes
 
-### Skipped Tests (Reference Only)
+The test structure was recently reorganized to:
 
-- `tests/unit/api.test.js`: Tests for API endpoints (skipped)
-- `tests/unit/loan-details.test.js`: Tests for loan details functionality
-- `tests/unit/loan-summary.test.js`: Tests for loan summary functionality
-- `tests/integration/api-flow.test.js`: Tests for API flows (skipped)
-- `tests/integration/api.test.js`: Integration tests for API endpoints (skipped)
-- `tests/integration/auth-api.test.js`: Authentication API tests (skipped)
+1. Separate MCP core and infrastructure tests
+2. Deprecate API-driven tests in favor of MCP-driven tests
+3. Remove duplicate tests
+4. Fix path issues in moved tests
 
-## Test Configuration
-
-The test configuration is defined in `jest.config.js`. This includes:
-
-- Test patterns
-- Coverage thresholds
-- Setup files
-- Test timeout
-- Verbose output
-
-## Notes for Future Development
-
-1. The auth-related tests are currently skipped due to dependencies on external modules and configuration.
-2. Test coverage is intentionally not enforced for the POC.
-3. To run the full test suite in the future, dependencies like bcrypt will need to be properly installed and configured.
+This reorganization makes the tests more maintainable and focused on the MCP functionality, which is the core of the project.

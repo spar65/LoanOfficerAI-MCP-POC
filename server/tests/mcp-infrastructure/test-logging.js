@@ -3,9 +3,9 @@
  * Run with: node test-logging.js
  */
 require('dotenv').config();
-const LogService = require('./services/logService');
-const McpService = require('./services/mcpService');
-const OpenAIService = require('./services/openaiService');
+const LogService = require('../../services/logService');
+const McpService = require('../../services/mcpService');
+const OpenAIService = require('../../services/openaiService');
 
 // Simulate MCP operations
 async function runDemo() {

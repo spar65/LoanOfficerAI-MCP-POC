@@ -15,7 +15,8 @@
     "test:performance": "cd server && npm run test:performance",
     "test:security": "cd server && npm run test:security",
     "test:custom": "cd server && npm run test:custom",
-    "test:interactive": "cd server && npm run test:interactive"
+    "test:interactive": "cd server && npm run test:interactive",
+    "test:mcp": "cd server && npm run test:mcp"
   },
   "keywords": [
     "ai",

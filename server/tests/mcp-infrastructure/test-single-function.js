@@ -6,7 +6,7 @@
  */
 
 const axios = require('axios');
-const LogService = require('./services/logService');
+const LogService = require('../../services/logService');
 
 // API base URL
 const API_BASE_URL = 'http://localhost:3001';

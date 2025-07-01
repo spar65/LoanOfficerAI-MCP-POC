@@ -3,8 +3,8 @@
  */
 require('dotenv').config();
 const axios = require('axios');
-const LogService = require('./services/logService');
-const dataService = require('./services/dataService');
+const LogService = require('../../services/logService');
+const dataService = require('../../services/dataService');
 
 // Verify data files
 LogService.info('Verifying loan and collateral data');

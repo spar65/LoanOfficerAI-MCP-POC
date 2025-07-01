@@ -3,8 +3,8 @@
  */
 require('dotenv').config();
 const axios = require('axios');
-const LogService = require('./services/logService');
-const dataService = require('./services/dataService');
+const LogService = require('../../services/logService');
+const dataService = require('../../services/dataService');
 
 // Ensure borrower B003 exists in the data
 LogService.info('Verifying that borrower B003 exists in the data');
