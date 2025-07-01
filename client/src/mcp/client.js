@@ -268,48 +268,75 @@ const mcpClient = {
     }
   },
   
-  async assessCropYieldRisk(borrowerId, options = {}) {
-    try {
-      let url = `${this.baseURL}/predict/crop-yield-risk/${borrowerId}`;
-      const params = [];
-      
-      if (options.cropType) {
-        params.push(`crop_type=${encodeURIComponent(options.cropType)}`);
+  async assessCropYieldRisk(borrowerId, cropType = null, season = 'current') {
+    return this.retryRequestWithRefresh(async function(borrowerId, cropType, season) {
+      try {
+        console.log(`Assessing crop yield risk for borrower ${borrowerId}, crop: ${cropType || 'all crops'}, season: ${season}`);
+        
+        // Build query parameters
+        const queryParams = new URLSearchParams();
+        if (cropType) queryParams.append('crop_type', cropType);
+        if (season) queryParams.append('season', season);
+        
+        const response = await axios.get(
+          `${this.baseURL}/analytics/crop-yield-risk/${borrowerId}?${queryParams.toString()}`,
+          this.getConfig()
+        );
+        
+        console.log('Crop yield risk assessment result:', response.data);
+        return response.data;
+      } catch (error) {
+        const processedError = this.handleApiError(error, 'assessCropYieldRisk');
+        
+        // If an auth error that needs token refresh, the calling function will handle it
+        if (processedError.tokenExpired) throw processedError;
+        
+        // Otherwise return graceful fallback
+        return {
+          borrower_id: borrowerId,
+          error: true,
+          message: `Unable to assess crop yield risk: ${error.message}`,
+          risk_level: "unknown",
+          risk_factors: ["Assessment unavailable due to data limitations or connectivity issues"],
+          recommendations: ["Contact agricultural specialist for manual assessment"]
+        };
       }
-      
-      if (options.season) {
-        params.push(`season=${encodeURIComponent(options.season)}`);
-      }
-      
-      if (params.length > 0) {
-        url += `?${params.join('&')}`;
-      }
-      
-      console.log(`Assessing crop yield risk for borrower ${borrowerId}...`);
-      const response = await axios.get(url, this.getConfig());
-      return response.data;
-    } catch (error) {
-      this.handleApiError(error, 'assessCropYieldRisk');
-      throw error;
-    }
+    }, borrowerId, cropType, season);
   },
   
-  async analyzeMarketPriceImpact(borrowerId, commodityTypes = []) {
-    try {
-      let url = `${this.baseURL}/predict/market-price-impact/${borrowerId}`;
-      
-      if (commodityTypes && commodityTypes.length > 0) {
-        url += `?commodities=${encodeURIComponent(commodityTypes.join(','))}`;
+  async analyzeMarketPriceImpact(commodity, priceChangePercent = null) {
+    return this.retryRequestWithRefresh(async function(commodity, priceChangePercent) {
+      try {
+        console.log(`Analyzing market price impact for ${commodity}, change: ${priceChangePercent || 'current projections'}`);
+        
+        // Build query parameters
+        const queryParams = new URLSearchParams();
+        if (priceChangePercent) queryParams.append('price_change_percent', priceChangePercent);
+        
+        const response = await axios.get(
+          `${this.baseURL}/analytics/market-price-impact/${commodity}?${queryParams.toString()}`,
+          this.getConfig()
+        );
+        
+        console.log('Market price impact analysis result:', response.data);
+        return response.data;
+      } catch (error) {
+        const processedError = this.handleApiError(error, 'analyzeMarketPriceImpact');
+        
+        // If an auth error that needs token refresh, the calling function will handle it
+        if (processedError.tokenExpired) throw processedError;
+        
+        // Otherwise return graceful fallback
+        return {
+          commodity: commodity,
+          error: true,
+          message: `Unable to analyze market price impact: ${error.message}`,
+          affected_loans_count: 0,
+          affected_loans: [],
+          portfolio_impact_summary: "Analysis unavailable due to data limitations or connectivity issues"
+        };
       }
-      
-      console.log(`Analyzing market price impact for borrower ${borrowerId}...`);
-      const response = await axios.get(url, this.getConfig());
-      return response.data;
-    } catch (error) {
-      this.handleApiError(error, 'analyzeMarketPriceImpact');
-      // For demo, return mock data if endpoint doesn't exist yet
-      return this.getMockMarketPriceImpact(borrowerId, commodityTypes);
-    }
+    }, commodity, priceChangePercent);
   },
   
   getMockMarketPriceImpact(borrowerId, commodityTypes) {
@@ -390,15 +417,39 @@ const mcpClient = {
     return factors;
   },
   
-  async recommendLoanRestructuring(loanId, optimizationGoal = 'lower_payments') {
-    try {
-      console.log(`Recommending loan restructuring options for loan ${loanId} with goal: ${optimizationGoal}`);
-      const response = await axios.get(`${this.baseURL}/recommendations/refinance/${loanId}?optimization_goal=${optimizationGoal}`, this.getConfig());
-      return response.data;
-    } catch (error) {
-      this.handleApiError(error, 'recommendLoanRestructuring');
-      throw error;
-    }
+  async recommendLoanRestructuring(loanId, restructuringGoal = null) {
+    return this.retryRequestWithRefresh(async function(loanId, restructuringGoal) {
+      try {
+        console.log(`Generating loan restructuring recommendations for loan ${loanId}, goal: ${restructuringGoal || 'general'}`);
+        
+        // Build query parameters
+        const queryParams = new URLSearchParams();
+        if (restructuringGoal) queryParams.append('goal', restructuringGoal);
+        
+        const response = await axios.get(
+          `${this.baseURL}/analytics/loan-restructuring/${loanId}?${queryParams.toString()}`,
+          this.getConfig()
+        );
+        
+        console.log('Loan restructuring recommendations:', response.data);
+        return response.data;
+      } catch (error) {
+        const processedError = this.handleApiError(error, 'recommendLoanRestructuring');
+        
+        // If an auth error that needs token refresh, the calling function will handle it
+        if (processedError.tokenExpired) throw processedError;
+        
+        // Otherwise return graceful fallback
+        return {
+          loan_id: loanId,
+          error: true,
+          message: `Unable to generate loan restructuring recommendations: ${error.message}`,
+          current_structure: {},
+          restructuring_options: [],
+          recommendation: "Unable to generate recommendations due to data limitations or connectivity issues"
+        };
+      }
+    }, loanId, restructuringGoal);
   },
   
   // =================== RISK ASSESSMENT FUNCTIONS ===================

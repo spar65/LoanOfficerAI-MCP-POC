@@ -154,6 +154,64 @@ const MCP_FUNCTIONS = [
       },
       required: ["borrower_id"],
     },
+  },
+  {
+    name: "assessCropYieldRisk",
+    description: "Evaluate agricultural risk factors affecting crop yields for a specific borrower, including weather patterns, pest risks, and forecasted yields. Returns risk assessment and mitigation recommendations.",
+    parameters: {
+      type: "object",
+      properties: {
+        borrower_id: {
+          type: "string",
+          description: "The ID of the borrower whose crop yield risk to assess"
+        },
+        crop_type: {
+          type: "string",
+          description: "Optional: The specific crop type to evaluate (e.g., corn, wheat, soybeans)",
+        },
+        season: {
+          type: "string",
+          description: "Optional: The growing season to evaluate (e.g., '2025', 'current')"
+        }
+      },
+      required: ["borrower_id"]
+    }
+  },
+  {
+    name: "analyzeMarketPriceImpact",
+    description: "Analyze how changes in agricultural commodity prices would impact loans and borrowers. Identifies vulnerable loans and quantifies potential financial impacts.",
+    parameters: {
+      type: "object",
+      properties: {
+        commodity: {
+          type: "string",
+          description: "The agricultural commodity to analyze (e.g., corn, wheat, livestock)"
+        },
+        price_change_percent: {
+          type: "string",
+          description: "Optional: The percentage price change to analyze (e.g., '-10%', '+15%'). If not provided, current market projections will be used."
+        }
+      },
+      required: ["commodity"]
+    }
+  },
+  {
+    name: "recommendLoanRestructuring",
+    description: "Generate loan restructuring options for a specific loan based on borrower financial situation, market conditions, and loan performance. Provides various restructuring scenarios with pros and cons.",
+    parameters: {
+      type: "object",
+      properties: {
+        loan_id: {
+          type: "string",
+          description: "The ID of the loan to generate restructuring recommendations for"
+        },
+        restructuring_goal: {
+          type: "string",
+          description: "Optional: The primary goal of restructuring (e.g., 'reduce_payments', 'extend_term', 'address_hardship')"
+        }
+      },
+      required: ["loan_id"]
+    }
   }
 ];
 
@@ -237,6 +295,32 @@ const Chatbot = ({ onClose }) => {
             console.log(`Calling risk assessment function: ${name} for borrower ${args.borrower_id}`);
             result = await mcpClient[name](args.borrower_id);
             console.log(`Risk assessment result:`, result);
+            break;
+            
+          case 'recommendLoanRestructuring':
+            // Takes loan_id and restructuring_goal
+            console.log(`Generating loan restructuring recommendations for loan ${args.loan_id}, goal: ${args.restructuring_goal || 'general'}`);
+            result = await mcpClient[name](args.loan_id, args.restructuring_goal);
+            console.log('Loan restructuring recommendations:', result);
+            break;
+            
+          case 'assessCropYieldRisk':
+            console.log(`Assessing crop yield risk for borrower ${args.borrower_id}, crop: ${args.crop_type || 'all crops'}`);
+            result = await mcpClient[name](
+              args.borrower_id,
+              args.crop_type || null,
+              args.season || 'current'
+            );
+            console.log('Crop yield risk assessment result:', result);
+            break;
+            
+          case 'analyzeMarketPriceImpact':
+            console.log(`Analyzing market price impact for ${args.commodity}, change: ${args.price_change_percent || 'current projections'}`);
+            result = await mcpClient[name](
+              args.commodity,
+              args.price_change_percent || null
+            );
+            console.log('Market price impact analysis result:', result);
             break;
             
           default:

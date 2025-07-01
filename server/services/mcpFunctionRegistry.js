@@ -15,12 +15,15 @@ async function callInternalApi(endpoint, method = 'GET', data = null) {
   try {
     // Simulate API call by directly accessing data
     const segments = endpoint.split('/').filter(s => s);
+    LogService.debug(`callInternalApi: Processing endpoint ${endpoint}, segments: ${JSON.stringify(segments)}`);
     
     if (segments[0] === 'api') {
       segments.shift(); // Remove 'api'
+      LogService.debug(`callInternalApi: Removed 'api' prefix, segments now: ${JSON.stringify(segments)}`);
     }
     
     // Route the request based on the endpoint
+    LogService.debug(`callInternalApi: Routing based on resource type: ${segments[0]}`);
     switch (segments[0]) {
       case 'loans': {
         // Handle loan-related endpoints
@@ -377,6 +380,259 @@ async function callInternalApi(endpoint, method = 'GET', data = null) {
         
         break;
       }
+
+      case 'analytics': {
+        // Check which analytics endpoint is being requested
+        LogService.debug(`callInternalApi: Processing analytics endpoint, segments[1]: ${segments[1]}, segments[2]: ${segments[2]}`);
+        
+        if (segments[1] === 'loan-restructuring' && segments[2]) {
+          // Extract the loan ID without any query parameters
+          const loanIdWithParams = segments[2];
+          const loanId = loanIdWithParams.split('?')[0].toUpperCase();
+          LogService.debug(`callInternalApi: Processing loan-restructuring for loan ID: ${loanId}`);
+          
+          // Parse query parameters
+          const params = new URLSearchParams(endpoint.split('?')[1] || '');
+          const restructuringGoal = params.get('goal') || null;
+          LogService.debug(`callInternalApi: Restructuring goal: ${restructuringGoal}`);
+          
+          // Load data
+          LogService.debug(`callInternalApi: Loading data for loan-restructuring`);
+          const loans = dataService.loadData(dataService.paths.loans);
+          const borrowers = dataService.loadData(dataService.paths.borrowers);
+          const payments = dataService.loadData(dataService.paths.payments);
+          LogService.debug(`callInternalApi: Loaded ${loans.length} loans, ${borrowers.length} borrowers, ${payments.length} payments`);
+          
+          // Find loan - ensure case-insensitive comparison
+          const loan = loans.find((l) => l.loan_id.toUpperCase() === loanId);
+          LogService.debug(`callInternalApi: Loan found: ${loan ? 'Yes' : 'No'}`);
+          if (!loan) {
+            return { error: "Loan not found", loan_id: loanId };
+          }
+          
+          // Find borrower - ensure case-insensitive comparison
+          const borrower = borrowers.find(
+            (b) => b.borrower_id.toUpperCase() === loan.borrower_id.toUpperCase()
+          );
+          if (!borrower) {
+            return {
+              error: "Borrower not found for this loan",
+              loan_id: loanId,
+              borrower_id: loan.borrower_id,
+            };
+          }
+          
+          // Get payment history for this loan
+          const loanPayments = payments.filter((p) => p.loan_id === loanId);
+          
+          // Calculate current loan structure
+          const principal = loan.loan_amount;
+          const originalTerm = 120; // 10 years in months
+          const elapsedTime = loanPayments.length;
+          const termRemaining = originalTerm - elapsedTime;
+          const currentRate = parseFloat(loan.interest_rate);
+          
+          // Calculate monthly payment
+          const monthlyRate = currentRate / 100 / 12;
+          const monthlyPayment = Math.round(
+            (principal * monthlyRate * Math.pow(1 + monthlyRate, originalTerm)) /
+            (Math.pow(1 + monthlyRate, originalTerm) - 1)
+          );
+          
+          // Generate a simplified response with restructuring options
+          return {
+            loan_id: loanId,
+            borrower_name: `${borrower.first_name} ${borrower.last_name}`,
+            current_structure: {
+              principal: principal,
+              rate: `${currentRate}%`,
+              term_remaining: termRemaining,
+              monthly_payment: monthlyPayment,
+              original_term: originalTerm
+            },
+            restructuring_options: [
+              {
+                option_name: "Term extension",
+                new_term: termRemaining + 36,
+                new_payment: Math.round(
+                  (principal * monthlyRate * Math.pow(1 + monthlyRate, termRemaining + 36)) /
+                  (Math.pow(1 + monthlyRate, termRemaining + 36) - 1)
+                ),
+                payment_reduction: "20%",
+                pros: ["Immediate payment relief", "No change in interest rate"],
+                cons: ["Longer payoff period", "More interest paid overall"]
+              },
+              {
+                option_name: "Rate reduction",
+                new_rate: `${Math.max(currentRate - 1.0, 3.0)}%`,
+                new_payment: Math.round(
+                  (principal * (Math.max(currentRate - 1.0, 3.0) / 100 / 12) * 
+                   Math.pow(1 + (Math.max(currentRate - 1.0, 3.0) / 100 / 12), termRemaining)) /
+                  (Math.pow(1 + (Math.max(currentRate - 1.0, 3.0) / 100 / 12), termRemaining) - 1)
+                ),
+                payment_reduction: "11.4%",
+                pros: ["Lower total interest", "Moderate payment relief"],
+                cons: ["May require additional collateral", "Subject to approval"]
+              }
+            ],
+            recommendation: 
+              restructuringGoal === "reduce_payments" 
+                ? "Term extension option provides the most significant payment relief."
+                : "Rate reduction option provides the best long-term financial benefit."
+          };
+        }
+        
+        if (segments[1] === 'crop-yield-risk' && segments[2]) {
+          // Extract the borrower ID without any query parameters
+          const borrowerIdWithParams = segments[2];
+          const borrowerId = borrowerIdWithParams.split('?')[0].toUpperCase();
+          LogService.debug(`callInternalApi: Processing crop-yield-risk for borrower ID: ${borrowerId}`);
+          
+          // Parse query parameters
+          const params = new URLSearchParams(endpoint.split('?')[1] || '');
+          const cropType = params.get('crop_type') || null;
+          const season = params.get('season') || 'current';
+          LogService.debug(`callInternalApi: Crop type: ${cropType}, Season: ${season}`);
+          
+          // Load data
+          LogService.debug(`callInternalApi: Loading data for crop-yield-risk`);
+          const borrowers = dataService.loadData(dataService.paths.borrowers);
+          LogService.debug(`callInternalApi: Loaded ${borrowers.length} borrowers`);
+          
+          // Find borrower - ensure case-insensitive comparison
+          const borrower = borrowers.find((b) => b.borrower_id.toUpperCase() === borrowerId);
+          LogService.debug(`callInternalApi: Borrower found: ${borrower ? 'Yes' : 'No'}`);
+          if (!borrower) {
+            return { error: "Borrower not found", borrower_id: borrowerId };
+          }
+          
+          // Determine crops grown by borrower (simulated data)
+          const farmerCrops = {
+            B001: { crops: ["corn", "soybeans"], region: "midwest" },
+            B002: { crops: ["wheat", "barley"], region: "plains" },
+            B003: { crops: ["cotton", "peanuts"], region: "southeast" },
+            B004: { crops: ["rice", "sugarcane"], region: "south" },
+            B005: { crops: ["potatoes", "onions"], region: "northwest" },
+          };
+          
+          // If we don't have specific crop data for this borrower, create some
+          if (!farmerCrops[borrowerId]) {
+            farmerCrops[borrowerId] = { crops: ["corn"], region: "midwest" };
+          }
+          
+          // Target specific crop if provided, otherwise use primary crop
+          const targetCrop =
+            cropType && farmerCrops[borrowerId].crops.includes(cropType)
+              ? cropType
+              : farmerCrops[borrowerId].crops[0];
+          
+          // Generate synthetic risk score (50-85 range)
+          const riskScore = Math.floor(Math.random() * 35) + 50;
+          
+          // Determine risk level based on score
+          let riskLevel = "medium";
+          if (riskScore < 60) riskLevel = "low";
+          else if (riskScore > 75) riskLevel = "high";
+          
+          // Generate yield impact based on risk score
+          const yieldImpactPercent = `${-(riskScore - 50) / 2}%`;
+          
+          // Return a simplified response
+          return {
+            borrower_id: borrowerId,
+            borrower_name: `${borrower.first_name} ${borrower.last_name}`,
+            crop_type: targetCrop,
+            yield_risk_score: riskScore,
+            risk_level: riskLevel,
+            yield_impact_percent: yieldImpactPercent,
+            risk_factors: [
+              "Drought susceptibility",
+              "Pest pressure",
+              "Market volatility"
+            ],
+            recommendations: [
+              "Review irrigation infrastructure",
+              "Consider crop insurance adjustment",
+              "Evaluate pest management program"
+            ],
+            region: farmerCrops[borrowerId].region
+          };
+        }
+        
+        if (segments[1] === 'market-price-impact' && segments[2]) {
+          // Extract the commodity without any query parameters
+          const commodityWithParams = segments[2];
+          const commodity = commodityWithParams.split('?')[0].toLowerCase();
+          LogService.debug(`callInternalApi: Processing market-price-impact for commodity: ${commodity}`);
+          
+          // Parse query parameters
+          const params = new URLSearchParams(endpoint.split('?')[1] || '');
+          const priceChangePercent = params.get('price_change_percent') || null;
+          LogService.debug(`callInternalApi: Price change percent: ${priceChangePercent}`);
+          
+          // Parse price change percentage or use default
+          let priceChange = -10; // Default to 10% decrease
+          if (priceChangePercent) {
+            const match = priceChangePercent.match(/([+-]?\d+)%/);
+            if (match) {
+              priceChange = parseInt(match[1]);
+            }
+          }
+          
+          // Validate commodity
+          const validCommodities = [
+            "corn",
+            "wheat",
+            "soybeans",
+            "cotton",
+            "rice",
+            "livestock",
+            "dairy",
+          ];
+          
+          if (!validCommodities.includes(commodity)) {
+            return {
+              error: "Invalid commodity specified",
+              valid_commodities: validCommodities,
+            };
+          }
+          
+          // Return a simplified response
+          return {
+            commodity: commodity,
+            price_change_percent: `${priceChange > 0 ? "+" : ""}${priceChange}%`,
+            affected_loans_count: 2,
+            affected_loans: [
+              {
+                loan_id: "L001",
+                borrower_name: "John Doe",
+                impact_level: "medium",
+                revenue_impact: "-$7,500",
+                debt_coverage_ratio: "1.15"
+              },
+              {
+                loan_id: "L004",
+                borrower_name: "Alice Johnson",
+                impact_level: "high",
+                revenue_impact: "-$12,000",
+                debt_coverage_ratio: "0.95"
+              }
+            ],
+            portfolio_impact_summary: `A ${Math.abs(priceChange)}% ${priceChange < 0 ? "decrease" : "increase"} in ${commodity} prices would significantly affect 2 loans with a total portfolio impact of $19,500`,
+            recommendations: [
+              "Review hedging strategies with affected borrowers",
+              "Consider loan restructuring for severely impacted borrowers"
+            ]
+          };
+        }
+        
+        // If no matching analytics endpoint, return error
+        return { error: 'Analytics endpoint not implemented', path: endpoint };
+      }
+
+      // Default case
+      default:
+        return { error: 'Unknown resource type', resource: segments[0] };
     }
     
     // Default response if no matching endpoint
@@ -677,60 +933,108 @@ const registry = {
   /**
    * Assess crop yield risk
    */
-  assessCropYieldRisk: MCPServiceWithLogging.createFunction('assessCropYieldRisk', async (args) => {
-    const { borrower_id } = args;
-    
-    if (!borrower_id) {
-      throw new Error('Borrower ID is required');
-    }
-    
-    try {
-      LogService.info(`Assessing crop yield risk for borrower ID: ${borrower_id}`);
-      const result = await callInternalApi(`/api/analytics/crop-yield-risk/${borrower_id}`);
-      
-      if (result.error) {
-        throw new Error(result.error);
+  assessCropYieldRisk: MCPServiceWithLogging.createFunction(
+    "assessCropYieldRisk",
+    async (args) => {
+      const { borrower_id, crop_type, season } = args;
+
+      if (!borrower_id) {
+        throw new Error("Borrower ID is required");
       }
-      
-      return result;
-    } catch (error) {
-      LogService.error(`Error assessing crop yield risk: ${error.message}`);
-      return {
-        error: true,
-        message: `Could not assess crop yield risk: ${error.message}`,
-        borrower_id
-      };
+
+      try {
+        LogService.debug(`Starting crop yield risk assessment for borrower ${borrower_id}`, {
+          borrower_id,
+          crop_type,
+          season
+        });
+        
+        // Build query parameters
+        let endpoint = `/api/analytics/crop-yield-risk/${borrower_id}`;
+        const queryParams = [];
+
+        if (crop_type) queryParams.push(`crop_type=${encodeURIComponent(crop_type)}`);
+        if (season) queryParams.push(`season=${encodeURIComponent(season || 'current')}`);
+
+        if (queryParams.length > 0) {
+          endpoint += `?${queryParams.join('&')}`;
+        }
+        
+        LogService.debug(`Calling internal API endpoint: ${endpoint}`);
+        const result = await callInternalApi(endpoint);
+        LogService.debug(`Internal API result:`, result);
+
+        if (result.error) {
+          throw new Error(result.error);
+        }
+
+        return result;
+      } catch (error) {
+        LogService.error(`Error in crop yield risk assessment: ${error.message}`, { 
+          borrower_id,
+          crop_type,
+          season,
+          stack: error.stack
+        });
+        
+        return {
+          error: true,
+          message: `Could not assess crop yield risk: ${error.message}`,
+          borrower_id
+        };
+      }
     }
-  }),
+  ),
   
   /**
    * Analyze market price impact
    */
-  analyzeMarketPriceImpact: MCPServiceWithLogging.createFunction('analyzeMarketPriceImpact', async (args) => {
-    const { borrower_id } = args;
-    
-    if (!borrower_id) {
-      throw new Error('Borrower ID is required');
-    }
-    
-    try {
-      LogService.info(`Analyzing market price impact for borrower ID: ${borrower_id}`);
-      const result = await callInternalApi(`/api/analytics/market-impact/${borrower_id}`);
-      
-      if (result.error) {
-        throw new Error(result.error);
+  analyzeMarketPriceImpact: MCPServiceWithLogging.createFunction(
+    "analyzeMarketPriceImpact",
+    async (args) => {
+      const { commodity, price_change_percent } = args;
+
+      if (!commodity) {
+        throw new Error("Commodity is required");
       }
-      
-      return result;
-    } catch (error) {
-      LogService.error(`Error analyzing market price impact: ${error.message}`);
-      return {
-        error: true,
-        message: `Could not analyze market price impact: ${error.message}`,
-        borrower_id
-      };
+
+      try {
+        LogService.debug(`Starting market price impact analysis for ${commodity}`, {
+          commodity,
+          price_change_percent
+        });
+        
+        // Build query parameters
+        let endpoint = `/api/analytics/market-price-impact/${commodity}`;
+
+        if (price_change_percent) {
+          endpoint += `?price_change_percent=${encodeURIComponent(price_change_percent)}`;
+        }
+        
+        LogService.debug(`Calling internal API endpoint: ${endpoint}`);
+        const result = await callInternalApi(endpoint);
+        LogService.debug(`Internal API result:`, result);
+
+        if (result.error) {
+          throw new Error(result.error);
+        }
+
+        return result;
+      } catch (error) {
+        LogService.error(`Error in market price impact analysis: ${error.message}`, { 
+          commodity,
+          price_change_percent,
+          stack: error.stack
+        });
+        
+        return {
+          error: true,
+          message: `Could not analyze market price impact: ${error.message}`,
+          commodity
+        };
+      }
     }
-  }),
+  ),
   
   /**
    * Get refinancing options
@@ -788,7 +1092,57 @@ const registry = {
         borrower_id
       };
     }
-  })
+  }),
+
+  /**
+   * Generate loan restructuring recommendations
+   */
+  recommendLoanRestructuring: MCPServiceWithLogging.createFunction(
+    "recommendLoanRestructuring",
+    async (args) => {
+      const { loan_id, restructuring_goal } = args;
+
+      if (!loan_id) {
+        throw new Error("Loan ID is required");
+      }
+
+      try {
+        LogService.debug(`Starting loan restructuring recommendation for loan ${loan_id}`, {
+          loan_id,
+          restructuring_goal
+        });
+        
+        // Build query parameters
+        let endpoint = `/api/analytics/loan-restructuring/${loan_id}`;
+
+        if (restructuring_goal) {
+          endpoint += `?goal=${encodeURIComponent(restructuring_goal)}`;
+        }
+        
+        LogService.debug(`Calling internal API endpoint: ${endpoint}`);
+        const result = await callInternalApi(endpoint);
+        LogService.debug(`Internal API result:`, result);
+
+        if (result.error) {
+          throw new Error(result.error);
+        }
+
+        return result;
+      } catch (error) {
+        LogService.error(`Error in loan restructuring recommendation: ${error.message}`, { 
+          loan_id,
+          restructuring_goal,
+          stack: error.stack
+        });
+        
+        return {
+          error: true,
+          message: `Could not generate loan restructuring recommendations: ${error.message}`,
+          loan_id
+        };
+      }
+    }
+  ),
 };
 
 // Schema definitions for MCP functions
@@ -953,9 +1307,17 @@ const functionSchemas = {
         borrower_id: {
           type: 'string',
           description: 'ID of the borrower to assess'
+        },
+        crop_type: {
+          type: 'string',
+          description: 'Type of crop'
+        },
+        season: {
+          type: 'string',
+          description: 'Season of the crop'
         }
       },
-      required: ['borrower_id']
+      required: ['borrower_id', 'crop_type', 'season']
     }
   },
   
@@ -965,12 +1327,16 @@ const functionSchemas = {
     parameters: {
       type: 'object',
       properties: {
-        borrower_id: {
+        commodity: {
           type: 'string',
-          description: 'ID of the borrower to analyze'
+          description: 'Name of the commodity'
+        },
+        price_change_percent: {
+          type: 'string',
+          description: 'Percentage change in commodity prices'
         }
       },
-      required: ['borrower_id']
+      required: ['commodity', 'price_change_percent']
     }
   },
   
@@ -1001,6 +1367,25 @@ const functionSchemas = {
         }
       },
       required: ['borrower_id']
+    }
+  },
+
+  recommendLoanRestructuring: {
+    name: 'recommendLoanRestructuring',
+    description: 'Generate loan restructuring recommendations',
+    parameters: {
+      type: 'object',
+      properties: {
+        loan_id: {
+          type: 'string',
+          description: 'ID of the loan to generate recommendations for'
+        },
+        restructuring_goal: {
+          type: 'string',
+          description: 'Optional restructuring goal'
+        }
+      },
+      required: ['loan_id']
     }
   }
 };
