@@ -5,6 +5,7 @@
 const express = require('express');
 const router = express.Router();
 const MCPServiceWithLogging = require('../services/mcpServiceWithLogging');
+const mcpDatabaseService = require('../../services/mcpDatabaseService');
 const mcpResponseFormatter = require('../utils/mcpResponseFormatter');
 const LogService = require('../services/logService');
 const { getContextForMCPCall } = require('../middleware/requestContext');
@@ -88,11 +89,8 @@ router.get('/loan/:id', async (req, res) => {
     
     // Create the implementation function
     const getLoanDetails = async (args) => {
-      // Simulate implementation that would call the data service
       const { loan_id } = args;
-      const dataService = require('../services/dataService');
-      const loans = dataService.loadData(dataService.paths.loans);
-      const loan = loans.find(l => l.loan_id === loan_id);
+      const loan = await mcpDatabaseService.getLoanDetails(loan_id);
       
       if (!loan) {
         throw new Error(`Loan with ID '${loan_id}' not found`);
@@ -153,11 +151,8 @@ router.get('/borrower/:id', async (req, res) => {
     
     // Create the implementation function
     const getBorrowerDetails = async (args) => {
-      // Simulate implementation that would call the data service
       const { borrower_id } = args;
-      const dataService = require('../services/dataService');
-      const borrowers = dataService.loadData(dataService.paths.borrowers);
-      const borrower = borrowers.find(b => b.borrower_id === borrower_id);
+      const borrower = await mcpDatabaseService.getBorrowerDetails(borrower_id);
       
       if (!borrower) {
         throw new Error(`Borrower with ID '${borrower_id}' not found`);

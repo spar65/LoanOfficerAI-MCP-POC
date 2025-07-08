@@ -1,62 +1,47 @@
 const express = require('express');
 const router = express.Router();
-const dataService = require('../services/dataService');
+const mcpDatabaseService = require('../../services/mcpDatabaseService');
 const LogService = require('../services/logService');
-const McpService = require('../services/mcpService');
 
 // Get all loans with borrower information
-router.get('/', (req, res) => {
+router.get('/', async (req, res) => {
   const startTime = Date.now();
-  LogService.mcp('MCP CALL: getActiveLoans', {
+  LogService.mcp('MCP CALL: getLoans', {
     status: req.query.status,
     tenant: req.tenantContext
   });
   
-  // Apply tenant filtering if tenant context exists
-  let loans = dataService.loadData(dataService.paths.loans);
-  let borrowers = dataService.loadData(dataService.paths.borrowers);
-  
-  LogService.debug(`Loaded ${loans.length} loans and ${borrowers.length} borrowers`);
-  
-  if (req.tenantContext) {
-    LogService.info(`Applying tenant filter: ${req.tenantContext}`);
-    loans = dataService.getTenantFilteredData(loans, req.tenantContext);
-    borrowers = dataService.getTenantFilteredData(borrowers, req.tenantContext);
-    LogService.debug(`After tenant filtering: ${loans.length} loans and ${borrowers.length} borrowers`);
+  try {
+    // Get loans from database
+    let loans = await mcpDatabaseService.getLoans();
+    
+    LogService.debug(`Loaded ${loans.length} loans from database`);
+    
+    // Filter loans by status if status parameter is provided
+    if (req.query.status) {
+      const status = req.query.status.toLowerCase();
+      LogService.info(`Filtering loans by status: ${status}`);
+      loans = loans.filter(loan => loan.status && loan.status.toLowerCase() === status);
+      LogService.debug(`After status filtering: ${loans.length} loans`);
+    }
+    
+    const duration = Date.now() - startTime;
+    LogService.mcp(`MCP RESULT: getLoans - ${loans.length} loans found (${duration}ms)`, {
+      count: loans.length,
+      duration: `${duration}ms`,
+      statusFilter: req.query.status || 'all',
+      responseSize: JSON.stringify(loans).length
+    });
+    
+    res.json(loans);
+  } catch (error) {
+    LogService.error('Error fetching loans from database', { error: error.message });
+    res.status(500).json({ error: 'Failed to retrieve loans', details: error.message });
   }
-  
-  // Filter loans by status if status parameter is provided
-  let filteredLoans = loans;
-  if (req.query.status) {
-    const status = req.query.status;
-    LogService.info(`Filtering loans by status: ${status}`);
-    filteredLoans = loans.filter(loan => loan.status === status);
-    LogService.debug(`After status filtering: ${filteredLoans.length} loans`);
-  }
-  
-  // Enhance loans with borrower information
-  const loansWithBorrowers = filteredLoans.map(loan => {
-    const borrower = borrowers.find(b => b.borrower_id === loan.borrower_id);
-    return {
-      ...loan,
-      borrower: borrower ? `${borrower.first_name} ${borrower.last_name}` : 'Unknown',
-      borrower_details: borrower || null
-    };
-  });
-  
-  const duration = Date.now() - startTime;
-  LogService.mcp(`MCP RESULT: getActiveLoans - ${filteredLoans.length} loans found (${duration}ms)`, {
-    count: filteredLoans.length,
-    duration: `${duration}ms`,
-    statusFilter: req.query.status || 'all',
-    responseSize: JSON.stringify(loansWithBorrowers).length
-  });
-  
-  res.json(loansWithBorrowers);
 });
 
 // Get loan by ID with all related information
-router.get('/:id', (req, res, next) => {
+router.get('/:id', async (req, res, next) => {
   const loanId = req.params.id;
   
   // If the path is actually one of the more specific routes, pass to next handler
@@ -68,9 +53,7 @@ router.get('/:id', (req, res, next) => {
   LogService.info(`Fetching loan details for loan ID: ${loanId}`);
   
   try {
-    // Apply tenant filtering
-    let loans = dataService.loadData(dataService.paths.loans);
-    const loan = loans.find(l => l.loan_id === loanId);
+    const loan = await mcpDatabaseService.getLoanById(loanId);
     
     if (loan) {
       LogService.info(`Loan found: ${loan.loan_id}`);
@@ -86,37 +69,22 @@ router.get('/:id', (req, res, next) => {
 });
 
 // Get loan by ID with comprehensive details
-router.get('/details/:id', (req, res) => {
+router.get('/details/:id', async (req, res) => {
   const loanId = req.params.id;
   LogService.info(`Fetching comprehensive loan details for loan ID: ${loanId}`);
   
   try {
-    // Apply tenant filtering
-    let loans = dataService.loadData(dataService.paths.loans);
-    let borrowers = dataService.loadData(dataService.paths.borrowers);
-    let payments = dataService.loadData(dataService.paths.payments);
-    let collaterals = dataService.loadData(dataService.paths.collateral);
-    
-    if (req.tenantContext) {
-      loans = dataService.getTenantFilteredData(loans, req.tenantContext);
-      borrowers = dataService.getTenantFilteredData(borrowers, req.tenantContext);
-      payments = dataService.getTenantFilteredData(payments, req.tenantContext);
-      collaterals = dataService.getTenantFilteredData(collaterals, req.tenantContext);
-    }
-    
-    const loan = loans.find(l => l.loan_id === loanId);
+    const loan = await mcpDatabaseService.getLoanDetails(loanId);
     
     if (loan) {
-      const borrower = borrowers.find(b => b.borrower_id === loan.borrower_id);
-      const loanPayments = dataService.getRelatedData(loanId, payments, 'loan_id');
-      const loanCollateral = dataService.getRelatedData(loanId, collaterals, 'loan_id');
+      // Get related data
+      const collateral = await mcpDatabaseService.getLoanCollateral(loanId);
+      const payments = await mcpDatabaseService.getLoanPayments(loanId);
       
       const loanDetails = {
         ...loan,
-        borrower: borrower ? `${borrower.first_name} ${borrower.last_name}` : 'Unknown',
-        borrower_details: borrower || null,
-        payments: loanPayments,
-        collateral: loanCollateral
+        collateral,
+        payments
       };
       
       LogService.info(`Detailed loan information retrieved for loan ID: ${loanId}`);
@@ -132,17 +100,16 @@ router.get('/details/:id', (req, res) => {
 });
 
 // Get loan status by ID
-router.get('/status/:id', (req, res) => {
+router.get('/status/:id', async (req, res) => {
   const loanId = req.params.id;
   LogService.info(`Fetching loan status for loan ID: ${loanId}`);
   
   try {
-    const loans = dataService.loadData(dataService.paths.loans);
-    const loan = loans.find(l => l.loan_id === loanId);
+    const loanStatus = await mcpDatabaseService.getLoanStatus(loanId);
     
-    if (loan) {
-      LogService.info(`Loan status for ID ${loanId}: ${loan.status}`);
-      res.json({ status: loan.status });
+    if (loanStatus) {
+      LogService.info(`Loan status for ID ${loanId}: ${loanStatus.status}`);
+      res.json(loanStatus);
     } else {
       LogService.warn(`Loan not found with ID: ${loanId}`);
       res.status(404).json({ error: 'Loan not found' });
@@ -154,7 +121,7 @@ router.get('/status/:id', (req, res) => {
 });
 
 // Get active loans
-router.get('/active', (req, res) => {
+router.get('/active', async (req, res) => {
   LogService.info('Fetching active loans');
   
   try {
@@ -164,27 +131,10 @@ router.get('/active', (req, res) => {
       LogService.debug('Processing internal API call for active loans');
     }
     
-    const loans = dataService.loadData(dataService.paths.loans);
-    const borrowers = dataService.loadData(dataService.paths.borrowers);
-    
-    if (!loans || !loans.length) {
-      LogService.warn('No loans data found');
-      return res.json({ error: 'No loans data available', loans: [] });
-    }
-    
-    const activeLoans = loans.filter(l => l.status === 'Active');
-    
-    const activeLoansWithBorrowers = activeLoans.map(loan => {
-      const borrower = borrowers.find(b => b.borrower_id === loan.borrower_id);
-      return {
-        ...loan,
-        borrower: borrower ? `${borrower.first_name} ${borrower.last_name}` : 'Unknown',
-        borrower_details: borrower || null
-      };
-    });
+    const activeLoans = await mcpDatabaseService.getActiveLoans();
     
     LogService.info(`Found ${activeLoans.length} active loans`);
-    return res.json(activeLoansWithBorrowers);
+    return res.json(activeLoans);
   } catch (error) {
     LogService.error('Error fetching active loans', { error: error.message, stack: error.stack });
     return res.status(500).json({ 
@@ -195,53 +145,15 @@ router.get('/active', (req, res) => {
 });
 
 // Get loans by borrower name
-router.get('/borrower/:name', (req, res) => {
+router.get('/borrower/:name', async (req, res) => {
   const borrowerName = req.params.name;
   LogService.info(`Fetching loans for borrower name: ${borrowerName}`);
   
   try {
-    const loans = dataService.loadData(dataService.paths.loans);
-    const borrowers = dataService.loadData(dataService.paths.borrowers);
-    
-    // Handle full names by splitting into first and last name
-    let matchingBorrowers = [];
-    if (borrowerName.includes(' ')) {
-      // If full name is provided (e.g., "John Doe")
-      const [firstName, lastName] = borrowerName.split(' ');
-      LogService.debug(`Searching for borrower with first name "${firstName}" and last name "${lastName}"`);
-      
-      matchingBorrowers = borrowers.filter(b => 
-        b.first_name.toLowerCase() === firstName.toLowerCase() && 
-        b.last_name.toLowerCase() === lastName.toLowerCase()
-      );
-    } else {
-      // If only a partial name is provided, search in both first and last name
-      LogService.debug(`Searching for borrower with name containing "${borrowerName}"`);
-      matchingBorrowers = borrowers.filter(b => 
-        b.first_name.toLowerCase().includes(borrowerName.toLowerCase()) ||
-        b.last_name.toLowerCase().includes(borrowerName.toLowerCase())
-      );
-    }
-    
-    if (matchingBorrowers.length === 0) {
-      LogService.info(`No borrowers found matching name: ${borrowerName}`);
-      return res.json([]);
-    }
-    
-    const borrowerIds = matchingBorrowers.map(b => b.borrower_id);
-    const borrowerLoans = loans.filter(l => borrowerIds.includes(l.borrower_id));
-    
-    const loansWithBorrowers = borrowerLoans.map(loan => {
-      const borrower = borrowers.find(b => b.borrower_id === loan.borrower_id);
-      return {
-        ...loan,
-        borrower: borrower ? `${borrower.first_name} ${borrower.last_name}` : 'Unknown',
-        borrower_details: borrower || null
-      };
-    });
+    const borrowerLoans = await mcpDatabaseService.getLoansByBorrower(borrowerName);
     
     LogService.info(`Found ${borrowerLoans.length} loans for borrower name: ${borrowerName}`);
-    res.json(loansWithBorrowers);
+    res.json(borrowerLoans);
   } catch (error) {
     LogService.error(`Error fetching loans for borrower name: ${borrowerName}`, { error: error.message });
     res.status(500).json({ error: 'Failed to retrieve loans by borrower name', details: error.message });
@@ -249,33 +161,11 @@ router.get('/borrower/:name', (req, res) => {
 });
 
 // Get loan summary statistics
-router.get('/summary', (req, res) => {
+router.get('/summary', async (req, res) => {
   LogService.info('Fetching loan portfolio summary statistics');
   
   try {
-    const loans = dataService.loadData(dataService.paths.loans);
-    const payments = dataService.loadData(dataService.paths.payments);
-    
-    const totalLoans = loans.length;
-    const activeLoans = loans.filter((l) => l.status === 'Active').length;
-    const totalAmount = loans.reduce((sum, l) => sum + l.loan_amount, 0);
-    
-    // Calculate delinquency rate based on loans with late payments
-    const loansWithLatePayments = loans.filter((loan) => {
-      const loanPayments = payments.filter((p) => p.loan_id === loan.loan_id);
-      return loanPayments.some((p) => p.status === 'Late');
-    });
-    
-    const delinquencyRate = totalLoans > 0 
-      ? (loansWithLatePayments.length / totalLoans) * 100 
-      : 0;
-    
-    const summary = {
-      totalLoans,
-      activeLoans,
-      totalAmount,
-      delinquencyRate
-    };
+    const summary = await mcpDatabaseService.getLoanSummary();
     
     LogService.info('Loan summary statistics calculated successfully');
     res.json(summary);
@@ -286,13 +176,12 @@ router.get('/summary', (req, res) => {
 });
 
 // Get all payments for a loan
-router.get('/:id/payments', (req, res) => {
+router.get('/:id/payments', async (req, res) => {
   const loanId = req.params.id;
   LogService.info(`Fetching payments for loan ID: ${loanId}`);
   
   try {
-    const payments = dataService.loadData(dataService.paths.payments);
-    const loanPayments = payments.filter(p => p.loan_id === loanId);
+    const loanPayments = await mcpDatabaseService.getLoanPayments(loanId);
     
     LogService.info(`Found ${loanPayments.length} payments for loan ID: ${loanId}`);
     res.json(loanPayments);
@@ -303,13 +192,12 @@ router.get('/:id/payments', (req, res) => {
 });
 
 // Get all collateral for a loan
-router.get('/:id/collateral', (req, res) => {
+router.get('/:id/collateral', async (req, res) => {
   const loanId = req.params.id;
   LogService.info(`Fetching collateral for loan ID: ${loanId}`);
   
   try {
-    const collaterals = dataService.loadData(dataService.paths.collateral);
-    const loanCollateral = collaterals.filter(c => c.loan_id === loanId);
+    const loanCollateral = await mcpDatabaseService.getLoanCollateral(loanId);
     
     LogService.info(`Found ${loanCollateral.length} collateral items for loan ID: ${loanId}`);
     res.json(loanCollateral);

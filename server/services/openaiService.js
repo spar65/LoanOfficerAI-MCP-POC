@@ -7,6 +7,18 @@ const LogService = require('./logService');
 
 class OpenAIService {
   constructor() {
+    this.client = null;
+    this.initialized = false;
+  }
+  
+  /**
+   * Initialize the OpenAI client (lazy initialization)
+   */
+  initialize() {
+    if (this.initialized) {
+      return;
+    }
+    
     if (!process.env.OPENAI_API_KEY) {
       LogService.error('OPENAI_API_KEY environment variable is not set');
       throw new Error('OpenAI API key is not configured');
@@ -16,6 +28,7 @@ class OpenAIService {
       apiKey: process.env.OPENAI_API_KEY
     });
     
+    this.initialized = true;
     LogService.info('OpenAI client initialized');
   }
   
@@ -25,6 +38,9 @@ class OpenAIService {
    * @returns {Promise<Object>} - OpenAI response
    */
   async createChatCompletion(options) {
+    // Initialize client if not already done
+    this.initialize();
+    
     const startTime = Date.now();
     const model = options.model || 'gpt-4o';
     const messages = options.messages || [];

@@ -12,46 +12,28 @@ const LogService = require('../services/logService');
  */
 function registerRoutes(app) {
   // Feature-specific routes
-  try {
-    // Load all route modules
-    const loansRoutes = require('./loans');
-    const borrowersRoutes = require('./borrowers');
-    const riskRoutes = require('./risk');
-    const analyticsRoutes = require('./analytics');
-    const openaiRoutes = require('./openai');
-    const collateralRoutes = require('./collateral');
-    const paymentsRoutes = require('./payments');
-    const mcpRoutes = require('./mcp');
-    
-    // Register routes with app
-    app.use('/api/loans', loansRoutes);
-    LogService.info('Loan routes registered at /api/loans');
-    
-    app.use('/api/borrowers', borrowersRoutes);
-    LogService.info('Borrower routes registered at /api/borrowers');
-    
-    app.use('/api/risk', riskRoutes);
-    LogService.info('Risk routes registered at /api/risk');
-    
-    app.use('/api/analytics', analyticsRoutes);
-    LogService.info('Analytics routes registered at /api/analytics');
-    
-    app.use('/api/openai', openaiRoutes);
-    LogService.info('OpenAI routes registered at /api/openai');
-    
-    app.use('/api/collateral', collateralRoutes);
-    LogService.info('Collateral routes registered at /api/collateral');
-    
-    app.use('/api/payments', paymentsRoutes);
-    LogService.info('Payment routes registered at /api/payments');
-    
-    app.use('/api/mcp', mcpRoutes);
-    LogService.info('Enhanced MCP routes registered at /api/mcp');
-  } catch (error) {
-    LogService.warn(`Failed to register all routes: ${error.message}`);
-    LogService.debug('Stack trace:', error.stack);
-    // Continue with partial route registration
-  }
+  const routes = [
+    { path: '/api/loans', module: './loans', name: 'Loan' },
+    { path: '/api/borrowers', module: './borrowers', name: 'Borrower' },
+    { path: '/api/risk', module: './risk', name: 'Risk' },
+    { path: '/api/analytics', module: './analytics', name: 'Analytics' },
+    { path: '/api/openai', module: './openai', name: 'OpenAI' },
+    { path: '/api/collateral', module: './collateral', name: 'Collateral' },
+    { path: '/api/payments', module: './payments', name: 'Payment' },
+    { path: '/api/mcp', module: './mcp', name: 'Enhanced MCP' }
+  ];
+
+  routes.forEach(route => {
+    try {
+      const routeModule = require(route.module);
+      app.use(route.path, routeModule);
+      LogService.info(`${route.name} routes registered at ${route.path}`);
+    } catch (error) {
+      LogService.warn(`Failed to register ${route.name} routes: ${error.message}`);
+      LogService.debug(`${route.name} route error:`, error.stack);
+      // Continue with other routes
+    }
+  });
 }
 
 module.exports = { registerRoutes }; 
