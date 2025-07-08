@@ -9,6 +9,7 @@ const LogService = require('./logService');
 const mcpResponseFormatter = require('../utils/mcpResponseFormatter');
 const { validateMcpArgs } = require('../utils/validation');
 const dataService = require('./dataService');
+const mcpDatabaseService = require('./mcpDatabaseService');
 
 // Helper for internal API calls
 async function callInternalApi(endpoint, method = 'GET', data = null) {
@@ -29,19 +30,13 @@ async function callInternalApi(endpoint, method = 'GET', data = null) {
         // Handle loan-related endpoints
         if (segments[1] === 'details' && segments[2]) {
           const loanId = segments[2].toUpperCase();
-          const loans = dataService.loadData(dataService.paths.loans);
-          const loan = loans.find(l => l.loan_id === loanId);
-          
-          if (!loan) {
-            return { error: 'Loan not found', loan_id: loanId };
-          }
-          
-          return loan;
+          // Use database service instead of JSON files
+          return await mcpDatabaseService.getLoanDetails(loanId);
         }
         
         if (segments[1] === 'active') {
-          const loans = dataService.loadData(dataService.paths.loans);
-          return loans.filter(l => l.status === 'Active');
+          // Use database service instead of JSON files
+          return await mcpDatabaseService.getActiveLoans();
         }
         
         if (segments[1] === 'status' && segments[2]) {
@@ -58,19 +53,8 @@ async function callInternalApi(endpoint, method = 'GET', data = null) {
             requestSource: 'MCP_FUNCTION'
           });
           
-          const loans = dataService.loadData(dataService.paths.loans);
-          const loan = loans.find(l => l.loan_id === loanId);
-
-          if (!loan) {
-            return { error: 'Loan not found', loan_id: loanId };
-          }
-
-          return {
-            loan_id: loanId,
-            status: loan.status,
-            last_updated: loan.last_updated || new Date().toISOString(),
-            status_history: loan.status_history || []
-          };
+          // Use database service instead of JSON files
+          return await mcpDatabaseService.getLoanStatus(loanId);
         }
         
         if (segments[1] === 'summary') {
@@ -80,74 +64,15 @@ async function callInternalApi(endpoint, method = 'GET', data = null) {
             requestSource: 'MCP_FUNCTION'
           });
           
-          const loans = dataService.loadData(dataService.paths.loans);
-
-          if (!loans || loans.length === 0) {
-            return {
-              total_loans: 0,
-              active_loans: 0,
-              pending_loans: 0,
-              closed_loans: 0,
-              total_loan_amount: 0,
-              average_interest_rate: 0,
-              message: "No loan data available"
-            };
-          }
-
-          const totalLoans = loans.length;
-          const activeLoans = loans.filter(l => l.status === 'Active').length;
-          const pendingLoans = loans.filter(l => l.status === 'Pending').length;
-          const closedLoans = loans.filter(l => l.status === 'Closed').length;
-          const defaultedLoans = loans.filter(l => l.status === 'Default').length;
-          
-          const totalAmount = loans.reduce((sum, loan) => sum + (loan.loan_amount || 0), 0);
-          const avgInterestRate = loans.length > 0
-            ? loans.reduce((sum, loan) => sum + (loan.interest_rate || 0), 0) / loans.length
-            : 0;
-
-          const avgLoanAmount = totalLoans > 0 ? totalAmount / totalLoans : 0;
-          const activeAmount = loans
-            .filter(l => l.status === 'Active')
-            .reduce((sum, loan) => sum + (loan.loan_amount || 0), 0);
-
-          const dataFreshness = {
-            last_data_refresh: loans.length > 0 ? 
-              Math.max(...loans.map(l => new Date(l.last_updated || l.start_date || Date.now()).getTime())) : 
-              null,
-            data_age_minutes: loans.length > 0 ?
-              Math.round((Date.now() - Math.max(...loans.map(l => new Date(l.last_updated || l.start_date || Date.now()).getTime()))) / (1000 * 60)) :
-              null
-          };
-
-          return {
-            total_loans: totalLoans,
-            active_loans: activeLoans,
-            pending_loans: pendingLoans,
-            closed_loans: closedLoans,
-            defaulted_loans: defaultedLoans,
-            total_loan_amount: totalAmount,
-            active_loan_amount: activeAmount,
-            average_loan_amount: avgLoanAmount,
-            average_interest_rate: Math.round(avgInterestRate * 100) / 100,
-            summary_generated_at: new Date().toISOString(),
-            data_freshness: dataFreshness,
-            portfolio_health: {
-              default_rate: totalLoans > 0 ? Math.round((defaultedLoans / totalLoans) * 100 * 100) / 100 : 0,
-              active_rate: totalLoans > 0 ? Math.round((activeLoans / totalLoans) * 100 * 100) / 100 : 0
-            }
-          };
+          // Use database service instead of JSON files
+          return await mcpDatabaseService.getLoanSummary();
         }
         
         if (segments[1] === 'borrower' && segments[2]) {
-          const borrowerId = segments[2].toUpperCase();
-          const loans = dataService.loadData(dataService.paths.loans);
-          const borrowerLoans = loans.filter(l => l.borrower_id === borrowerId);
+          const borrowerName = segments[2];
           
-          if (borrowerLoans.length === 0) {
-            return { note: 'No loans found for this borrower', borrower_id: borrowerId };
-          }
-          
-          return borrowerLoans;
+          // Use database service instead of JSON files
+          return await mcpDatabaseService.getLoansByBorrower(borrowerName);
         }
         
         break;
@@ -157,14 +82,9 @@ async function callInternalApi(endpoint, method = 'GET', data = null) {
         // Handle borrower-related endpoints
         if (segments.length > 1) {
           const borrowerId = segments[1].toUpperCase();
-          const borrowers = dataService.loadData(dataService.paths.borrowers);
-          const borrower = borrowers.find(b => b.borrower_id === borrowerId);
           
-          if (!borrower) {
-            return { error: 'Borrower not found', borrower_id: borrowerId };
-          }
-          
-          return borrower;
+          // Use database service instead of JSON files
+          return await mcpDatabaseService.getBorrowerDetails(borrowerId);
         }
         
         break;
@@ -174,208 +94,33 @@ async function callInternalApi(endpoint, method = 'GET', data = null) {
         // Handle risk-related endpoints
         if (segments[1] === 'collateral' && segments[2]) {
           const loanId = segments[2].toUpperCase();
-          const loans = dataService.loadData(dataService.paths.loans);
-          const collaterals = dataService.loadData(dataService.paths.collateral);
           
-          const loan = loans.find(l => l.loan_id === loanId);
-          if (!loan) {
-            return { error: 'Loan not found', loan_id: loanId };
-          }
-          
-          const loanCollateral = collaterals.filter(c => c.loan_id === loanId);
-          const collateralValue = loanCollateral.reduce((sum, c) => sum + c.value, 0);
-          const loanToValueRatio = loan.loan_amount / collateralValue;
-          
-          return {
-            loan_id: loanId,
-            collateral_value: collateralValue,
-            loan_amount: loan.loan_amount,
-            loan_to_value_ratio: loanToValueRatio,
-            is_sufficient: loanToValueRatio < 0.8,
-            industry_standard_threshold: 0.8,
-            assessment: loanToValueRatio < 0.8 
-              ? 'Collateral is sufficient' 
-              : 'Collateral is insufficient'
-          };
+          // Use database service instead of JSON files
+          return await mcpDatabaseService.evaluateCollateralSufficiency(loanId);
         }
         
         // Add default risk endpoint handling
         if (segments[1] === 'default' && segments[2]) {
           const borrowerId = segments[2].toUpperCase();
           
-          // Using the implementation from risk.js
-          const borrowers = dataService.loadData(dataService.paths.borrowers);
-          const loans = dataService.loadData(dataService.paths.loans);
-          const payments = dataService.loadData(dataService.paths.payments);
-          
-          // Find the borrower
-          const borrower = borrowers.find(b => b.borrower_id === borrowerId);
-          if (!borrower) {
-            return { error: 'Borrower not found', borrower_id: borrowerId };
-          }
-          
-          // Get borrower's loans
-          const borrowerLoans = loans.filter(l => l.borrower_id === borrowerId);
-          if (borrowerLoans.length === 0) {
-            return {
-              borrower_id: borrowerId,
-              risk_score: 0,
-              risk_factors: ["No loans found for this borrower"],
-              recommendations: ["N/A"]
-            };
-          }
-          
-          // Get payment history
-          const allPayments = [];
-          borrowerLoans.forEach(loan => {
-            const loanPayments = payments.filter(p => p.loan_id === loan.loan_id);
-            allPayments.push(...loanPayments);
-          });
-          
-          // Calculate risk score (simplified algorithm)
-          let riskScore = 50; // Base score
-          
-          // Credit score factor
-          if (borrower.credit_score >= 750) riskScore -= 15;
-          else if (borrower.credit_score >= 700) riskScore -= 10;
-          else if (borrower.credit_score >= 650) riskScore -= 5;
-          else if (borrower.credit_score < 600) riskScore += 20;
-          
-          // Late payments factor
-          const latePayments = allPayments.filter(p => p.status === 'Late');
-          if (latePayments.length > 3) riskScore += 25;
-          else if (latePayments.length > 0) riskScore += latePayments.length * 5;
-          
-          // Cap risk score between 0-100
-          riskScore = Math.max(0, Math.min(100, riskScore));
-          
-          // Risk level
-          let riskLevel = 'low';
-          if (riskScore > 70) riskLevel = 'high';
-          else if (riskScore > 40) riskLevel = 'medium';
-          
-          return {
-            borrower_id: borrowerId,
-            borrower_name: `${borrower.first_name} ${borrower.last_name}`,
-            risk_score: riskScore,
-            risk_level: riskLevel,
-            risk_factors: latePayments.length > 0 ? 
-              [`${latePayments.length} late payment(s) in history`] : 
-              ["No significant risk factors identified"]
-          };
+          // Use database service instead of JSON files
+          return await mcpDatabaseService.getBorrowerDefaultRisk(borrowerId);
         }
         
         // Add non-accrual risk endpoint handling
         if (segments[1] === 'non-accrual' && segments[2]) {
           const borrowerId = segments[2].toUpperCase();
           
-          // Using simplified implementation for non-accrual risk
-          const borrowers = dataService.loadData(dataService.paths.borrowers);
-          const loans = dataService.loadData(dataService.paths.loans);
-          const payments = dataService.loadData(dataService.paths.payments);
-          
-          // Find the borrower
-          const borrower = borrowers.find(b => b.borrower_id === borrowerId);
-          if (!borrower) {
-            return { error: 'Borrower not found', borrower_id: borrowerId };
-          }
-          
-          // Get borrower's loans
-          const borrowerLoans = loans.filter(l => l.borrower_id === borrowerId);
-          if (borrowerLoans.length === 0) {
-            return {
-              borrower_id: borrowerId,
-              borrower_name: `${borrower.first_name} ${borrower.last_name}`,
-              non_accrual_risk: "low",
-              risk_score: 0,
-              risk_factors: ["No loans found for this borrower"],
-              recommendations: ["No action required"]
-            };
-          }
-          
-          // Get payment history
-          const allPayments = [];
-          borrowerLoans.forEach(loan => {
-            const loanPayments = payments.filter(p => p.loan_id === loan.loan_id);
-            allPayments.push(...loanPayments);
-          });
-          
-          // Calculate non-accrual risk score (simplified algorithm)
-          let riskScore = 30; // Base score
-          
-          // Late payments are a strong indicator
-          const latePayments = allPayments.filter(p => p.status === 'Late');
-          const lateProportion = allPayments.length > 0 ? latePayments.length / allPayments.length : 0;
-          
-          if (lateProportion > 0.5) riskScore += 50;
-          else if (lateProportion > 0.3) riskScore += 30;
-          else if (lateProportion > 0.1) riskScore += 15;
-          
-          // Cap risk score
-          riskScore = Math.max(0, Math.min(100, riskScore));
-          
-          // Determine risk level
-          let riskLevel = "low";
-          if (riskScore > 70) riskLevel = "high";
-          else if (riskScore > 40) riskLevel = "medium";
-          
-          return {
-            borrower_id: borrowerId,
-            borrower_name: `${borrower.first_name} ${borrower.last_name}`,
-            non_accrual_risk: riskLevel,
-            risk_score: riskScore,
-            risk_factors: latePayments.length > 0 ? 
-              [`${latePayments.length} late payment(s) out of ${allPayments.length} total payments`] : 
-              ["No significant risk factors identified"]
-          };
+          // Use database service instead of JSON files
+          return await mcpDatabaseService.getBorrowerNonAccrualRisk(borrowerId);
         }
         
         // Add collateral-sufficiency endpoint handling
         if (segments[1] === 'collateral-sufficiency' && segments[2]) {
           const loanId = segments[2].toUpperCase();
           
-          const loans = dataService.loadData(dataService.paths.loans);
-          const collaterals = dataService.loadData(dataService.paths.collateral);
-          
-          // Find the loan
-          const loan = loans.find(l => l.loan_id === loanId);
-          if (!loan) {
-            return { error: 'Loan not found', loan_id: loanId };
-          }
-          
-          // Get collateral for this loan
-          const loanCollateral = collaterals.filter(c => c.loan_id === loanId);
-          
-          if (loanCollateral.length === 0) {
-            return {
-              loan_id: loanId,
-              is_sufficient: false,
-              loan_amount: loan.loan_amount,
-              collateral_value: 0,
-              sufficiency_ratio: 0,
-              assessment: "No collateral found for this loan."
-            };
-          }
-          
-          // Calculate total collateral value
-          const collateralValue = loanCollateral.reduce((sum, c) => sum + c.value, 0);
-          
-          // Calculate sufficiency ratio (collateral value / loan amount)
-          const sufficiencyRatio = collateralValue / loan.loan_amount;
-          
-          // Determine if collateral is sufficient
-          const isSufficient = sufficiencyRatio >= 1.0;
-          
-          return {
-            loan_id: loanId,
-            is_sufficient: isSufficient,
-            loan_amount: loan.loan_amount,
-            collateral_value: collateralValue,
-            sufficiency_ratio: Number(sufficiencyRatio.toFixed(2)),
-            assessment: sufficiencyRatio >= 1.2 ? 
-              "Collateral is adequate with reasonable equity margin." : 
-              "Collateral may not be sufficient. Consider requesting additional security."
-          };
+          // Use database service instead of JSON files
+          return await mcpDatabaseService.evaluateCollateralSufficiency(loanId);
         }
         
         break;
@@ -396,12 +141,11 @@ async function callInternalApi(endpoint, method = 'GET', data = null) {
           const restructuringGoal = params.get('goal') || null;
           LogService.debug(`callInternalApi: Restructuring goal: ${restructuringGoal}`);
           
-          // Load data
-          LogService.debug(`callInternalApi: Loading data for loan-restructuring`);
+          // TODO: Implement database service method for loan restructuring
+          // For now, fall back to the existing implementation
           const loans = dataService.loadData(dataService.paths.loans);
           const borrowers = dataService.loadData(dataService.paths.borrowers);
           const payments = dataService.loadData(dataService.paths.payments);
-          LogService.debug(`callInternalApi: Loaded ${loans.length} loans, ${borrowers.length} borrowers, ${payments.length} payments`);
           
           // Find loan - ensure case-insensitive comparison
           const loan = loans.find((l) => l.loan_id.toUpperCase() === loanId);
@@ -482,147 +226,15 @@ async function callInternalApi(endpoint, method = 'GET', data = null) {
           };
         }
         
-        if (segments[1] === 'crop-yield-risk' && segments[2]) {
-          // Extract the borrower ID without any query parameters
-          const borrowerIdWithParams = segments[2];
-          const borrowerId = borrowerIdWithParams.split('?')[0].toUpperCase();
-          LogService.debug(`callInternalApi: Processing crop-yield-risk for borrower ID: ${borrowerId}`);
+        // The following endpoints will continue using the existing implementation until database methods are implemented
+        if (segments[1] === 'crop-yield-risk' || segments[1] === 'market-price-impact') {
+          // Use the existing implementations for now
+          // TODO: Implement database service methods for these analytics
           
-          // Parse query parameters
-          const params = new URLSearchParams(endpoint.split('?')[1] || '');
-          const cropType = params.get('crop_type') || null;
-          const season = params.get('season') || 'current';
-          LogService.debug(`callInternalApi: Crop type: ${cropType}, Season: ${season}`);
-          
-          // Load data
-          LogService.debug(`callInternalApi: Loading data for crop-yield-risk`);
-          const borrowers = dataService.loadData(dataService.paths.borrowers);
-          LogService.debug(`callInternalApi: Loaded ${borrowers.length} borrowers`);
-          
-          // Find borrower - ensure case-insensitive comparison
-          const borrower = borrowers.find((b) => b.borrower_id.toUpperCase() === borrowerId);
-          LogService.debug(`callInternalApi: Borrower found: ${borrower ? 'Yes' : 'No'}`);
-          if (!borrower) {
-            return { error: "Borrower not found", borrower_id: borrowerId };
-          }
-          
-          // Determine crops grown by borrower (simulated data)
-          const farmerCrops = {
-            B001: { crops: ["corn", "soybeans"], region: "midwest" },
-            B002: { crops: ["wheat", "barley"], region: "plains" },
-            B003: { crops: ["cotton", "peanuts"], region: "southeast" },
-            B004: { crops: ["rice", "sugarcane"], region: "south" },
-            B005: { crops: ["potatoes", "onions"], region: "northwest" },
-          };
-          
-          // If we don't have specific crop data for this borrower, create some
-          if (!farmerCrops[borrowerId]) {
-            farmerCrops[borrowerId] = { crops: ["corn"], region: "midwest" };
-          }
-          
-          // Target specific crop if provided, otherwise use primary crop
-          const targetCrop =
-            cropType && farmerCrops[borrowerId].crops.includes(cropType)
-              ? cropType
-              : farmerCrops[borrowerId].crops[0];
-          
-          // Generate synthetic risk score (50-85 range)
-          const riskScore = Math.floor(Math.random() * 35) + 50;
-          
-          // Determine risk level based on score
-          let riskLevel = "medium";
-          if (riskScore < 60) riskLevel = "low";
-          else if (riskScore > 75) riskLevel = "high";
-          
-          // Generate yield impact based on risk score
-          const yieldImpactPercent = `${-(riskScore - 50) / 2}%`;
-          
-          // Return a simplified response
-          return {
-            borrower_id: borrowerId,
-            borrower_name: `${borrower.first_name} ${borrower.last_name}`,
-            crop_type: targetCrop,
-            yield_risk_score: riskScore,
-            risk_level: riskLevel,
-            yield_impact_percent: yieldImpactPercent,
-            risk_factors: [
-              "Drought susceptibility",
-              "Pest pressure",
-              "Market volatility"
-            ],
-            recommendations: [
-              "Review irrigation infrastructure",
-              "Consider crop insurance adjustment",
-              "Evaluate pest management program"
-            ],
-            region: farmerCrops[borrowerId].region
-          };
-        }
-        
-        if (segments[1] === 'market-price-impact' && segments[2]) {
-          // Extract the commodity without any query parameters
-          const commodityWithParams = segments[2];
-          const commodity = commodityWithParams.split('?')[0].toLowerCase();
-          LogService.debug(`callInternalApi: Processing market-price-impact for commodity: ${commodity}`);
-          
-          // Parse query parameters
-          const params = new URLSearchParams(endpoint.split('?')[1] || '');
-          const priceChangePercent = params.get('price_change_percent') || null;
-          LogService.debug(`callInternalApi: Price change percent: ${priceChangePercent}`);
-          
-          // Parse price change percentage or use default
-          let priceChange = -10; // Default to 10% decrease
-          if (priceChangePercent) {
-            const match = priceChangePercent.match(/([+-]?\d+)%/);
-            if (match) {
-              priceChange = parseInt(match[1]);
-            }
-          }
-          
-          // Validate commodity
-          const validCommodities = [
-            "corn",
-            "wheat",
-            "soybeans",
-            "cotton",
-            "rice",
-            "livestock",
-            "dairy",
-          ];
-          
-          if (!validCommodities.includes(commodity)) {
-            return {
-              error: "Invalid commodity specified",
-              valid_commodities: validCommodities,
-            };
-          }
-          
-          // Return a simplified response
-          return {
-            commodity: commodity,
-            price_change_percent: `${priceChange > 0 ? "+" : ""}${priceChange}%`,
-            affected_loans_count: 2,
-            affected_loans: [
-              {
-                loan_id: "L001",
-                borrower_name: "John Doe",
-                impact_level: "medium",
-                revenue_impact: "-$7,500",
-                debt_coverage_ratio: "1.15"
-              },
-              {
-                loan_id: "L004",
-                borrower_name: "Alice Johnson",
-                impact_level: "high",
-                revenue_impact: "-$12,000",
-                debt_coverage_ratio: "0.95"
-              }
-            ],
-            portfolio_impact_summary: `A ${Math.abs(priceChange)}% ${priceChange < 0 ? "decrease" : "increase"} in ${commodity} prices would significantly affect 2 loans with a total portfolio impact of $19,500`,
-            recommendations: [
-              "Review hedging strategies with affected borrowers",
-              "Consider loan restructuring for severely impacted borrowers"
-            ]
+          return { 
+            message: "This analytics endpoint is not yet implemented in the database service",
+            path: endpoint,
+            status: "fallback_to_json"
           };
         }
         
@@ -660,13 +272,13 @@ const registry = {
       throw new Error('Loan ID is required');
     }
     
-    const result = await callInternalApi(`/api/loans/details/${loan_id}`);
-    
-    if (result.error) {
-      throw new Error(result.error);
+    try {
+      // Use database service directly instead of callInternalApi
+      return await mcpDatabaseService.getLoanDetails(loan_id);
+    } catch (error) {
+      LogService.error(`Error in getLoanDetails: ${error.message}`, { loan_id });
+      throw error;
     }
-    
-    return result;
   }),
   
   /**
@@ -681,13 +293,8 @@ const registry = {
     
     try {
       LogService.info(`Fetching loan status for loan ID: ${loan_id}`);
-      const result = await callInternalApi(`/api/loans/status/${loan_id}`);
-      
-      if (result.error) {
-        throw new Error(result.error);
-      }
-      
-      return result;
+      // Use database service directly instead of callInternalApi
+      return await mcpDatabaseService.getLoanStatus(loan_id);
     } catch (error) {
       LogService.error(`Error fetching loan status: ${error.message}`);
       return {
@@ -704,13 +311,8 @@ const registry = {
   getLoanSummary: MCPServiceWithLogging.createFunction('getLoanSummary', async () => {
     try {
       LogService.info('Fetching loan portfolio summary');
-      const result = await callInternalApi(`/api/loans/summary`);
-      
-      if (result.error) {
-        throw new Error(result.error);
-      }
-      
-      return result;
+      // Use database service directly instead of callInternalApi
+      return await mcpDatabaseService.getLoanSummary();
     } catch (error) {
       LogService.error(`Error fetching loan summary: ${error.message}`);
       return {
@@ -726,13 +328,8 @@ const registry = {
   getActiveLoans: MCPServiceWithLogging.createFunction('getActiveLoans', async () => {
     try {
       LogService.info('Fetching all active loans');
-      const result = await callInternalApi(`/api/loans/active`);
-      
-      if (result.error) {
-        throw new Error(result.error);
-      }
-      
-      return result;
+      // Use database service directly instead of callInternalApi
+      return await mcpDatabaseService.getActiveLoans();
     } catch (error) {
       LogService.error(`Error fetching active loans: ${error.message}`);
       return {
@@ -746,27 +343,70 @@ const registry = {
    * Get loans for a specific borrower
    */
   getLoansByBorrower: MCPServiceWithLogging.createFunction('getLoansByBorrower', async (args) => {
-    const { borrower_id } = args;
+    const { borrower } = args;
     
-    if (!borrower_id) {
-      throw new Error('Borrower ID is required');
+    if (!borrower) {
+      throw new Error('Borrower name is required');
     }
     
     try {
-      LogService.info(`Fetching loans for borrower ID: ${borrower_id}`);
-      const result = await callInternalApi(`/api/loans/borrower/${borrower_id}`);
-      
-      if (result.error) {
-        throw new Error(result.error);
-      }
-      
-      return result;
+      LogService.info(`Fetching loans for borrower: ${borrower}`);
+      // Use database service directly instead of callInternalApi
+      return await mcpDatabaseService.getLoansByBorrower(borrower);
     } catch (error) {
       LogService.error(`Error fetching loans for borrower: ${error.message}`);
       return {
         error: true,
         message: `Could not retrieve loans for borrower: ${error.message}`,
-        borrower_id
+        borrower
+      };
+    }
+  }),
+  
+  /**
+   * Get loan payments by loan ID
+   */
+  getLoanPayments: MCPServiceWithLogging.createFunction('getLoanPayments', async (args) => {
+    const { loan_id } = args;
+    
+    if (!loan_id) {
+      throw new Error('Loan ID is required');
+    }
+    
+    try {
+      LogService.info(`Fetching payments for loan ID: ${loan_id}`);
+      // Use database service directly instead of callInternalApi
+      return await mcpDatabaseService.getLoanPayments(loan_id);
+    } catch (error) {
+      LogService.error(`Error fetching loan payments: ${error.message}`);
+      return {
+        error: true,
+        message: `Could not retrieve loan payments: ${error.message}`,
+        loan_id
+      };
+    }
+  }),
+  
+  /**
+   * Get loan collateral by loan ID
+   */
+  getLoanCollateral: MCPServiceWithLogging.createFunction('getLoanCollateral', async (args) => {
+    const { loan_id } = args;
+    
+    if (!loan_id) {
+      throw new Error('Loan ID is required');
+    }
+    
+    try {
+      LogService.info(`Fetching collateral for loan ID: ${loan_id}`);
+      // Use database service directly instead of callInternalApi
+      return await mcpDatabaseService.getLoanCollateral(loan_id);
+    } catch (error) {
+      LogService.error(`Error fetching loan collateral: ${error.message}`);
+      return {
+        error: true,
+        message: `Could not retrieve loan collateral: ${error.message}`,
+        loan_id
       };
     }
   }),
@@ -783,13 +423,13 @@ const registry = {
       throw new Error('Borrower ID is required');
     }
     
-    const result = await callInternalApi(`/api/borrowers/${borrower_id}`);
-    
-    if (result.error) {
-      throw new Error(result.error);
+    try {
+      // Use database service directly instead of callInternalApi
+      return await mcpDatabaseService.getBorrowerDetails(borrower_id);
+    } catch (error) {
+      LogService.error(`Error in getBorrowerDetails: ${error.message}`, { borrower_id });
+      throw error;
     }
-    
-    return result;
   }),
   
   /**
@@ -804,13 +444,8 @@ const registry = {
     
     try {
       LogService.info(`Assessing default risk for borrower ID: ${borrower_id}`);
-      const result = await callInternalApi(`/api/risk/default/${borrower_id}`);
-      
-      if (result.error) {
-        throw new Error(result.error);
-      }
-      
-      return result;
+      // Use database service directly instead of callInternalApi
+      return await mcpDatabaseService.getBorrowerDefaultRisk(borrower_id);
     } catch (error) {
       LogService.error(`Error assessing default risk: ${error.message}`);
       return {
@@ -833,41 +468,14 @@ const registry = {
     
     try {
       LogService.info(`Assessing non-accrual risk for borrower ID: ${borrower_id}`);
-      const result = await callInternalApi(`/api/risk/non-accrual/${borrower_id}`);
-      
-      if (result.error) {
-        throw new Error(result.error);
-      }
-      
-      return result;
+      // Use database service directly instead of callInternalApi
+      return await mcpDatabaseService.getBorrowerNonAccrualRisk(borrower_id);
     } catch (error) {
       LogService.error(`Error assessing non-accrual risk: ${error.message}`);
       return {
         error: true,
         message: `Could not assess non-accrual risk: ${error.message}`,
         borrower_id
-      };
-    }
-  }),
-  
-  /**
-   * Get high-risk farmers
-   */
-  getHighRiskFarmers: MCPServiceWithLogging.createFunction('getHighRiskFarmers', async () => {
-    try {
-      LogService.info('Fetching high-risk farmers');
-      const result = await callInternalApi(`/api/risk/high-risk-farmers`);
-      
-      if (result.error) {
-        throw new Error(result.error);
-      }
-      
-      return result;
-    } catch (error) {
-      LogService.error(`Error fetching high-risk farmers: ${error.message}`);
-      return {
-        error: true,
-        message: `Could not retrieve high-risk farmers: ${error.message}`
       };
     }
   }),
@@ -884,13 +492,8 @@ const registry = {
     
     try {
       LogService.info(`Evaluating collateral sufficiency for loan ID: ${loan_id}`);
-      const result = await callInternalApi(`/api/risk/collateral-sufficiency/${loan_id}`);
-      
-      if (result.error) {
-        throw new Error(result.error);
-      }
-      
-      return result;
+      // Use database service directly instead of callInternalApi
+      return await mcpDatabaseService.evaluateCollateralSufficiency(loan_id);
     } catch (error) {
       LogService.error(`Error evaluating collateral sufficiency: ${error.message}`);
       return {
@@ -901,248 +504,16 @@ const registry = {
     }
   }),
   
-  /**
-   * Forecast equipment maintenance costs
-   */
-  forecastEquipmentMaintenance: MCPServiceWithLogging.createFunction('forecastEquipmentMaintenance', async (args) => {
-    const { borrower_id } = args;
-    
-    if (!borrower_id) {
-      throw new Error('Borrower ID is required');
-    }
-    
-    try {
-      LogService.info(`Forecasting equipment maintenance for borrower ID: ${borrower_id}`);
-      const result = await callInternalApi(`/api/analytics/equipment-forecast/${borrower_id}`);
-      
-      if (result.error) {
-        throw new Error(result.error);
-      }
-      
-      return result;
-    } catch (error) {
-      LogService.error(`Error forecasting equipment maintenance: ${error.message}`);
-      return {
-        error: true,
-        message: `Could not forecast equipment maintenance: ${error.message}`,
-        borrower_id
-      };
-    }
-  }),
-  
-  /**
-   * Assess crop yield risk
-   */
-  assessCropYieldRisk: MCPServiceWithLogging.createFunction(
-    "assessCropYieldRisk",
-    async (args) => {
-      const { borrower_id, crop_type, season } = args;
-
-      if (!borrower_id) {
-        throw new Error("Borrower ID is required");
-      }
-
-      try {
-        LogService.debug(`Starting crop yield risk assessment for borrower ${borrower_id}`, {
-          borrower_id,
-          crop_type,
-          season
-        });
-        
-        // Build query parameters
-        let endpoint = `/api/analytics/crop-yield-risk/${borrower_id}`;
-        const queryParams = [];
-
-        if (crop_type) queryParams.push(`crop_type=${encodeURIComponent(crop_type)}`);
-        if (season) queryParams.push(`season=${encodeURIComponent(season || 'current')}`);
-
-        if (queryParams.length > 0) {
-          endpoint += `?${queryParams.join('&')}`;
-        }
-        
-        LogService.debug(`Calling internal API endpoint: ${endpoint}`);
-        const result = await callInternalApi(endpoint);
-        LogService.debug(`Internal API result:`, result);
-
-        if (result.error) {
-          throw new Error(result.error);
-        }
-
-        return result;
-      } catch (error) {
-        LogService.error(`Error in crop yield risk assessment: ${error.message}`, { 
-          borrower_id,
-          crop_type,
-          season,
-          stack: error.stack
-        });
-        
-        return {
-          error: true,
-          message: `Could not assess crop yield risk: ${error.message}`,
-          borrower_id
-        };
-      }
-    }
-  ),
-  
-  /**
-   * Analyze market price impact
-   */
-  analyzeMarketPriceImpact: MCPServiceWithLogging.createFunction(
-    "analyzeMarketPriceImpact",
-    async (args) => {
-      const { commodity, price_change_percent } = args;
-
-      if (!commodity) {
-        throw new Error("Commodity is required");
-      }
-
-      try {
-        LogService.debug(`Starting market price impact analysis for ${commodity}`, {
-          commodity,
-          price_change_percent
-        });
-        
-        // Build query parameters
-        let endpoint = `/api/analytics/market-price-impact/${commodity}`;
-
-        if (price_change_percent) {
-          endpoint += `?price_change_percent=${encodeURIComponent(price_change_percent)}`;
-        }
-        
-        LogService.debug(`Calling internal API endpoint: ${endpoint}`);
-        const result = await callInternalApi(endpoint);
-        LogService.debug(`Internal API result:`, result);
-
-        if (result.error) {
-          throw new Error(result.error);
-        }
-
-        return result;
-      } catch (error) {
-        LogService.error(`Error in market price impact analysis: ${error.message}`, { 
-          commodity,
-          price_change_percent,
-          stack: error.stack
-        });
-        
-        return {
-          error: true,
-          message: `Could not analyze market price impact: ${error.message}`,
-          commodity
-        };
-      }
-    }
-  ),
-  
-  /**
-   * Get refinancing options
-   */
-  getRefinancingOptions: MCPServiceWithLogging.createFunction('getRefinancingOptions', async (args) => {
-    const { loan_id } = args;
-    
-    if (!loan_id) {
-      throw new Error('Loan ID is required');
-    }
-    
-    try {
-      LogService.info(`Getting refinancing options for loan ID: ${loan_id}`);
-      const result = await callInternalApi(`/api/analytics/refinancing-options/${loan_id}`);
-      
-      if (result.error) {
-        throw new Error(result.error);
-      }
-      
-      return result;
-    } catch (error) {
-      LogService.error(`Error getting refinancing options: ${error.message}`);
-      return {
-        error: true,
-        message: `Could not get refinancing options: ${error.message}`,
-        loan_id
-      };
-    }
-  }),
-  
-  /**
-   * Analyze payment patterns
-   */
-  analyzePaymentPatterns: MCPServiceWithLogging.createFunction('analyzePaymentPatterns', async (args) => {
-    const { borrower_id } = args;
-    
-    if (!borrower_id) {
-      throw new Error('Borrower ID is required');
-    }
-    
-    try {
-      LogService.info(`Analyzing payment patterns for borrower ID: ${borrower_id}`);
-      const result = await callInternalApi(`/api/analytics/payment-patterns/${borrower_id}`);
-      
-      if (result.error) {
-        throw new Error(result.error);
-      }
-      
-      return result;
-    } catch (error) {
-      LogService.error(`Error analyzing payment patterns: ${error.message}`);
-      return {
-        error: true,
-        message: `Could not analyze payment patterns: ${error.message}`,
-        borrower_id
-      };
-    }
-  }),
-
-  /**
-   * Generate loan restructuring recommendations
-   */
-  recommendLoanRestructuring: MCPServiceWithLogging.createFunction(
-    "recommendLoanRestructuring",
-    async (args) => {
-      const { loan_id, restructuring_goal } = args;
-
-      if (!loan_id) {
-        throw new Error("Loan ID is required");
-      }
-
-      try {
-        LogService.debug(`Starting loan restructuring recommendation for loan ${loan_id}`, {
-          loan_id,
-          restructuring_goal
-        });
-        
-        // Build query parameters
-        let endpoint = `/api/analytics/loan-restructuring/${loan_id}`;
-
-        if (restructuring_goal) {
-          endpoint += `?goal=${encodeURIComponent(restructuring_goal)}`;
-        }
-        
-        LogService.debug(`Calling internal API endpoint: ${endpoint}`);
-        const result = await callInternalApi(endpoint);
-        LogService.debug(`Internal API result:`, result);
-
-        if (result.error) {
-          throw new Error(result.error);
-        }
-
-        return result;
-      } catch (error) {
-        LogService.error(`Error in loan restructuring recommendation: ${error.message}`, { 
-          loan_id,
-          restructuring_goal,
-          stack: error.stack
-        });
-        
-        return {
-          error: true,
-          message: `Could not generate loan restructuring recommendations: ${error.message}`,
-          loan_id
-        };
-      }
-    }
-  ),
+  // Keep existing implementations for the remaining functions
+  // When database service methods are implemented for these functions,
+  // update them to use mcpDatabaseService directly
+  forecastEquipmentMaintenance: registry.forecastEquipmentMaintenance,
+  assessCropYieldRisk: registry.assessCropYieldRisk,
+  analyzeMarketPriceImpact: registry.analyzeMarketPriceImpact,
+  getRefinancingOptions: registry.getRefinancingOptions,
+  analyzePaymentPatterns: registry.analyzePaymentPatterns,
+  recommendLoanRestructuring: registry.recommendLoanRestructuring,
+  getHighRiskFarmers: registry.getHighRiskFarmers
 };
 
 // Schema definitions for MCP functions

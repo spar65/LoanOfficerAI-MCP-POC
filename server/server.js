@@ -21,6 +21,7 @@ const { createServer } = require('http');
 const LogService = require('./services/logService');
 const OpenAIService = require('./services/openaiService');
 const TokenService = require('./auth/tokenService');
+const DatabaseManager = require('../utils/database');
 
 // Import middleware
 const errorHandler = require('./middleware/errorHandler');
@@ -68,24 +69,48 @@ app.use((req, res, next) => {
 });
 
 // Add health check endpoint
-app.get('/api/health', (req, res) => {
-  res.json({
-    status: 'ok',
-    timestamp: new Date().toISOString(),
-    service: 'loan-officer-ai',
-    version: '1.0.0',
-    environment: process.env.NODE_ENV || 'development'
-  });
-});
+app.get('/api/health', async (req, res) => {
+  // Check database connection
+  let dbStatus = 'disconnected';
+  try {
+    const isConnected = await DatabaseManager.testConnection();
+    dbStatus = isConnected ? 'connected' : 'disconnected';
+  } catch (error) {
+    LogService.error('Database connection check failed', {
+      error: error.message
+    });
+  }
 
-// Add system status endpoint for backward compatibility
-app.get('/api/system/status', (req, res) => {
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
     service: 'loan-officer-ai',
     version: '1.0.0',
     environment: process.env.NODE_ENV || 'development',
+    database: dbStatus
+  });
+});
+
+// Add system status endpoint for backward compatibility
+app.get('/api/system/status', async (req, res) => {
+  // Check database connection
+  let dbStatus = 'disconnected';
+  try {
+    const isConnected = await DatabaseManager.testConnection();
+    dbStatus = isConnected ? 'connected' : 'disconnected';
+  } catch (error) {
+    LogService.error('Database connection check failed', {
+      error: error.message
+    });
+  }
+
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    service: 'loan-officer-ai',
+    version: '1.0.0',
+    environment: process.env.NODE_ENV || 'development',
+    database: dbStatus,
     memory: {
       used: `${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)} MB`,
       total: `${Math.round(process.memoryUsage().heapTotal / 1024 / 1024)} MB`
@@ -94,11 +119,30 @@ app.get('/api/system/status', (req, res) => {
 });
 
 // Server initialization function (extracted for testing)
-function init() {
+async function init() {
   LogService.info('Initializing server...');
   
-  // Verify required data files are available
-  verifyDataFiles();
+  // Initialize database connection if enabled
+  if (process.env.USE_DATABASE === 'true') {
+    try {
+      LogService.info('Initializing database connection...');
+      const isConnected = await DatabaseManager.testConnection();
+      if (!isConnected) {
+        LogService.error('Database connection failed');
+      } else {
+        LogService.info('Database connection established successfully');
+      }
+    } catch (error) {
+      LogService.error('Failed to connect to database', {
+        error: error.message,
+        stack: error.stack
+      });
+    }
+  } else {
+    LogService.info('Database usage disabled by configuration, using JSON files');
+    // Verify required data files are available
+    verifyDataFiles();
+  }
   
   // Register API routes
   registerRoutes();
@@ -163,7 +207,7 @@ function registerRoutes() {
  */
 async function startServer(port = process.env.PORT || 3001) {
   // Initialize if not already done
-  init();
+  await init();
   
   // Create HTTP server
   const server = createServer(app);
@@ -186,6 +230,18 @@ async function startServer(port = process.env.PORT || 3001) {
           resolve();
         });
       });
+    }
+    
+    // Close database connection
+    if (process.env.USE_DATABASE === 'true') {
+      try {
+        await DatabaseManager.disconnect();
+        LogService.info('Database connection closed');
+      } catch (error) {
+        LogService.error('Error closing database connection', {
+          error: error.message
+        });
+      }
     }
     
     // Exit process
@@ -213,6 +269,7 @@ async function startServer(port = process.env.PORT || 3001) {
         LogService.info('===== SERVER STARTED =====');
         LogService.info(`Server running on port ${port}`);
         LogService.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
+        LogService.info(`Database: ${process.env.USE_DATABASE === 'true' ? 'Enabled' : 'Disabled'}`);
         LogService.info('======================================');
         LogService.info(`API URL: http://localhost:${port}/api`);
         LogService.info(`Health check: http://localhost:${port}/api/health`);

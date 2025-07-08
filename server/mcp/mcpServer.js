@@ -6,6 +6,7 @@
 
 const LoanOfficerMCPServer = require('./server');
 const LogService = require('../services/logService');
+const DatabaseManager = require('../../utils/database');
 
 let mcpServer = null;
 
@@ -13,8 +14,17 @@ let mcpServer = null;
  * Configure MCP Server and attach it to Express app
  * @param {Object} app - Express application instance
  */
-function configureMCP(app) {
+async function configureMCP(app) {
   try {
+    // Initialize database if enabled
+    if (process.env.USE_DATABASE === 'true') {
+      LogService.info('Initializing database connection for MCP server...');
+      const isConnected = await DatabaseManager.testConnection();
+      if (!isConnected) {
+        throw new Error('Database connection failed during MCP server initialization');
+      }
+    }
+    
     // Initialize MCP server
     mcpServer = new LoanOfficerMCPServer();
     
@@ -30,6 +40,26 @@ function configureMCP(app) {
     
     app.delete('/mcp', async (req, res) => {
       await mcpServer.handleSessionRequest(req, res);
+    });
+    
+    // Add health check endpoint for MCP
+    app.get('/mcp/health', async (req, res) => {
+      try {
+        const dbHealth = process.env.USE_DATABASE === 'true' ? 
+          await DatabaseManager.testConnection() : 'disabled';
+        
+        res.json({
+          status: 'healthy',
+          database: dbHealth ? 'connected' : 'disconnected',
+          timestamp: new Date().toISOString()
+        });
+      } catch (error) {
+        res.status(500).json({
+          status: 'unhealthy',
+          error: error.message,
+          timestamp: new Date().toISOString()
+        });
+      }
     });
     
     LogService.info('MCP server configured at /mcp endpoint');
@@ -50,10 +80,10 @@ function configureMCP(app) {
 /**
  * Stop the MCP server gracefully
  */
-function stopMCPServer() {
+async function stopMCPServer() {
   if (mcpServer) {
     LogService.info('Stopping MCP server...');
-    mcpServer.stop();
+    await mcpServer.stop();
     mcpServer = null;
   }
 }

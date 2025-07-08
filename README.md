@@ -9,6 +9,7 @@ A proof-of-concept application demonstrating AI-powered agricultural lending int
 - **May 19, 2025**: Added OpenAI integration with proper API key management
 
 ## What is MCP?
+
 - **Structured data retrieval**: Backend functions return standardized JSON data
 - **Better context management**: Functions can provide additional context to the AI model
 
@@ -214,3 +215,43 @@ Server tests are located in the `server/tests` directory and organized into:
 ### Client Tests
 
 Client tests are located in the `client/src/tests` directory:
+
+# Database Integration
+
+The application now supports SQL Server database integration:
+
+- Data is stored in a SQL Server database instead of JSON files
+- Connection pooling with retry logic ensures robust database access
+- Automated schema creation simplifies setup
+- Docker support for macOS users
+
+## Setting Up the Database
+
+1. **Docker SQL Server (macOS/Linux)**:
+
+   ```bash
+   docker run -e "ACCEPT_EULA=Y" -e "SA_PASSWORD=YourStrong@Passw0rd" \
+      -p 1433:1433 --name sql-server \
+      -d mcr.microsoft.com/mssql/server:2019-latest
+   ```
+
+2. **LocalDB (Windows)**:
+   Use SQL Server LocalDB with connection string: `(localdb)\MSSQLLocalDB`
+
+3. **Configure Environment**:
+   Create a `.env` file with:
+
+   ```
+   DB_SERVER=localhost
+   DB_NAME=LoanOfficerDB
+   DB_USER=sa
+   DB_PASSWORD=YourStrong@Passw0rd
+   USE_DATABASE=true
+   ```
+
+4. **Run Database Tests**:
+   ```bash
+   node run-db-tests.js
+   ```
+
+For more details, see [DB-INTEGRATION-GUIDE.md](DB-INTEGRATION-GUIDE.md).
