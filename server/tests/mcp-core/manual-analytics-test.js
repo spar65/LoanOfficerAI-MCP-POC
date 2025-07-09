@@ -9,7 +9,7 @@
  * Run with: node tests/manual-analytics-test.js
  */
 
-const mcpFunctionRegistry = require('../services/mcpFunctionRegistry');
+const mcpFunctionRegistry = require('../../services/mcpFunctionRegistry');
 
 // Test the loan restructuring function
 async function testLoanRestructuring() {
