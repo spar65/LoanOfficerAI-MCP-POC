@@ -504,16 +504,36 @@ const registry = {
     }
   }),
   
-  // Keep existing implementations for the remaining functions
-  // When database service methods are implemented for these functions,
-  // update them to use mcpDatabaseService directly
-  forecastEquipmentMaintenance: registry.forecastEquipmentMaintenance,
-  assessCropYieldRisk: registry.assessCropYieldRisk,
-  analyzeMarketPriceImpact: registry.analyzeMarketPriceImpact,
-  getRefinancingOptions: registry.getRefinancingOptions,
-  analyzePaymentPatterns: registry.analyzePaymentPatterns,
-  recommendLoanRestructuring: registry.recommendLoanRestructuring,
-  getHighRiskFarmers: registry.getHighRiskFarmers
+  // Functions below will be replaced with database implementations
+  // For now, they will call dataService directly
+  
+  forecastEquipmentMaintenance: MCPServiceWithLogging.createFunction('forecastEquipmentMaintenance', async (args) => {
+    return dataService.forecastEquipmentMaintenance(args.borrower_id);
+  }),
+  
+  assessCropYieldRisk: MCPServiceWithLogging.createFunction('assessCropYieldRisk', async (args) => {
+    return dataService.assessCropYieldRisk(args.borrower_id, args.crop_type, args.season);
+  }),
+  
+  analyzeMarketPriceImpact: MCPServiceWithLogging.createFunction('analyzeMarketPriceImpact', async (args) => {
+    return dataService.analyzeMarketPriceImpact(args.commodity, args.price_change_percent);
+  }),
+  
+  getRefinancingOptions: MCPServiceWithLogging.createFunction('getRefinancingOptions', async (args) => {
+    return dataService.getRefinancingOptions(args.loan_id);
+  }),
+  
+  analyzePaymentPatterns: MCPServiceWithLogging.createFunction('analyzePaymentPatterns', async (args) => {
+    return dataService.analyzePaymentPatterns(args.borrower_id);
+  }),
+  
+  recommendLoanRestructuring: MCPServiceWithLogging.createFunction('recommendLoanRestructuring', async (args) => {
+    return dataService.recommendLoanRestructuring(args.loan_id, args.restructuring_goal);
+  }),
+  
+  getHighRiskFarmers: MCPServiceWithLogging.createFunction('getHighRiskFarmers', async () => {
+    return dataService.getHighRiskFarmers();
+  })
 };
 
 // Schema definitions for MCP functions

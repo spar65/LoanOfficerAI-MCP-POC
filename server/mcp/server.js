@@ -3,7 +3,7 @@ const { StreamableHTTPServerTransport } = require('@modelcontextprotocol/sdk/ser
 const { z } = require('zod');
 const LogService = require('../services/logService');
 const dataService = require('../services/dataService');
-const mcpDatabaseService = require('../../services/mcpDatabaseService');
+const mcpDatabaseService = require('../services/mcpDatabaseService');
 const DatabaseManager = require('../../utils/database');
 
 class LoanOfficerMCPServer {

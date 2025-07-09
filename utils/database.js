@@ -13,7 +13,7 @@ class DatabaseManager {
     
     this.config = {
       server: serverConfig.split(',')[0], // Extract server name without port
-      database: process.env.DB_NAME || 'master', // Initially connect to master database
+      database: process.env.DB_NAME || 'LoanOfficerDB', // Default to LoanOfficerDB
       user: process.env.DB_USER || 'sa',
       password: process.env.DB_PASSWORD || 'YourStrong@Passw0rd',
       options: { 
@@ -45,34 +45,51 @@ class DatabaseManager {
     }
     
     try {
-      // Connect to master database
-      const masterPool = await sql.connect({
-        ...this.config,
-        database: 'master'
-      });
-      
-      // Check if our database exists
+      // Try to connect directly to the target database first
       const dbName = this.config.database;
-      const dbCheckResult = await masterPool.request()
-        .input('dbName', sql.VarChar, dbName)
-        .query('SELECT database_id FROM sys.databases WHERE name = @dbName');
       
-      // If database doesn't exist, create it
-      if (dbCheckResult.recordset.length === 0) {
-        LogService.info(`Creating database ${dbName}...`);
-        await masterPool.request()
-          .query(`CREATE DATABASE [${dbName}]`);
+      try {
+        // Attempt direct connection to the database
+        await this.connect();
+        LogService.info(`Connected to existing database '${dbName}'`);
         
-        LogService.info(`Database ${dbName} created successfully`);
+        // Create schema if needed
+        await this.createSchema();
+        
+        this.dbInitialized = true;
+        return;
+      } catch (connectError) {
+        // If direct connection fails, try to create the database
+        LogService.info(`Direct connection to '${dbName}' failed, attempting to create database...`);
+        
+        // Connect to master database
+        const masterPool = await sql.connect({
+          ...this.config,
+          database: 'master'
+        });
+        
+        // Check if our database exists
+        const dbCheckResult = await masterPool.request()
+          .input('dbName', sql.VarChar, dbName)
+          .query('SELECT database_id FROM sys.databases WHERE name = @dbName');
+        
+        // If database doesn't exist, create it
+        if (dbCheckResult.recordset.length === 0) {
+          LogService.info(`Creating database ${dbName}...`);
+          await masterPool.request()
+            .query(`CREATE DATABASE [${dbName}]`);
+          
+          LogService.info(`Database ${dbName} created successfully`);
+        }
+        
+        // Close master connection
+        await masterPool.close();
+        
+        // Connect to our database and create schema if needed
+        await this.createSchema();
+        
+        this.dbInitialized = true;
       }
-      
-      // Close master connection
-      await masterPool.close();
-      
-      // Connect to our database and create schema if needed
-      await this.createSchema();
-      
-      this.dbInitialized = true;
     } catch (error) {
       LogService.error('Error initializing database', {
         error: error.message,
@@ -157,6 +174,65 @@ class DatabaseManager {
             response NVARCHAR(MAX),
             timestamp DATETIME,
             created_at DATETIME DEFAULT GETDATE()
+          )
+        `);
+      }
+      
+      if (!existingTables.includes('Users')) {
+        LogService.info('Creating Users table...');
+        await pool.request().query(`
+          CREATE TABLE Users (
+            id VARCHAR(50) PRIMARY KEY,
+            username VARCHAR(50) UNIQUE NOT NULL,
+            email VARCHAR(100) UNIQUE NOT NULL,
+            passwordHash VARCHAR(255) NOT NULL,
+            firstName VARCHAR(50),
+            lastName VARCHAR(50),
+            role VARCHAR(50) DEFAULT 'loan_officer',
+            tenantId VARCHAR(50) NOT NULL DEFAULT 'default',
+            active BIT DEFAULT 1,
+            lastLogin DATETIME,
+            preferredAIModel VARCHAR(50) DEFAULT 'claude-sonnet-4',
+            createdAt DATETIME DEFAULT GETDATE(),
+            updatedAt DATETIME DEFAULT GETDATE()
+          )
+        `);
+      }
+      
+      if (!existingTables.includes('Payments')) {
+        LogService.info('Creating Payments table...');
+        await pool.request().query(`
+          CREATE TABLE Payments (
+            payment_id VARCHAR(50) PRIMARY KEY,
+            loan_id VARCHAR(50) NOT NULL,
+            payment_date DATE NOT NULL,
+            amount DECIMAL(15,2) NOT NULL,
+            status VARCHAR(20) DEFAULT 'pending',
+            payment_method VARCHAR(50) DEFAULT 'ACH',
+            late_fee DECIMAL(15,2) DEFAULT 0,
+            days_late INT DEFAULT 0,
+            created_at DATETIME DEFAULT GETDATE(),
+            FOREIGN KEY (loan_id) REFERENCES Loans(loan_id)
+          )
+        `);
+      }
+      
+      if (!existingTables.includes('Equipment')) {
+        LogService.info('Creating Equipment table...');
+        await pool.request().query(`
+          CREATE TABLE Equipment (
+            equipment_id VARCHAR(50) PRIMARY KEY,
+            borrower_id VARCHAR(50) NOT NULL,
+            type VARCHAR(50) NOT NULL,
+            purchase_date DATE,
+            condition VARCHAR(20),
+            purchase_price DECIMAL(15,2),
+            current_value DECIMAL(15,2),
+            depreciation_rate DECIMAL(5,2),
+            maintenance_cost_ytd DECIMAL(15,2) DEFAULT 0,
+            created_at DATETIME DEFAULT GETDATE(),
+            updated_at DATETIME DEFAULT GETDATE(),
+            FOREIGN KEY (borrower_id) REFERENCES Borrowers(borrower_id)
           )
         `);
       }

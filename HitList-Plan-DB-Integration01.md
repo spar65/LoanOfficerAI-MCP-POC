@@ -1,343 +1,308 @@
 # Database Integration Plan for MCP Loan Management System
 
-## Overview
+## Current State Analysis
 
-This plan outlines the strategy for integrating a SQL database with our MCP Loan Management System. The goal is to replace the current JSON file-based data storage with a robust database solution while preserving the MCP architecture and function interfaces.
+### What's Already Implemented
 
-## Architecture Changes
+1. **Database Infrastructure**
 
-### Current Architecture
+   - ✅ Database utility module (`utils/database.js`) with connection management
+   - ✅ Database schema (`database/createSchema.sql`) with core tables
+   - ✅ Migration script (`scripts/migrateJsonToDb.js`) to transfer JSON data
+   - ✅ MCP Database Service (`services/mcpDatabaseService.js`) with basic CRUD operations
 
+2. **Service Layer Integration**
+
+   - ✅ MCP Function Registry updated to use database service
+   - ✅ Direct database calls implemented in `mcpDatabaseService.js`
+   - ✅ Database connection with retry logic and error handling
+   - ✅ Logging integration throughout the database layer
+
+3. **Current Issues**
+   - ❌ Path resolution issues between server and services directories
+   - ❌ Some MCP functions still using JSON files (analytics endpoints)
+   - ❌ Missing database implementations for advanced analytics
+   - ❌ Incomplete schema for AI-enhanced features
+
+## Implementation Plan
+
+### Phase 1: Fix Current Integration Issues (Immediate)
+
+#### 1.1 Fix Path Resolution
+
+The main issue is that there are two `mcpDatabaseService.js` files:
+
+- `/services/mcpDatabaseService.js` (root level)
+- `/server/services/mcpDatabaseService.js` (server level)
+
+**Action Items:**
+
+1. Consolidate to single service file location
+2. Update all imports to use consistent paths
+3. Remove duplicate files
+
+#### 1.2 Complete Database Migration
+
+**Action Items:**
+
+1. Ensure all JSON data is properly migrated
+2. Verify data integrity after migration
+3. Create backup of JSON files before full transition
+
+### Phase 2: Complete Database Service Implementation (Week 1)
+
+#### 2.1 Implement Missing Database Methods
+
+**Analytics Methods to Implement:**
+
+- `getLoanRestructuringOptions(loanId, goal)`
+- `analyzeCropYieldRisk(params)`
+- `analyzeMarketPriceImpact(params)`
+- `generatePredictiveAnalytics(params)`
+
+#### 2.2 Enhanced Risk Assessment Methods
+
+- `calculateComprehensiveRiskScore(borrowerId)`
+- `evaluatePortfolioRisk()`
+- `predictDefaultProbability(loanId)`
+
+### Phase 3: Schema Enhancements (Week 2)
+
+#### 3.1 Add Missing Tables
+
+```sql
+-- Risk assessment history
+CREATE TABLE RiskAssessments (
+    assessment_id VARCHAR(50) PRIMARY KEY,
+    borrower_id VARCHAR(50) NOT NULL,
+    assessment_date DATETIME DEFAULT GETDATE(),
+    risk_score DECIMAL(5,2),
+    risk_factors NVARCHAR(MAX), -- JSON
+    confidence_level DECIMAL(5,2),
+    FOREIGN KEY (borrower_id) REFERENCES Borrowers(borrower_id)
+);
+
+-- Analytics cache for performance
+CREATE TABLE AnalyticsCache (
+    cache_id VARCHAR(50) PRIMARY KEY,
+    query_hash VARCHAR(64) NOT NULL,
+    result_data NVARCHAR(MAX), -- JSON
+    created_at DATETIME DEFAULT GETDATE(),
+    expires_at DATETIME,
+    INDEX IX_AnalyticsCache_Hash (query_hash)
+);
 ```
-Client → MCP Client API → Server → MCP Function Registry → JSON Files
+
+#### 3.2 Add Indexes for Performance
+
+```sql
+-- Performance indexes
+CREATE INDEX IX_Loans_BorrowerStatus ON Loans(borrower_id, status);
+CREATE INDEX IX_Payments_LoanDate ON Payments(loan_id, payment_date DESC);
+CREATE INDEX IX_Borrowers_CreditScore ON Borrowers(credit_score DESC);
 ```
 
-### Target Architecture
+### Phase 4: Testing & Validation (Week 3)
 
-```
-Client → MCP Client API → Server → MCP Function Registry → Database Service → SQL Database
-```
+#### 4.1 Integration Tests
 
-## Implementation Strategy
+- Test all MCP functions with database backend
+- Verify data consistency between old JSON and new DB
+- Performance benchmarking
 
-### Phase 1: Database Setup (Week 1)
+#### 4.2 Load Testing
 
-- Create SQL database schema with all tables and indexes
-- Develop database utility module for connection management
-- Create data migration scripts to transfer JSON data to database
+- Concurrent user scenarios
+- Large dataset handling
+- Query optimization
 
-### Phase 2: Data Service Layer (Week 2)
+### Phase 5: Deployment Strategy (Week 4)
 
-- Develop `DatabaseService` with CRUD operations for all entities
-- Create `MCPDatabaseService` with MCP-specific operations
-- Implement data validation and error handling
-- Add transaction support for multi-table operations
+#### 5.1 Staged Rollout
 
-### Phase 3: MCP Function Registry Updates (Week 3)
+1. **Stage 1**: Read operations from DB, writes to both JSON and DB
+2. **Stage 2**: All operations from DB, JSON as backup
+3. **Stage 3**: Full database-only operation
 
-- Refactor MCP functions to use database services
-- Maintain identical function signatures for backward compatibility
-- Add performance monitoring and logging for database operations
-- Implement caching for frequently accessed data
+#### 5.2 Monitoring & Rollback
 
-### Phase 4: Testing & Deployment (Week 4)
+- Implement health checks
+- Create rollback procedures
+- Monitor performance metrics
 
-- Create database integration tests
-- Validate all MCP functions with database backend
-- Performance testing and optimization
-- Staged deployment with fallback to JSON if needed
+## Technical Specifications
 
-## Detailed Implementation Plan
-
-### 1. Database Implementation
-
-Create the database utility module:
+### Database Configuration
 
 ```javascript
-// utils/database.js
-const sql = require("mssql");
-
-class DatabaseManager {
-  constructor() {
-    this.config = {
-      server: process.env.DB_SERVER || "(localdb)\\MSSQLLocalDB",
-      database: process.env.DB_NAME || "LoanOfficerDB",
-      options: {
-        trustedConnection: true,
-        enableArithAbort: true,
-        trustServerCertificate: true,
-        encrypt: false,
-      },
-    };
-
-    // Use SQL authentication if provided
-    if (process.env.DB_USER && process.env.DB_PASSWORD) {
-      this.config.user = process.env.DB_USER;
-      this.config.password = process.env.DB_PASSWORD;
-      delete this.config.options.trustedConnection;
-    }
-
-    this.pool = null;
-  }
-
-  async connect() {
-    if (!this.pool) {
-      this.pool = await sql.connect(this.config);
-    }
-    return this.pool;
-  }
-
-  async query(query, params = []) {
-    const pool = await this.connect();
-    const request = pool.request();
-
-    // Add parameters if provided
-    params.forEach((param, index) => {
-      request.input(`param${index}`, param);
-    });
-
-    return request.query(query);
-  }
-
-  async disconnect() {
-    if (this.pool) {
-      await this.pool.close();
-      this.pool = null;
-    }
-  }
-}
-
-module.exports = new DatabaseManager();
+// Enhanced database configuration
+const dbConfig = {
+  development: {
+    server: "localhost",
+    database: "LoanOfficerDB_Dev",
+    options: {
+      trustServerCertificate: true,
+      enableArithAbort: true,
+    },
+  },
+  production: {
+    server: process.env.DB_SERVER,
+    database: process.env.DB_NAME,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    options: {
+      encrypt: true,
+      trustServerCertificate: false,
+    },
+  },
+};
 ```
 
-### 2. Data Service Implementation
+### Service Architecture
 
-Create entity-specific data services:
-
-```javascript
-// services/borrowerService.js
-const db = require("../utils/database");
-const { v4: uuidv4 } = require("uuid");
-
-class BorrowerService {
-  async getBorrowerById(borrowerId) {
-    const result = await db.query(
-      "SELECT * FROM Borrowers WHERE borrower_id = @param0",
-      [borrowerId]
-    );
-    return result.recordset[0];
-  }
-
-  async getAllBorrowers() {
-    const result = await db.query("SELECT * FROM Borrowers");
-    return result.recordset;
-  }
-
-  async createBorrower(borrowerData) {
-    const borrowerId =
-      borrowerData.borrower_id || `B${uuidv4().substring(0, 6)}`;
-
-    await db.query(
-      `
-      INSERT INTO Borrowers (
-        borrower_id, first_name, last_name, address, phone, email,
-        credit_score, income, farm_size, farm_type, debt_to_income_ratio,
-        risk_score, ai_risk_assessment, last_risk_update
-      ) VALUES (
-        @param0, @param1, @param2, @param3, @param4, @param5,
-        @param6, @param7, @param8, @param9, @param10,
-        @param11, @param12, @param13
-      )
-    `,
-      [
-        borrowerId,
-        borrowerData.first_name,
-        borrowerData.last_name,
-        borrowerData.address,
-        borrowerData.phone,
-        borrowerData.email,
-        borrowerData.credit_score,
-        borrowerData.income,
-        borrowerData.farm_size,
-        borrowerData.farm_type,
-        borrowerData.debt_to_income_ratio || null,
-        borrowerData.risk_score || null,
-        JSON.stringify(borrowerData.ai_risk_assessment || {}),
-        borrowerData.last_risk_update || new Date(),
-      ]
-    );
-
-    return this.getBorrowerById(borrowerId);
-  }
-
-  // Add update and delete methods
-}
-
-module.exports = new BorrowerService();
+```
+┌─────────────────┐     ┌──────────────────┐     ┌─────────────┐
+│   MCP Client    │────▶│  MCP Function    │────▶│  Database   │
+│   (React App)   │     │    Registry      │     │   Service   │
+└─────────────────┘     └──────────────────┘     └─────────────┘
+                                │                         │
+                                ▼                         ▼
+                        ┌──────────────────┐     ┌─────────────┐
+                        │   MCP Service    │     │   SQL DB    │
+                        │   with Logging   │     │  (MSSQL)    │
+                        └──────────────────┘     └─────────────┘
 ```
 
-### 3. MCP Function Registry Updates
+## Success Criteria
 
-Update the MCP function registry to use the database services:
+1. **Functional Requirements**
 
-```javascript
-// services/mcpFunctionRegistry.js
-const borrowerService = require("./borrowerService");
-const loanService = require("./loanService");
-const LogService = require("./logService");
+   - All MCP functions work with database backend
+   - No data loss during migration
+   - Backward compatibility maintained
 
-class McpFunctionRegistry {
-  constructor() {
-    this.registry = {
-      // Replace JSON file access with database service calls
-      getBorrowerDetails: async (args) => {
-        try {
-          return await borrowerService.getBorrowerById(args.borrower_id);
-        } catch (error) {
-          LogService.error("Error in getBorrowerDetails", { error, args });
-          throw error;
-        }
-      },
+2. **Performance Requirements**
 
-      getLoanDetails: async (args) => {
-        try {
-          return await loanService.getLoanById(args.loan_id);
-        } catch (error) {
-          LogService.error("Error in getLoanDetails", { error, args });
-          throw error;
-        }
-      },
+   - Response time < 200ms for basic queries
+   - Support for 100+ concurrent users
+   - 99.9% uptime
 
-      // Additional MCP functions...
-    };
+3. **Quality Requirements**
+   - 90%+ test coverage
+   - Zero critical bugs in production
+   - Complete audit trail for all operations
 
-    this.functionSchemas = {
-      // Keep existing function schemas
-    };
-  }
+## Risk Mitigation
 
-  // Keep existing methods
-}
+1. **Data Loss Risk**
 
-module.exports = new McpFunctionRegistry();
+   - Maintain JSON backups
+   - Implement transaction logging
+   - Regular database backups
+
+2. **Performance Risk**
+
+   - Implement caching layer
+   - Query optimization
+   - Connection pooling
+
+3. **Integration Risk**
+   - Phased rollout approach
+   - Feature flags for rollback
+   - Comprehensive testing
+
+## Next Steps
+
+1. **Immediate Actions** (Today)
+
+   - Fix path resolution issues
+   - Run migration script with test data
+   - Verify basic CRUD operations
+
+2. **This Week**
+
+   - Complete missing database methods
+   - Add integration tests
+   - Performance optimization
+
+3. **Next Week**
+   - Schema enhancements
+   - Advanced analytics implementation
+   - Load testing
+
+## Conclusion
+
+The database integration is well underway with solid infrastructure in place. The main challenges are:
+
+1. Resolving the dual service file issue
+2. Completing the remaining analytics implementations
+3. Ensuring smooth migration from JSON to database
+
+With the structured approach outlined above, we can achieve a robust, scalable database-backed MCP system while maintaining the existing functionality and performance expectations.
+
+## Implementation Results (July 8, 2025)
+
+### Issues Resolved
+
+1. **Path Resolution Issue**:
+
+   - Removed duplicate `mcpDatabaseService.js` file from root `/services` directory
+   - Consolidated to single file in `/server/services/mcpDatabaseService.js`
+   - Updated all imports to use consistent paths
+
+2. **Database Connection**:
+
+   - Fixed database name default from `'master'` to `'LoanOfficerDB'`
+   - Updated `initializeDatabase` method to try connecting to existing database first
+   - Database successfully connects to existing `LoanOfficerDB`
+
+3. **Data Migration**:
+   - Created simplified migration approach using direct SQL queries
+   - Successfully populated database with test data (B001, L001, C001)
+   - Verified data integrity with test queries
+
+### Current Status
+
+✅ **Working Components**:
+
+- Database connection and initialization
+- MCP endpoints returning data from database
+- Direct database queries via `mcpDatabaseService`
+- RESTful API endpoints (`/api/mcp/loan/:id`)
+
+✅ **Test Results**:
+
+```bash
+# Direct database query: ✅ Found 1 record
+# Service method: ✅ Succeeded (L001)
+# MCP endpoint: ✅ Returns loan data with metadata
+curl http://localhost:3001/api/mcp/loan/L001
+# Returns: {"loan_id":"L001","borrower_id":"B001",...}
 ```
 
-### 4. Migration Script
+### Next Steps
 
-Create a script to migrate JSON data to the database:
+1. **Complete Data Migration**:
 
-```javascript
-// scripts/migrateJsonToDb.js
-const fs = require("fs");
-const path = require("path");
-const borrowerService = require("../services/borrowerService");
-const loanService = require("../services/loanService");
-const paymentService = require("../services/paymentService");
-const collateralService = require("../services/collateralService");
+   - Fix the full migration script to handle null values properly
+   - Migrate all JSON data (borrowers, loans, payments, equipment)
+   - Verify foreign key relationships
 
-async function migrateJsonToDatabase() {
-  try {
-    // Migrate borrowers
-    console.log("Migrating borrowers...");
-    const borrowersPath = path.join(__dirname, "../data/borrowers.json");
-    const borrowersData = JSON.parse(fs.readFileSync(borrowersPath, "utf8"));
+2. **Implement Missing Analytics**:
 
-    for (const borrower of borrowersData) {
-      await borrowerService.createBorrower(borrower);
-    }
+   - Loan restructuring options
+   - Crop yield risk analysis
+   - Market price impact calculations
 
-    // Migrate loans
-    console.log("Migrating loans...");
-    const loansPath = path.join(__dirname, "../data/loans.json");
-    const loansData = JSON.parse(fs.readFileSync(loansPath, "utf8"));
+3. **Production Readiness**:
+   - Add connection pooling optimization
+   - Implement caching layer
+   - Add comprehensive error handling
 
-    for (const loan of loansData) {
-      await loanService.createLoan(loan);
-    }
+### Key Learnings
 
-    // Continue with other entities...
+1. **Null Handling**: The `executeQuery` method handles nulls correctly when passed directly in SQL strings rather than as parameterized values
+2. **Path Management**: Keeping services within the server directory structure simplifies module resolution
+3. **Incremental Migration**: Starting with simple test data helps validate the infrastructure before full migration
 
-    console.log("Migration completed successfully");
-  } catch (error) {
-    console.error("Migration failed:", error);
-  }
-}
-
-migrateJsonToDatabase();
-```
-
-## Testing Strategy
-
-1. Unit tests for each database service
-2. Integration tests for MCP functions with database
-3. Performance comparison tests (JSON vs. DB)
-4. Load testing to ensure scalability
-
-## Rollback Plan
-
-1. Maintain JSON files as backup during initial deployment
-2. Implement feature flag to switch between JSON and DB backends
-3. Create database snapshot before deployment
-
-## Timeline
-
-| Week | Tasks                                 | Deliverables                          |
-| ---- | ------------------------------------- | ------------------------------------- |
-| 1    | Database schema setup, utility module | Working database with schema          |
-| 2    | Data services implementation          | CRUD operations for all entities      |
-| 3    | MCP function registry updates         | Updated MCP functions using DB        |
-| 4    | Testing, optimization, deployment     | Production-ready database integration |
-
-## Implementation Summary
-
-We have successfully completed the following steps for database integration:
-
-1. **Database Schema Design**:
-
-   - Created a comprehensive schema with core tables (Users, Borrowers, Loans, etc.)
-   - Added MCP-specific tables for AI interactions and recommendations
-   - Designed proper relationships between tables
-   - Added appropriate indexes for performance optimization
-
-2. **Database Infrastructure**:
-
-   - Created `database/createSchema.sql` with complete table definitions
-   - Implemented `utils/database.js` for connection management
-   - Added proper error handling and transaction support
-   - Implemented performance monitoring for queries
-
-3. **MCP Database Service Layer**:
-
-   - Created `mcpDatabaseService.js` as intermediary between MCP and database
-   - Implemented all CRUD operations for MCP functions
-   - Added proper validation and error handling
-   - Ensured backward compatibility with existing function signatures
-
-4. **Data Migration**:
-
-   - Created `migrateJsonToDb.js` to transfer data from JSON files to database
-   - Added data transformation logic to match database schema
-   - Implemented transaction support for all-or-nothing migration
-   - Added proper logging and error handling
-
-5. **Function Registry Updates**:
-
-   - Updated `mcpFunctionRegistry.js` to use database services
-   - Maintained backward compatibility for client applications
-   - Improved error reporting and recovery mechanisms
-   - Set up fallback to JSON when needed for incomplete functions
-
-6. **Setup and Configuration**:
-
-   - Created `setupDatabase.js` for database creation and schema setup
-   - Added `dbSetup.sh` for automated setup process
-   - Implemented proper environment variable support
-   - Created comprehensive setup documentation
-
-7. **Documentation**:
-   - Created comprehensive DB integration guide
-   - Documented database schema and relationships
-   - Provided troubleshooting instructions
-   - Added best practices for database performance
-
-This implementation successfully transforms the application from using static JSON files to a fully functional SQL Server database while maintaining all existing functionality and interfaces.
+The database integration is now functional and ready for the next phase of development!

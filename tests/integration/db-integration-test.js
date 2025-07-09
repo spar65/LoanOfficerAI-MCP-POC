@@ -4,7 +4,7 @@
  * Tests the integration between the application and the database layer
  */
 const db = require('../../utils/database');
-const mcpDatabaseService = require('../../services/mcpDatabaseService');
+const mcpDatabaseService = require('../../server/services/mcpDatabaseService');
 const LogService = require('../../services/logService');
 
 // Test data for creating test records

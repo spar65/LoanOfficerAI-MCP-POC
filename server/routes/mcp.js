@@ -5,7 +5,7 @@
 const express = require('express');
 const router = express.Router();
 const MCPServiceWithLogging = require('../services/mcpServiceWithLogging');
-const mcpDatabaseService = require('../../services/mcpDatabaseService');
+const mcpDatabaseService = require('../services/mcpDatabaseService');
 const mcpResponseFormatter = require('../utils/mcpResponseFormatter');
 const LogService = require('../services/logService');
 const { getContextForMCPCall } = require('../middleware/requestContext');
@@ -75,6 +75,8 @@ router.get('/loan/:id', async (req, res) => {
   const loanId = req.params.id;
   const functionName = 'getLoanDetails';
   
+  console.log(`[DEBUG] GET /api/mcp/loan/${loanId} - Starting request`);
+  
   try {
     // Validate args
     const validation = validateAndPrepareArgs(functionName, { loan_id: loanId });
@@ -84,13 +86,18 @@ router.get('/loan/:id', async (req, res) => {
       );
     }
     
+    console.log('[DEBUG] Validation passed, args:', validation.args);
+    
     // Get context for logging
     const context = getContextForMCPCall(functionName, validation.args);
     
     // Create the implementation function
     const getLoanDetails = async (args) => {
       const { loan_id } = args;
+      console.log(`[DEBUG] Calling mcpDatabaseService.getLoanDetails with loan_id: ${loan_id}`);
       const loan = await mcpDatabaseService.getLoanDetails(loan_id);
+      
+      console.log('[DEBUG] Loan result:', loan);
       
       if (!loan) {
         throw new Error(`Loan with ID '${loan_id}' not found`);
@@ -100,11 +107,14 @@ router.get('/loan/:id', async (req, res) => {
     };
     
     // Execute the function with logging
+    console.log('[DEBUG] Executing function with MCPServiceWithLogging...');
     const result = await MCPServiceWithLogging.executeFunction(
       getLoanDetails,
       functionName,
       validation.args
     );
+    
+    console.log('[DEBUG] Function execution result:', result);
     
     // Format the response
     const formattedResponse = mcpResponseFormatter.formatSuccess(result, functionName);
@@ -112,6 +122,9 @@ router.get('/loan/:id', async (req, res) => {
     // Return response
     res.json(formattedResponse);
   } catch (error) {
+    console.log('[DEBUG] Caught error:', error.message);
+    console.log('[DEBUG] Error stack:', error.stack);
+    
     if (error.message.includes('not found')) {
       return res.status(404).json(
         mcpResponseFormatter.formatNotFound('loan', loanId, functionName)

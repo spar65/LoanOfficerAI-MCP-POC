@@ -6,7 +6,7 @@
  * replacing direct JSON file access.
  */
 
-const db = require('../utils/database');
+const db = require('../../utils/database');
 const { v4: uuidv4 } = require('uuid');
 const LogService = require('./logService');
 const sql = require('mssql');
@@ -33,7 +33,7 @@ class McpDatabaseService {
    */
   async getLoanById(loanId) {
     try {
-      const result = await db.query('SELECT * FROM loans WHERE loan_id = @param0', [loanId]);
+      const result = await db.executeQuery('SELECT * FROM loans WHERE loan_id = @loanId', { loanId });
       return result.recordset?.[0] || null;
     } catch (error) {
       LogService.error('Error fetching loan by ID', { error: error.message, loanId });
@@ -439,9 +439,9 @@ class McpDatabaseService {
    */
   async getBorrowerDetails(borrowerId) {
     try {
-      const result = await db.query(
-        'SELECT * FROM Borrowers WHERE borrower_id = @param0',
-        [borrowerId]
+      const result = await db.executeQuery(
+        'SELECT * FROM Borrowers WHERE borrower_id = @borrowerId',
+        { borrowerId }
       );
       
       if (result.recordset.length === 0) {
@@ -466,9 +466,9 @@ class McpDatabaseService {
    */
   async getLoanDetails(loanId) {
     try {
-      const result = await db.query(
-        'SELECT * FROM Loans WHERE loan_id = @param0',
-        [loanId]
+      const result = await db.executeQuery(
+        'SELECT * FROM Loans WHERE loan_id = @loanId',
+        { loanId }
       );
       
       if (result.recordset.length === 0) {
@@ -493,10 +493,10 @@ class McpDatabaseService {
    */
   async getLoanStatus(loanId) {
     try {
-      const result = await db.query(
-        `SELECT loan_id, status, updatedAt as last_updated FROM Loans 
-         WHERE loan_id = @param0`,
-        [loanId]
+      const result = await db.executeQuery(
+        `SELECT loan_id, status, updated_at as last_updated FROM Loans 
+         WHERE loan_id = @loanId`,
+        { loanId }
       );
       
       if (result.recordset.length === 0) {

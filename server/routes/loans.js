@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const mcpDatabaseService = require('../../services/mcpDatabaseService');
+const mcpDatabaseService = require('../services/mcpDatabaseService');
 const LogService = require('../services/logService');
 
 // Get all loans with borrower information
