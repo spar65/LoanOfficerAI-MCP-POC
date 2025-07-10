@@ -11,7 +11,7 @@
 - **AI-Native**: Every operation accessible through natural language
 - **MCP-First**: Structured function calling ensures reliable AI interactions
 - **Enterprise-Ready**: Production-grade security, monitoring, and scalability
-- **Hybrid Resilience**: Database + JSON fallback for maximum reliability
+- **Database-First**: SQL Server primary with JSON fallback for maximum reliability
 
 ---
 
@@ -51,7 +51,7 @@
 │                        BUSINESS LOGIC LAYER                         │
 │  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐    │
 │  │   Loan Services │  │   Risk Engine   │  │   Analytics     │    │
-│  │   (6 functions) │  │   (4 functions) │  │   (6 functions) │    │
+│  │   (5 functions) │  │   (3 functions) │  │   (8 functions) │    │
 │  └─────────────────┘  └─────────────────┘  └─────────────────┘    │
 └─────────────────────────────────────────────────────────────────────┘
                                     │
@@ -59,8 +59,8 @@
 ┌─────────────────────────────────────────────────────────────────────┐
 │                         DATA ACCESS LAYER                           │
 │  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐    │
-│  │   Repository    │  │   Connection    │  │   Fallback      │    │
-│  │   Pattern       │  │   Pool Manager  │  │   Mechanism     │    │
+│  │   MCP Database  │  │   Connection    │  │   Fallback      │    │
+│  │   Service       │  │   Pool Manager  │  │   Mechanism     │    │
 │  └─────────────────┘  └─────────────────┘  └─────────────────┘    │
 └─────────────────────────────────────────────────────────────────────┘
                                     │
@@ -74,7 +74,7 @@
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
-## �� CORE ARCHITECTURAL COMPONENTS
+## 🔧 CORE ARCHITECTURAL COMPONENTS
 
 ### 1. Presentation Layer
 
@@ -157,21 +157,21 @@ services/
 
 ### 5. Data Access Layer
 
-**Repository Pattern**
+**MCP Database Service**
 
-- **Abstraction**: Clean separation between business logic and data access
-- **Connection Management**: Pooled connections with retry logic
+- **Primary Integration**: SQL Server database with connection pooling
 - **Fallback Strategy**: Automatic JSON file fallback on database failure
 - **Transaction Support**: ACID compliance for data integrity
+- **Performance Optimization**: Indexed queries and connection management
 
 ### 6. Persistence Layer
 
-**Hybrid Data Strategy**
+**Database-First Strategy**
 
-- **Primary**: SQL Server with connection pooling
+- **Primary**: SQL Server with connection pooling and optimization
 - **Fallback**: JSON files for development and reliability
 - **Audit Trail**: Complete operation logging for compliance
-- **Backup Strategy**: Automated data protection (future)
+- **Schema Management**: Automatic database schema creation and migration
 
 ---
 
@@ -203,10 +203,10 @@ services/
    ├─ Executes getBorrowerDefaultRisk(B001)
    └─ Returns structured data
 
-6. DATABASE SERVICE
-   ├─ Attempts SQL Server query
+6. MCP DATABASE SERVICE
+   ├─ Executes SQL Server query
    ├─ Falls back to JSON if needed
-   └─ Returns borrower risk data
+   └─ Returns borrower risk data from database
 
 7. OPENAI SERVICE (Second Call)
    ├─ Formats raw data into natural language
@@ -219,31 +219,31 @@ services/
    └─ Logs interaction for analytics
 ```
 
-### Traditional API Flow
+### Database Query Flow
 
 ```
-1. API REQUEST
-   └─ GET /api/loans/active
+1. MCP FUNCTION CALL
+   └─ getBorrowerDefaultRisk("B001")
 
-2. EXPRESS ROUTER
-   ├─ Validates authentication
-   ├─ Applies rate limiting
-   └─ Routes to loan controller
+2. MCP DATABASE SERVICE
+   ├─ Validates input parameters
+   ├─ Constructs parameterized SQL query
+   └─ Executes via connection pool
 
-3. LOAN CONTROLLER
-   ├─ Validates request parameters
-   ├─ Calls appropriate service method
-   └─ Formats response
+3. SQL SERVER DATABASE
+   ├─ Executes query with optimized indexes
+   ├─ Returns recordset with borrower data
+   └─ Maintains connection pool efficiency
 
-4. DATA SERVICE
-   ├─ Queries database or JSON files
-   ├─ Applies business logic
-   └─ Returns processed data
+4. RESULT PROCESSING
+   ├─ Extracts data from recordset
+   ├─ Applies business logic calculations
+   └─ Formats response for AI consumption
 
-5. HTTP RESPONSE
-   ├─ JSON formatted data
-   ├─ Appropriate status codes
-   └─ CORS headers included
+5. FALLBACK MECHANISM (if needed)
+   ├─ Detects database connection failure
+   ├─ Automatically switches to JSON files
+   └─ Maintains service availability
 ```
 
 ---

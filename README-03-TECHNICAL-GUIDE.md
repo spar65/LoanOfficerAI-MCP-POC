@@ -70,9 +70,9 @@ NODE_ENV=development
 LOG_LEVEL=debug
 ENABLE_FILE_LOGGING=true
 
-# Database configuration (optional)
-USE_DATABASE=false
-DB_SERVER=(localdb)\\MSSQLLocalDB
+# Database configuration (SQL Server - Primary)
+USE_DATABASE=true
+DB_SERVER=localhost
 DB_NAME=LoanOfficerDB
 DB_USER=sa
 DB_PASSWORD=YourStrong@Passw0rd
@@ -150,11 +150,11 @@ server/
 │   ├── authMiddleware.js    # Authentication middleware
 │   ├── authRoutes.js        # Authentication endpoints
 │   └── userService.js       # User management
-├── data/                    # JSON data files (fallback)
-│   ├── borrowers.json       # Borrower test data
-│   ├── loans.json           # Loan test data
-│   ├── payments.json        # Payment history
-│   └── collateral.json      # Collateral information
+├── data/                    # JSON data files (fallback only)
+│   ├── borrowers.json       # Borrower fallback data
+│   ├── loans.json           # Loan fallback data
+│   ├── payments.json        # Payment history fallback
+│   └── collateral.json      # Collateral fallback data
 ├── middleware/              # Express middleware
 │   ├── authMiddleware.js    # JWT validation
 │   ├── errorHandler.js      # Global error handling
@@ -169,7 +169,7 @@ server/
 │   └── openai.js            # AI proxy endpoints
 ├── services/                # Business logic
 │   ├── dataService.js       # Core business operations
-│   ├── mcpDatabaseService.js # Database-integrated MCP
+│   ├── mcpDatabaseService.js # Database-integrated MCP (Primary)
 │   ├── mcpService.js        # MCP protocol implementation
 │   ├── openaiService.js     # OpenAI integration
 │   └── logService.js        # Centralized logging
@@ -179,6 +179,7 @@ server/
 │   ├── mcp-core/            # MCP function tests
 │   └── helpers/             # Test utilities
 └── utils/                   # Utility functions
+    ├── database.js          # Database connection management
     ├── validation.js        # Input validation
     └── mcpResponseFormatter.js # Response formatting
 ```
