@@ -158,28 +158,40 @@ function verifyDataFiles() {
   LogService.info('Verifying data files...');
   
   try {
-    // Check for borrower data
-    LogService.debug('Attempting to directly read borrowers.json...');
-    const borrowers = require('./data/borrowers.json');
+    // Check for borrower data using database service
+    LogService.debug('Attempting to verify borrower data via database...');
     
-    // Verify first borrower
-    const firstBorrower = borrowers.find(b => b.borrower_id === 'B001');
-    if (firstBorrower) {
-      LogService.debug('Borrower B001 found in borrowers.json', firstBorrower);
-    } else {
-      LogService.warn('Borrower B001 not found in borrowers.json');
-    }
+    // Import database service
+    const mcpDatabaseService = require('./services/mcpDatabaseService');
     
-    LogService.info('Borrowers data verified successfully', {
-      borrowerCount: borrowers.length,
-      b001Found: !!firstBorrower
-    });
+    // Test database connection and data availability
+    mcpDatabaseService.executeQuery('SELECT TOP 1 * FROM Borrowers WHERE borrower_id = ?', ['B001'])
+      .then(result => {
+        const borrowers = result.recordset || result;
+        if (borrowers && borrowers.length > 0) {
+          LogService.debug('Borrower B001 found in database', borrowers[0]);
+          LogService.info('Borrower data verified successfully via database', {
+            borrowerCount: borrowers.length,
+            b001Found: true
+          });
+        } else {
+          LogService.warn('Borrower B001 not found in database');
+        }
+      })
+      .catch(error => {
+        LogService.error('Failed to verify borrower data via database', {
+          error: error.message,
+          stack: error.stack
+        });
+        // Continue without throwing error - system can still function
+      });
+    
   } catch (error) {
     LogService.error('Failed to verify data files', {
       error: error.message,
       stack: error.stack
     });
-    throw new Error('Data files missing or corrupted: ' + error.message);
+    // Don't throw error - system should continue to function
   }
 }
 

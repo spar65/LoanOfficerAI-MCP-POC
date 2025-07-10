@@ -84,43 +84,32 @@ const verifyBorrowersData = () => {
   }
 };
 
-// Ensure borrowers data is loaded and includes B001
-const ensureBorrowerB001 = () => {
+// Ensure borrower B001 exists in the system
+const ensureBorrowerB001 = async () => {
   try {
-    // Check if data already exists in memory
-    const result = verifyBorrowersData();
+    LogService.debug('Ensuring borrower B001 exists in database...');
     
-    // If B001 not found, add it to the data
-    if (result.error || !result.b001Found) {
-      LogService.warn('Adding borrower B001 to borrowers data');
+    // Check if B001 exists in database
+    const result = await mcpDatabaseService.executeQuery(
+      'SELECT * FROM Borrowers WHERE borrower_id = ?', 
+      ['B001']
+    );
+    
+    const borrowers = result.recordset || result;
+    
+    if (!borrowers || borrowers.length === 0) {
+      LogService.warn('Borrower B001 not found in database, creating...');
       
-      // Load existing borrowers or create empty array
-      let borrowers = [];
-      try {
-        borrowers = JSON.parse(fs.readFileSync(borrowersPath, 'utf8'));
-      } catch (e) {
-        LogService.warn('Creating new borrowers.json file');
-      }
+      // Insert B001 into database
+      await mcpDatabaseService.executeQuery(
+        `INSERT INTO Borrowers (borrower_id, first_name, last_name, address, phone, email, credit_score, income, farm_size, farm_type)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        ['B001', 'John', 'Doe', '123 Farm Rd, Smalltown, USA', '555-1234', 'john@example.com', 750, 100000, 500, 'Crop']
+      );
       
-      // Add B001 if not exists
-      if (!borrowers.find(b => b.borrower_id === 'B001')) {
-        borrowers.push({
-          "borrower_id": "B001",
-          "first_name": "John",
-          "last_name": "Doe",
-          "address": "123 Farm Rd, Smalltown, USA",
-          "phone": "555-1234",
-          "email": "john@example.com",
-          "credit_score": 750,
-          "income": 100000,
-          "farm_size": 500,
-          "farm_type": "Crop"
-        });
-        
-        // Write updated data to file
-        fs.writeFileSync(borrowersPath, JSON.stringify(borrowers, null, 2));
-        LogService.info('Added borrower B001 to borrowers.json');
-      }
+      LogService.info('Added borrower B001 to database');
+    } else {
+      LogService.debug('Borrower B001 already exists in database');
     }
     
     return true;
@@ -136,173 +125,75 @@ const ensureBorrowerB001 = () => {
 // Data loading function
 const loadData = async (filePath) => {
   try {
-    // Ensure B001 exists in borrowers data if we're loading borrowers
-    if (filePath === borrowersPath) {
-      ensureBorrowerB001();
+    LogService.debug(`Loading data from database instead of file: ${filePath}`);
+    
+    // Determine which table to query based on file path
+    let tableName = '';
+    if (filePath.includes('borrowers.json')) {
+      tableName = 'Borrowers';
+    } else if (filePath.includes('loans.json')) {
+      tableName = 'Loans';
+    } else if (filePath.includes('payments.json')) {
+      tableName = 'Payments';
+    } else if (filePath.includes('collateral.json')) {
+      tableName = 'Collateral';
+    } else if (filePath.includes('equipment.json')) {
+      tableName = 'Equipment';
+    } else {
+      LogService.warn(`Unknown data file: ${filePath}, returning empty array`);
+      return [];
     }
     
-    // For testing, we might want to use mock data
+    // Query database
+    const result = await mcpDatabaseService.executeQuery(`SELECT * FROM ${tableName}`, {});
+    const data = result.recordset || result || [];
+    
+    // Special handling for borrowers - ensure B001 exists
+    if (tableName === 'Borrowers') {
+      const hasB001 = data.some(b => b.borrower_id === 'B001');
+      if (!hasB001) {
+        LogService.warn('B001 not found in database, attempting to create...');
+        await ensureBorrowerB001();
+        
+        // Re-query to get updated data
+        const updatedResult = await mcpDatabaseService.executeQuery(`SELECT * FROM ${tableName}`, {});
+        return updatedResult.recordset || updatedResult || [];
+      }
+    }
+    
+    LogService.debug(`Successfully loaded ${data.length} records from ${tableName}`);
+    return data;
+    
+  } catch (error) {
+    LogService.error(`Error loading data from database for ${filePath}:`, {
+      message: error.message,
+      stack: error.stack
+    });
+    
+    // For testing, try to use mock data
     if (process.env.NODE_ENV === 'test') {
       const fileName = path.basename(filePath);
       const mockFilePath = path.join(mockDataDir, fileName);
       
-      // Try to load the mock data first
+      // Try to load the mock data
       if (typeof fs.existsSync === 'function' && fs.existsSync(mockFilePath)) {
         try {
           const data = fs.readFileSync(mockFilePath, 'utf8');
           
           if (!data || data.trim() === '') {
             LogService.warn(`Mock data file is empty: ${mockFilePath}`);
-            // Continue to fallback logic below
-          } else {
-            try {
-              return JSON.parse(data);
-            } catch (parseError) {
-              LogService.error(`Mock data invalid at ${mockFilePath}: ${parseError.message}`);
-              // Continue to fallback logic below
-            }
+            return [];
           }
+          
+          return JSON.parse(data);
         } catch (mockError) {
           LogService.error(`Error reading mock data at ${mockFilePath}: ${mockError.message}`);
-          // Continue to fallback logic below
-        }
-      }
-      // If we are in a test environment and mock data is not available or not
-      // usable, fall through to the regular data-loading logic below so that
-      // Jest "fs.readFileSync" mocks can supply the data.
-      try {
-        const data = fs.readFileSync(filePath, 'utf8');
-
-        if (!data || (typeof data === 'string' && data.trim() === '')) {
-          LogService.warn(`Data file is empty: ${filePath}`);
           return [];
         }
-
-        return JSON.parse(data);
-      } catch (testReadError) {
-        // If reading the original path fails (because the Jest test didn't
-        // mock it or the file doesn't exist), return an empty array so the
-        // service can still operate without crashing.
-        LogService.error(`Error reading data (test env) from ${filePath}: ${testReadError.message}`);
-        return [];
       }
     }
     
-    // Regular data loading for non-test environments
-    if (fs.existsSync(filePath)) {
-      try {
-        const data = fs.readFileSync(filePath, 'utf8');
-        
-        if (!data || data.trim() === '') {
-          LogService.warn(`Data file is empty: ${filePath}`);
-          
-          // Special case for borrowers.json
-          if (filePath === borrowersPath) {
-            LogService.warn('Returning default borrowers array with B001');
-            return [{
-              "borrower_id": "B001",
-              "first_name": "John",
-              "last_name": "Doe",
-              "address": "123 Farm Rd, Smalltown, USA",
-              "phone": "555-1234",
-              "email": "john@example.com",
-              "credit_score": 750,
-              "income": 100000,
-              "farm_size": 500,
-              "farm_type": "Crop"
-            }];
-          }
-          
-          return [];
-        }
-        
-        const parsed = JSON.parse(data);
-        
-        // Special case for borrowers.json - ensure B001 exists
-        if (filePath === borrowersPath && Array.isArray(parsed)) {
-          const hasB001 = parsed.some(b => b.borrower_id === 'B001');
-          if (!hasB001) {
-            LogService.warn('Adding B001 to parsed borrowers data');
-            parsed.push({
-              "borrower_id": "B001",
-              "first_name": "John",
-              "last_name": "Doe",
-              "address": "123 Farm Rd, Smalltown, USA",
-              "phone": "555-1234",
-              "email": "john@example.com",
-              "credit_score": 750,
-              "income": 100000,
-              "farm_size": 500,
-              "farm_type": "Crop"
-            });
-          }
-        }
-        
-        return parsed;
-      } catch (readError) {
-        LogService.error(`Error reading data from ${filePath}:`, readError);
-        
-        // Special case for borrowers.json
-        if (filePath === borrowersPath) {
-          LogService.warn('Returning default borrowers array with B001 after error');
-          return [{
-            "borrower_id": "B001",
-            "first_name": "John",
-            "last_name": "Doe",
-            "address": "123 Farm Rd, Smalltown, USA",
-            "phone": "555-1234",
-            "email": "john@example.com",
-            "credit_score": 750,
-            "income": 100000,
-            "farm_size": 500,
-            "farm_type": "Crop"
-          }];
-        }
-        
-        return [];
-      }
-    } else {
-      LogService.warn(`Regular data file not found at ${filePath}, returning empty array`);
-      
-      // Special case for borrowers.json
-      if (filePath === borrowersPath) {
-        LogService.warn('Returning default borrowers array with B001 for missing file');
-        return [{
-          "borrower_id": "B001",
-          "first_name": "John",
-          "last_name": "Doe",
-          "address": "123 Farm Rd, Smalltown, USA",
-          "phone": "555-1234",
-          "email": "john@example.com",
-          "credit_score": 750,
-          "income": 100000,
-          "farm_size": 500,
-          "farm_type": "Crop"
-        }];
-      }
-      
-      return [];
-    }
-  } catch (error) {
-    LogService.error(`Error loading data from ${filePath}:`, error);
-    
-    // Special case for borrowers.json
-    if (filePath === borrowersPath) {
-      LogService.warn('Returning default borrowers array with B001 after catch-all error');
-      return [{
-        "borrower_id": "B001",
-        "first_name": "John",
-        "last_name": "Doe",
-        "address": "123 Farm Rd, Smalltown, USA",
-        "phone": "555-1234",
-        "email": "john@example.com",
-        "credit_score": 750,
-        "income": 100000,
-        "farm_size": 500,
-        "farm_type": "Crop"
-      }];
-    }
-    
+    // Return empty array as fallback
     return [];
   }
 };

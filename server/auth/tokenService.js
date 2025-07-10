@@ -25,17 +25,30 @@ let cleanupInterval = null;
 // Load persisted tokens if available
 try {
   if (fs.existsSync(tokenStorePath)) {
-    const data = JSON.parse(fs.readFileSync(tokenStorePath, 'utf8'));
-    for (const [token, tokenData] of Object.entries(data)) {
-      refreshTokens.set(token, {
-        userId: tokenData.userId,
-        expiresAt: tokenData.expiresAt
-      });
+    try {
+      const data = fs.readFileSync(tokenStorePath, 'utf8');
+      if (data && data.trim()) {
+        const parsedData = JSON.parse(data);
+        for (const [token, tokenData] of Object.entries(parsedData)) {
+          refreshTokens.set(token, {
+            userId: tokenData.userId,
+            expiresAt: tokenData.expiresAt
+          });
+        }
+        console.log(`Loaded ${refreshTokens.size} refresh tokens`);
+      } else {
+        console.log('Token storage file is empty, starting with clean state');
+      }
+    } catch (parseError) {
+      console.error('Error parsing token storage file:', parseError.message);
+      console.log('Starting with clean token state');
     }
-    console.log(`Loaded ${refreshTokens.size} refresh tokens`);
+  } else {
+    console.log('No existing token storage file found, starting with clean state');
   }
 } catch (err) {
-  console.error('Error loading refresh tokens:', err);
+  console.error('Error loading refresh tokens:', err.message);
+  console.log('Starting with clean token state');
   // Continue without persisted tokens
 }
 

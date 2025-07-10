@@ -24,13 +24,19 @@ global.getMockData = (filename) => {
   try {
     const filePath = path.join(__dirname, 'mock-data', `${filename}.json`);
     if (fs.existsSync(filePath)) {
-      return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+      const data = fs.readFileSync(filePath, 'utf8');
+      if (data && data.trim()) {
+        return JSON.parse(data);
+      } else {
+        console.warn(`Mock data file is empty: ${filePath}`);
+        return [];
+      }
     } else {
       // console.warn(`Mock data file not found: ${filePath}`); // Keep this commented for cleaner test output unless debugging this function
       return [];
     }
   } catch (error) {
-    // console.error(`Error loading mock data: ${error.message}`); // Keep this commented
+    console.error(`Error loading mock data from ${filename}: ${error.message}`);
     return [];
   }
 };
