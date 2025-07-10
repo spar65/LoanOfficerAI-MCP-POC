@@ -79,10 +79,14 @@ function runTest(command, testName, category) {
     const isServerTest = command.includes('tests/mcp-core/') || 
                         command.includes('tests/mcp-infrastructure/');
     
-    // If we're already in the server directory, don't add another 'server' to the path
-    const currentDir = process.cwd();
-    const isAlreadyInServer = currentDir.endsWith('/server') || currentDir.endsWith('\\server');
-    const cwd = isServerTest && !isAlreadyInServer ? path.join(currentDir, 'server') : currentDir;
+    // Always ensure we're running server tests from the server directory
+    let cwd = process.cwd();
+    if (isServerTest) {
+      // If we're in the root directory, go to server
+      if (!cwd.endsWith('/server') && !cwd.endsWith('\\server')) {
+        cwd = path.join(cwd, 'server');
+      }
+    }
     
     const output = execSync(command, { 
       encoding: 'utf8', 
@@ -261,10 +265,11 @@ async function runAllTests() {
   printSection('UNIT TESTS (Jest)');
   
   try {
-    // Use the same directory logic for Jest tests
-    const currentDir = process.cwd();
-    const isAlreadyInServer = currentDir.endsWith('/server') || currentDir.endsWith('\\server');
-    const jestCwd = isAlreadyInServer ? currentDir : path.join(currentDir, 'server');
+    // Always ensure Jest runs from the server directory
+    let jestCwd = process.cwd();
+    if (!jestCwd.endsWith('/server') && !jestCwd.endsWith('\\server')) {
+      jestCwd = path.join(jestCwd, 'server');
+    }
     
     execSync('npm run test:unit', { 
       stdio: 'pipe', 

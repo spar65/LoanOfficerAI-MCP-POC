@@ -459,9 +459,13 @@ async function assessCropYieldRisk(borrowerId, cropType, season) {
   try {
     LogService.info(`Assessing crop yield risk for borrower ${borrowerId}, crop: ${cropType}, season: ${season}`);
     
-    // Load required data
-    const borrowers = await mcpDatabaseService.executeQuery('SELECT * FROM Borrowers', {});
-    const loans = await mcpDatabaseService.executeQuery('SELECT * FROM Loans', {});
+    // Load required data from database
+    const borrowersResult = await mcpDatabaseService.executeQuery('SELECT * FROM Borrowers', {});
+    const loansResult = await mcpDatabaseService.executeQuery('SELECT * FROM Loans', {});
+    
+    // Extract arrays from database results
+    const borrowers = borrowersResult.recordset || borrowersResult;
+    const loans = loansResult.recordset || loansResult;
     
     // Find the borrower
     const borrower = borrowers.find(b => b.borrower_id.toUpperCase() === borrowerId.toUpperCase());
@@ -566,9 +570,13 @@ async function analyzeMarketPriceImpact(commodity, priceChangePercent) {
   try {
     LogService.info(`Analyzing market price impact for ${commodity}, change: ${priceChangePercent}`);
     
-    // Load required data
-    const borrowers = await mcpDatabaseService.executeQuery('SELECT * FROM Borrowers', {});
-    const loans = await mcpDatabaseService.executeQuery('SELECT * FROM Loans', {});
+    // Load required data from database
+    const borrowersResult = await mcpDatabaseService.executeQuery('SELECT * FROM Borrowers', {});
+    const loansResult = await mcpDatabaseService.executeQuery('SELECT * FROM Loans', {});
+    
+    // Extract arrays from database results
+    const borrowers = borrowersResult.recordset || borrowersResult;
+    const loans = loansResult.recordset || loansResult;
     
     // Parse price change
     const priceChange = parseFloat(priceChangePercent.toString().replace('%', '')) / 100;
@@ -691,10 +699,15 @@ async function analyzePaymentPatterns(borrowerId) {
   try {
     LogService.info(`Analyzing payment patterns for borrower ${borrowerId}`);
     
-    // Load required data
-    const borrowers = await mcpDatabaseService.executeQuery('SELECT * FROM Borrowers', {});
-    const loans = await mcpDatabaseService.executeQuery('SELECT * FROM Loans', {});
-    const payments = await mcpDatabaseService.executeQuery('SELECT * FROM Payments', {});
+    // Load required data from database
+    const borrowersResult = await mcpDatabaseService.executeQuery('SELECT * FROM Borrowers', {});
+    const loansResult = await mcpDatabaseService.executeQuery('SELECT * FROM Loans', {});
+    const paymentsResult = await mcpDatabaseService.executeQuery('SELECT * FROM Payments', {});
+    
+    // Extract arrays from database results
+    const borrowers = borrowersResult.recordset || borrowersResult;
+    const loans = loansResult.recordset || loansResult;
+    const payments = paymentsResult.recordset || paymentsResult;
     
     // Find the borrower
     const borrower = borrowers.find(b => b.borrower_id.toUpperCase() === borrowerId.toUpperCase());
@@ -769,9 +782,13 @@ async function forecastEquipmentMaintenance(borrowerId) {
   try {
     LogService.info(`Forecasting equipment maintenance for borrower ${borrowerId}`);
     
-    // Load required data
-    const borrowers = await mcpDatabaseService.executeQuery('SELECT * FROM Borrowers', {});
-    const equipment = await mcpDatabaseService.executeQuery('SELECT * FROM Equipment', {});
+    // Load required data from database
+    const borrowersResult = await mcpDatabaseService.executeQuery('SELECT * FROM Borrowers', {});
+    const equipmentResult = await mcpDatabaseService.executeQuery('SELECT * FROM Equipment', {});
+    
+    // Extract arrays from database results
+    const borrowers = borrowersResult.recordset || borrowersResult;
+    const equipment = equipmentResult.recordset || equipmentResult;
     
     // Find the borrower
     const borrower = borrowers.find(b => b.borrower_id.toUpperCase() === borrowerId.toUpperCase());
@@ -829,10 +846,15 @@ async function getHighRiskFarmers() {
   try {
     LogService.info('Identifying high-risk farmers');
     
-    // Load required data
-    const borrowers = await mcpDatabaseService.executeQuery('SELECT * FROM Borrowers', {});
-    const loans = await mcpDatabaseService.executeQuery('SELECT * FROM Loans', {});
-    const payments = await mcpDatabaseService.executeQuery('SELECT * FROM Payments', {});
+    // Load required data from database
+    const borrowersResult = await mcpDatabaseService.executeQuery('SELECT * FROM Borrowers', {});
+    const loansResult = await mcpDatabaseService.executeQuery('SELECT * FROM Loans', {});
+    const paymentsResult = await mcpDatabaseService.executeQuery('SELECT * FROM Payments', {});
+    
+    // Extract arrays from database results
+    const borrowers = borrowersResult.recordset || borrowersResult;
+    const loans = loansResult.recordset || loansResult;
+    const payments = paymentsResult.recordset || paymentsResult;
     
     const highRiskFarmers = [];
     

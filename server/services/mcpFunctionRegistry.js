@@ -143,9 +143,12 @@ async function callInternalApi(endpoint, method = 'GET', data = null) {
           
           // TODO: Implement database service method for loan restructuring
           // For now, fall back to the existing implementation
-          const loans = dataService.loadData(dataService.paths.loans);
-          const borrowers = dataService.loadData(dataService.paths.borrowers);
-          const payments = dataService.loadData(dataService.paths.payments);
+          const loansResult = await mcpDatabaseService.executeQuery('SELECT * FROM Loans', {});
+          const borrowersResult = await mcpDatabaseService.executeQuery('SELECT * FROM Borrowers', {});
+          const paymentsResult = await mcpDatabaseService.executeQuery('SELECT * FROM Payments', {});
+          const loans = loansResult.recordset || loansResult;
+          const borrowers = borrowersResult.recordset || borrowersResult;
+          const payments = paymentsResult.recordset || paymentsResult;
           
           // Find loan - ensure case-insensitive comparison
           const loan = loans.find((l) => l.loan_id.toUpperCase() === loanId);

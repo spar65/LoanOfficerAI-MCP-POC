@@ -100,10 +100,13 @@ class LoanOfficerMCPServer {
           // Fallback to JSON implementation
           const normalizedId = borrowerId.toUpperCase().trim();
           
-          // Load data
-          const borrowers = dataService.loadData(dataService.paths.borrowers);
-          const loans = dataService.loadData(dataService.paths.loans);
-          const payments = dataService.loadData(dataService.paths.payments);
+          // Load data from database
+          const borrowersResult = await mcpDatabaseService.executeQuery('SELECT * FROM Borrowers', {});
+          const loansResult = await mcpDatabaseService.executeQuery('SELECT * FROM Loans', {});
+          const paymentsResult = await mcpDatabaseService.executeQuery('SELECT * FROM Payments', {});
+          const borrowers = borrowersResult.recordset || borrowersResult;
+          const loans = loansResult.recordset || loansResult;
+          const payments = paymentsResult.recordset || paymentsResult;
           
           // Find borrower
           const borrower = borrowers.find(b => b.borrower_id === normalizedId);
@@ -266,9 +269,11 @@ class LoanOfficerMCPServer {
           
           const normalizedLoanId = loanId.toUpperCase().trim();
           
-          // Load data
-          const loans = dataService.loadData(dataService.paths.loans);
-          const collaterals = dataService.loadData(dataService.paths.collateral);
+          // Load data from database
+          const loansResult = await mcpDatabaseService.executeQuery('SELECT * FROM Loans', {});
+          const collateralsResult = await mcpDatabaseService.executeQuery('SELECT * FROM Collateral', {});
+          const loans = loansResult.recordset || loansResult;
+          const collaterals = collateralsResult.recordset || collateralsResult;
           
           // Find loan
           const loan = loans.find(l => l.loan_id === normalizedLoanId);
@@ -441,10 +446,13 @@ class LoanOfficerMCPServer {
           
           const normalizedId = borrowerId.toUpperCase().trim();
           
-          // Load data
-          const borrowers = dataService.loadData(dataService.paths.borrowers);
-          const loans = dataService.loadData(dataService.paths.loans);
-          const payments = dataService.loadData(dataService.paths.payments);
+          // Load data from database
+          const borrowersResult = await mcpDatabaseService.executeQuery('SELECT * FROM Borrowers', {});
+          const loansResult = await mcpDatabaseService.executeQuery('SELECT * FROM Loans', {});
+          const paymentsResult = await mcpDatabaseService.executeQuery('SELECT * FROM Payments', {});
+          const borrowers = borrowersResult.recordset || borrowersResult;
+          const loans = loansResult.recordset || loansResult;
+          const payments = paymentsResult.recordset || paymentsResult;
           
           const borrower = borrowers.find(b => b.borrower_id === normalizedId);
           if (!borrower) {

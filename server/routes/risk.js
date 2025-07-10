@@ -635,16 +635,18 @@ router.get('/high-risk-farmers', async (req, res) => {
 });
 
 // Evaluate collateral sufficiency
-router.get('/collateral-sufficiency/:loan_id', (req, res) => {
+router.get('/collateral-sufficiency/:loan_id', async (req, res) => {
   const loanId = req.params.loan_id;
   const marketConditions = req.query.market_conditions || 'stable';
   
   LogService.info(`Evaluating collateral sufficiency for loan ${loanId} with market conditions: ${marketConditions}`);
   
   try {
-    // Load data
-    const loans = dataService.loadData(dataService.paths.loans);
-    const collaterals = dataService.loadData(dataService.paths.collateral);
+    // Load data from database
+    const loansResult = await mcpDatabaseService.executeQuery('SELECT * FROM Loans', {});
+    const collateralsResult = await mcpDatabaseService.executeQuery('SELECT * FROM Collateral', {});
+    const loans = loansResult.recordset || loansResult;
+    const collaterals = collateralsResult.recordset || collateralsResult;
     
     // Find the loan
     const loan = loans.find(l => l.loan_id === loanId);

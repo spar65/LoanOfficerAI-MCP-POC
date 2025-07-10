@@ -703,139 +703,150 @@ router.get('/predict/non-accrual-risk/:borrower_id', async (req, res) => {
 });
 
 // Recommend refinancing options
-router.get('/recommendations/refinance/:loan_id', (req, res) => {
+router.get('/recommendations/refinance/:loan_id', async (req, res) => {
   const loanId = req.params.loan_id;
   
   LogService.info(`Generating refinancing options for loan ${loanId}`);
   
-  // Load data
-  const loans = dataService.loadData(dataService.paths.loans);
-  const payments = dataService.loadData(dataService.paths.payments);
+  try {
+    // Load data from database
+    const loansResult = await mcpDatabaseService.executeQuery('SELECT * FROM Loans', {});
+    const paymentsResult = await mcpDatabaseService.executeQuery('SELECT * FROM Payments', {});
+    const loans = loansResult.recordset || loansResult;
+    const payments = paymentsResult.recordset || paymentsResult;
   
-  // Find the loan
-  const loan = loans.find(l => l.loan_id === loanId);
-  if (!loan) {
-    return res.status(404).json({ error: 'Loan not found' });
-  }
-  
-  // Get payment history
-  const loanPayments = payments.filter(p => p.loan_id === loanId);
-  
-  // Current loan details
-  const currentRate = loan.interest_rate;
-  const currentTerm = loan.term_length;
-  
-  // Calculate remaining term (simplified)
-  // In a real system, this would be calculated based on amortization schedule
-  const remainingTerm = Math.max(Math.floor(currentTerm * 0.7), 24); // Assume 30% of term has passed, min 24 months
-  
-  // Generate refinancing options (simplified)
-  const options = [];
-  
-  // Option 1: Lower rate, same term
-  if (currentRate > 3.0) {
-    const newRate = Math.max(currentRate - 0.75, 3.0);
+    // Find the loan
+    const loan = loans.find(l => l.loan_id === loanId);
+    if (!loan) {
+      return res.status(404).json({ error: 'Loan not found' });
+    }
     
-    // Calculate monthly payment at current rate (simplified)
-    const monthlyPaymentBefore = (loan.loan_amount * (currentRate/100/12) * Math.pow(1 + currentRate/100/12, currentTerm)) / 
-                               (Math.pow(1 + currentRate/100/12, currentTerm) - 1);
+    // Get payment history
+    const loanPayments = payments.filter(p => p.loan_id === loanId);
     
-    // Calculate new monthly payment
-    const monthlyPaymentAfter = (loan.loan_amount * (newRate/100/12) * Math.pow(1 + newRate/100/12, remainingTerm)) / 
-                              (Math.pow(1 + newRate/100/12, remainingTerm) - 1);
+    // Current loan details
+    const currentRate = loan.interest_rate;
+    const currentTerm = loan.term_length;
     
-    const monthlySavings = monthlyPaymentBefore - monthlyPaymentAfter;
-    const totalInterestSavings = monthlySavings * remainingTerm;
+    // Calculate remaining term (simplified)
+    // In a real system, this would be calculated based on amortization schedule
+    const remainingTerm = Math.max(Math.floor(currentTerm * 0.7), 24); // Assume 30% of term has passed, min 24 months
     
-    options.push({
-      option_id: "REFI-1",
-      description: "Lower rate refinance",
-      new_rate: newRate,
-      new_term: remainingTerm,
-      monthly_payment: Number(monthlyPaymentAfter.toFixed(2)),
-      monthly_savings: Number(monthlySavings.toFixed(2)),
-      total_interest_savings: Number(totalInterestSavings.toFixed(2))
+    // Generate refinancing options (simplified)
+    const options = [];
+  
+    // Option 1: Lower rate, same term
+    if (currentRate > 3.0) {
+      const newRate = Math.max(currentRate - 0.75, 3.0);
+      
+      // Calculate monthly payment at current rate (simplified)
+      const monthlyPaymentBefore = (loan.loan_amount * (currentRate/100/12) * Math.pow(1 + currentRate/100/12, currentTerm)) / 
+                                 (Math.pow(1 + currentRate/100/12, currentTerm) - 1);
+      
+      // Calculate new monthly payment
+      const monthlyPaymentAfter = (loan.loan_amount * (newRate/100/12) * Math.pow(1 + newRate/100/12, remainingTerm)) / 
+                                (Math.pow(1 + newRate/100/12, remainingTerm) - 1);
+      
+      const monthlySavings = monthlyPaymentBefore - monthlyPaymentAfter;
+      const totalInterestSavings = monthlySavings * remainingTerm;
+      
+      options.push({
+        option_id: "REFI-1",
+        description: "Lower rate refinance",
+        new_rate: newRate,
+        new_term: remainingTerm,
+        monthly_payment: Number(monthlyPaymentAfter.toFixed(2)),
+        monthly_savings: Number(monthlySavings.toFixed(2)),
+        total_interest_savings: Number(totalInterestSavings.toFixed(2))
+      });
+    }
+    
+    // Option 2: Shorter term, slightly lower rate
+    if (remainingTerm > 36) {
+      const newTerm = Math.floor(remainingTerm * 0.8);
+      const newRate = Math.max(currentRate - 0.25, 3.0);
+      
+      // Calculate monthly payment at current rate (simplified)
+      const monthlyPaymentBefore = (loan.loan_amount * (currentRate/100/12) * Math.pow(1 + currentRate/100/12, currentTerm)) / 
+                                 (Math.pow(1 + currentRate/100/12, currentTerm) - 1);
+      
+      // Calculate new monthly payment
+      const monthlyPaymentAfter = (loan.loan_amount * (newRate/100/12) * Math.pow(1 + newRate/100/12, newTerm)) / 
+                                (Math.pow(1 + newRate/100/12, newTerm) - 1);
+      
+      // Note: monthly payment might be higher, but total interest paid will be lower
+      const totalInterestBefore = (monthlyPaymentBefore * remainingTerm) - loan.loan_amount;
+      const totalInterestAfter = (monthlyPaymentAfter * newTerm) - loan.loan_amount;
+      const totalInterestSavings = totalInterestBefore - totalInterestAfter;
+      
+      options.push({
+        option_id: "REFI-2",
+        description: "Shorter term refinance",
+        new_rate: newRate,
+        new_term: newTerm,
+        monthly_payment: Number(monthlyPaymentAfter.toFixed(2)),
+        monthly_difference: Number((monthlyPaymentAfter - monthlyPaymentBefore).toFixed(2)),
+        total_interest_savings: Number(totalInterestSavings.toFixed(2))
+      });
+    }
+    
+    // Option 3: Cash-out refinance for equipment or expansion
+    if (loan.loan_amount > 50000 && loanPayments.filter(p => p.status === 'Late').length === 0) {
+      const additionalAmount = loan.loan_amount * 0.2; // 20% additional
+      const newLoanAmount = loan.loan_amount + additionalAmount;
+      const newRate = currentRate + 0.25; // Slightly higher rate for cash-out
+      
+      // Calculate monthly payment at current rate (simplified)
+      const monthlyPaymentBefore = (loan.loan_amount * (currentRate/100/12) * Math.pow(1 + currentRate/100/12, currentTerm)) / 
+                                 (Math.pow(1 + currentRate/100/12, currentTerm) - 1);
+      
+      // Calculate new monthly payment
+      const monthlyPaymentAfter = (newLoanAmount * (newRate/100/12) * Math.pow(1 + newRate/100/12, remainingTerm)) / 
+                                (Math.pow(1 + newRate/100/12, remainingTerm) - 1);
+      
+      options.push({
+        option_id: "REFI-3",
+        description: "Cash-out refinance for farm improvements",
+        new_loan_amount: Number(newLoanAmount.toFixed(2)),
+        additional_funds: Number(additionalAmount.toFixed(2)),
+        new_rate: newRate,
+        new_term: remainingTerm,
+        monthly_payment: Number(monthlyPaymentAfter.toFixed(2)),
+        monthly_payment_increase: Number((monthlyPaymentAfter - monthlyPaymentBefore).toFixed(2))
+      });
+    }
+    
+    const result = {
+      loan_id: loanId,
+      current_rate: currentRate,
+      current_term_remaining: remainingTerm,
+      current_balance: loan.loan_amount,
+      refinancing_recommended: options.length > 0,
+      options: options
+    };
+    
+    LogService.info(`Generated ${options.length} refinancing options for loan ${loanId}`);
+    res.json(result);
+  } catch (error) {
+    LogService.error(`Error generating refinancing options for loan ${loanId}`, { error: error.message });
+    res.status(500).json({ 
+      error: 'Failed to generate refinancing options', 
+      details: error.message 
     });
   }
-  
-  // Option 2: Shorter term, slightly lower rate
-  if (remainingTerm > 36) {
-    const newTerm = Math.floor(remainingTerm * 0.8);
-    const newRate = Math.max(currentRate - 0.25, 3.0);
-    
-    // Calculate monthly payment at current rate (simplified)
-    const monthlyPaymentBefore = (loan.loan_amount * (currentRate/100/12) * Math.pow(1 + currentRate/100/12, currentTerm)) / 
-                               (Math.pow(1 + currentRate/100/12, currentTerm) - 1);
-    
-    // Calculate new monthly payment
-    const monthlyPaymentAfter = (loan.loan_amount * (newRate/100/12) * Math.pow(1 + newRate/100/12, newTerm)) / 
-                              (Math.pow(1 + newRate/100/12, newTerm) - 1);
-    
-    // Note: monthly payment might be higher, but total interest paid will be lower
-    const totalInterestBefore = (monthlyPaymentBefore * remainingTerm) - loan.loan_amount;
-    const totalInterestAfter = (monthlyPaymentAfter * newTerm) - loan.loan_amount;
-    const totalInterestSavings = totalInterestBefore - totalInterestAfter;
-    
-    options.push({
-      option_id: "REFI-2",
-      description: "Shorter term refinance",
-      new_rate: newRate,
-      new_term: newTerm,
-      monthly_payment: Number(monthlyPaymentAfter.toFixed(2)),
-      monthly_difference: Number((monthlyPaymentAfter - monthlyPaymentBefore).toFixed(2)),
-      total_interest_savings: Number(totalInterestSavings.toFixed(2))
-    });
-  }
-  
-  // Option 3: Cash-out refinance for equipment or expansion
-  if (loan.loan_amount > 50000 && loanPayments.filter(p => p.status === 'Late').length === 0) {
-    const additionalAmount = loan.loan_amount * 0.2; // 20% additional
-    const newLoanAmount = loan.loan_amount + additionalAmount;
-    const newRate = currentRate + 0.25; // Slightly higher rate for cash-out
-    
-    // Calculate monthly payment at current rate (simplified)
-    const monthlyPaymentBefore = (loan.loan_amount * (currentRate/100/12) * Math.pow(1 + currentRate/100/12, currentTerm)) / 
-                               (Math.pow(1 + currentRate/100/12, currentTerm) - 1);
-    
-    // Calculate new monthly payment
-    const monthlyPaymentAfter = (newLoanAmount * (newRate/100/12) * Math.pow(1 + newRate/100/12, remainingTerm)) / 
-                              (Math.pow(1 + newRate/100/12, remainingTerm) - 1);
-    
-    options.push({
-      option_id: "REFI-3",
-      description: "Cash-out refinance for farm improvements",
-      new_loan_amount: Number(newLoanAmount.toFixed(2)),
-      additional_funds: Number(additionalAmount.toFixed(2)),
-      new_rate: newRate,
-      new_term: remainingTerm,
-      monthly_payment: Number(monthlyPaymentAfter.toFixed(2)),
-      monthly_payment_increase: Number((monthlyPaymentAfter - monthlyPaymentBefore).toFixed(2))
-    });
-  }
-  
-  const result = {
-    loan_id: loanId,
-    current_rate: currentRate,
-    current_term_remaining: remainingTerm,
-    current_balance: loan.loan_amount,
-    refinancing_recommended: options.length > 0,
-    options: options
-  };
-  
-  LogService.info(`Generated ${options.length} refinancing options for loan ${loanId}`);
-  res.json(result);
 });
 
 // Forecast equipment maintenance costs
-router.get('/equipment-forecast/:borrower_id', (req, res) => {
+router.get('/equipment-forecast/:borrower_id', async (req, res) => {
   const borrowerId = req.params.borrower_id;
   const year = req.query.year || new Date().getFullYear() + 1;
   
   LogService.info(`Forecasting equipment maintenance costs for borrower ${borrowerId} for year ${year}`);
   
   try {
-    // Load data
-    const borrowers = dataService.loadData(dataService.paths.borrowers);
+    // Load data from database
+    const borrowersResult = await mcpDatabaseService.executeQuery('SELECT * FROM Borrowers', {});
+    const borrowers = borrowersResult.recordset || borrowersResult;
     
     // Find the borrower
     const borrower = borrowers.find(b => b.borrower_id === borrowerId);
@@ -964,7 +975,7 @@ router.get('/equipment-forecast/:borrower_id', (req, res) => {
 });
 
 // Assess crop yield risk
-router.get("/crop-yield-risk/:borrower_id", (req, res) => {
+router.get("/crop-yield-risk/:borrower_id", async (req, res) => {
   try {
     const borrowerId = req.params.borrower_id.toUpperCase();
     const cropType = req.query.crop_type || null;
@@ -975,9 +986,11 @@ router.get("/crop-yield-risk/:borrower_id", (req, res) => {
       season: season,
     });
     
-    // Load required data
-    const borrowers = dataService.loadData(dataService.paths.borrowers);
-    const loans = dataService.loadData(dataService.paths.loans);
+    // Load required data from database
+    const borrowersResult = await mcpDatabaseService.executeQuery('SELECT * FROM Borrowers', {});
+    const loansResult = await mcpDatabaseService.executeQuery('SELECT * FROM Loans', {});
+    const borrowers = borrowersResult.recordset || borrowersResult;
+    const loans = loansResult.recordset || loansResult;
     
     // Find the borrower
     const borrower = borrowers.find((b) => b.borrower_id.toUpperCase() === borrowerId);
@@ -1172,7 +1185,7 @@ router.get("/crop-yield-risk/:borrower_id", (req, res) => {
 });
 
 // Analyze market price impact
-router.get("/market-price-impact/:commodity", (req, res) => {
+router.get("/market-price-impact/:commodity", async (req, res) => {
   try {
     const commodity = req.params.commodity.toLowerCase();
     const priceChangePercent = req.query.price_change_percent || null;
@@ -1181,9 +1194,11 @@ router.get("/market-price-impact/:commodity", (req, res) => {
       price_change_percent: priceChangePercent,
     });
     
-    // Load required data
-    const borrowers = dataService.loadData(dataService.paths.borrowers);
-    const loans = dataService.loadData(dataService.paths.loans);
+    // Load required data from database
+    const borrowersResult = await mcpDatabaseService.executeQuery('SELECT * FROM Borrowers', {});
+    const loansResult = await mcpDatabaseService.executeQuery('SELECT * FROM Loans', {});
+    const borrowers = borrowersResult.recordset || borrowersResult;
+    const loans = loansResult.recordset || loansResult;
     
     // Validate commodity
     const validCommodities = [
@@ -1347,16 +1362,18 @@ router.get("/market-price-impact/:commodity", (req, res) => {
 });
 
 // Get refinancing options
-router.get('/refinancing-options/:loan_id', (req, res) => {
+router.get('/refinancing-options/:loan_id', async (req, res) => {
   const loanId = req.params.loan_id;
   
   LogService.info(`Getting refinancing options for loan ${loanId}`);
   
   try {
-    // Load data
-    const loans = dataService.loadData(dataService.paths.loans);
-    const borrowers = dataService.loadData(dataService.paths.borrowers);
-    
+    // Load data from database
+    const loansResult = await mcpDatabaseService.executeQuery('SELECT * FROM Loans', {});
+    const borrowersResult = await mcpDatabaseService.executeQuery('SELECT * FROM Borrowers', {});
+    const loans = loansResult.recordset || loansResult;
+    const borrowers = borrowersResult.recordset || borrowersResult;
+  
     // Find the loan - ensure case-insensitive comparison
     const loan = loans.find((l) => l.loan_id.toUpperCase() === loanId.toUpperCase());
     if (!loan) {
@@ -1538,7 +1555,7 @@ function calculateMonthlyWithCashout(oldPrincipal, newPrincipal, oldRate, newRat
 }
 
 // Generate loan restructuring recommendations
-router.get("/loan-restructuring/:loan_id", (req, res) => {
+router.get("/loan-restructuring/:loan_id", async (req, res) => {
   try {
     const loanId = req.params.loan_id.toUpperCase();
     const restructuringGoal = req.query.goal || null;
@@ -1547,10 +1564,13 @@ router.get("/loan-restructuring/:loan_id", (req, res) => {
       restructuring_goal: restructuringGoal
     });
     
-    // Load required data
-    const loans = dataService.loadData(dataService.paths.loans);
-    const borrowers = dataService.loadData(dataService.paths.borrowers);
-    const payments = dataService.loadData(dataService.paths.payments);
+    // Load required data from database
+    const loansResult = await mcpDatabaseService.executeQuery('SELECT * FROM Loans', {});
+    const borrowersResult = await mcpDatabaseService.executeQuery('SELECT * FROM Borrowers', {});
+    const paymentsResult = await mcpDatabaseService.executeQuery('SELECT * FROM Payments', {});
+    const loans = loansResult.recordset || loansResult;
+    const borrowers = borrowersResult.recordset || borrowersResult;
+    const payments = paymentsResult.recordset || paymentsResult;
     
     // Find the loan - ensure case-insensitive comparison
     const loan = loans.find((l) => l.loan_id.toUpperCase() === loanId.toUpperCase());

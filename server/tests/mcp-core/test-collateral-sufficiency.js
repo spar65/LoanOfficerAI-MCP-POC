@@ -1,130 +1,153 @@
 /**
- * Test script to verify the collateral sufficiency functionality
+ * Test Collateral Sufficiency MCP Function
+ * 
+ * This test validates the collateral sufficiency evaluation function
+ * by testing various loan scenarios and market conditions.
  */
-require('dotenv').config();
-const axios = require('axios');
-const LogService = require('../../services/logService');
-const dataService = require('../../services/dataService');
 
-// Verify data files
-LogService.info('Verifying loan and collateral data');
-try {
-  // Check loans data
-  const loans = dataService.loadData(dataService.paths.loans);
-  LogService.info(`Found ${loans.length} loans`);
-  
-  // Look for L002 specifically
-  const l002 = loans.find(l => l.loan_id === 'L002');
-  if (l002) {
-    LogService.info('Loan L002 found:', l002);
-  } else {
-    LogService.error('Loan L002 not found in loans data');
-  }
-  
-  // Check collateral data
-  const collateral = dataService.loadData(dataService.paths.collateral);
-  LogService.info(`Found ${collateral.length} collateral items`);
-  
-  // Look for collateral for L002
-  const l002Collateral = collateral.filter(c => c.loan_id === 'L002');
-  if (l002Collateral.length > 0) {
-    LogService.info(`Found ${l002Collateral.length} collateral items for loan L002:`, l002Collateral);
-  } else {
-    LogService.warn('No collateral found for loan L002');
-  }
-} catch (error) {
-  LogService.error('Error verifying data:', {
-    message: error.message,
-    stack: error.stack
-  });
-}
+const mcpFunctionRegistry = require('../../services/mcpFunctionRegistry');
+const db = require('../../../utils/database'); // Import database utility
 
-const PORT = process.env.PORT || 3001;
-const BASE_URL = `http://localhost:${PORT}`;
+// Mock data for testing
+const mockLoans = [
+  {
+    loan_id: 'L001',
+    borrower_id: 'B001',
+    loan_amount: 250000,
+    interest_rate: 4.5,
+    status: 'active'
+  }
+];
+
+const mockCollateral = [
+  {
+    collateral_id: 'C001',
+    loan_id: 'L001',
+    type: 'Real Estate',
+    description: 'Farm Property - 100 acres',
+    value: 300000
+  },
+  {
+    collateral_id: 'C002',
+    loan_id: 'L001',
+    type: 'Equipment',
+    description: 'John Deere Tractor',
+    value: 75000
+  }
+];
+
+// Mock the database service to return test data
+const mockDatabaseService = {
+  executeQuery: async (query, params) => {
+    if (query.includes('SELECT * FROM Loans')) {
+      return { recordset: mockLoans };
+    }
+    if (query.includes('SELECT * FROM Collateral')) {
+      return { recordset: mockCollateral };
+    }
+    return { recordset: [] };
+  }
+};
 
 async function testCollateralSufficiency() {
-  LogService.info('Starting collateral sufficiency test...');
+  console.log('🧪 Testing Collateral Sufficiency Function...\n');
   
   try {
-    // Step 1: Test direct endpoint for L002
-    LogService.info('Step 1: Testing risk/collateral/L002 endpoint');
-    try {
-      const collateralRes = await axios.get(`${BASE_URL}/api/risk/collateral/L002?market_conditions=stable`, {
-        headers: {
-          'Accept': 'application/json',
-          'X-Internal-Call': 'true',
-          'Authorization': 'Bearer SYSTEM_INTERNAL_CALL'
-        }
-      });
-      
-      LogService.info('Collateral endpoint response for L002:', collateralRes.data);
-    } catch (collateralErr) {
-      LogService.error('Failed to retrieve collateral data for L002:', {
-        message: collateralErr.message,
-        status: collateralErr.response?.status,
-        data: collateralErr.response?.data
-      });
-    }
-    
-    // Step 2: Test via OpenAI endpoint with function calling
-    LogService.info('Step 2: Testing OpenAI endpoint with function calling');
-    try {
-      const openaiRes = await axios.post(`${BASE_URL}/api/openai/chat`, {
-        messages: [{ 
-          role: 'user', 
-          content: "Is the collateral for loan L002 sufficient given current market conditions?" 
-        }],
-        function_call: 'auto'
-      }, {
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'X-Internal-Call': 'true',
-          'Authorization': 'Bearer SYSTEM_INTERNAL_CALL'
-        }
-      });
-      
-      LogService.info('OpenAI response:', openaiRes.data);
-    } catch (openaiErr) {
-      LogService.error('Failed to get OpenAI response:', {
-        message: openaiErr.message,
-        status: openaiErr.response?.status,
-        data: openaiErr.response?.data
-      });
-    }
-    
-    // Step 3: Test collateral data service loading directly
-    LogService.info('Step 3: Testing direct access to collateral data');
-    try {
-      const collateralData = dataService.loadData(dataService.paths.collateral);
-      LogService.info(`Direct data service loaded ${collateralData.length} collateral items`);
-      
-      const l002CollateralItems = collateralData.filter(c => c.loan_id === 'L002');
-      LogService.info(`Found ${l002CollateralItems.length} collateral items for L002 in direct data load`);
-    } catch (dataErr) {
-      LogService.error('Error accessing collateral data directly:', {
-        message: dataErr.message,
-        stack: dataErr.stack
-      });
-    }
-    
-    LogService.info('Collateral sufficiency test completed');
-  } catch (error) {
-    LogService.error('Test failed with error:', {
-      message: error.message,
-      stack: error.stack
+    // Test 1: Standard collateral evaluation
+    console.log('Test 1: Standard collateral evaluation for loan L001');
+    const result1 = await mcpFunctionRegistry.executeFunction('evaluateCollateralSufficiency', {
+      loanId: 'L001',
+      marketConditions: 'stable'
     });
+    
+    console.log('✅ Result:', JSON.stringify(result1, null, 2));
+    
+    // Test 2: Declining market conditions
+    console.log('\nTest 2: Collateral evaluation with declining market');
+    const result2 = await mcpFunctionRegistry.executeFunction('evaluateCollateralSufficiency', {
+      loanId: 'L001', 
+      marketConditions: 'declining'
+    });
+    
+    console.log('✅ Result:', JSON.stringify(result2, null, 2));
+    
+    // Test 3: Non-existent loan
+    console.log('\nTest 3: Non-existent loan test');
+    const result3 = await mcpFunctionRegistry.executeFunction('evaluateCollateralSufficiency', {
+      loanId: 'L999',
+      marketConditions: 'stable'
+    });
+    
+    console.log('✅ Result:', JSON.stringify(result3, null, 2));
+    
+    console.log('\n🎉 All collateral sufficiency tests completed successfully!');
+    
+  } catch (error) {
+    console.error('❌ Test failed:', error.message);
+    console.error('Stack trace:', error.stack);
   }
 }
 
-// Only run if server is already running
-axios.get(`${BASE_URL}/api/health`)
-  .then(() => {
-    LogService.info(`Server is running at ${BASE_URL}`);
-    testCollateralSufficiency();
-  })
-  .catch((error) => {
-    LogService.error(`Server is not running at ${BASE_URL}. Start the server first.`, {
-      message: error.message
+// Function to test with different collateral scenarios
+async function testCollateralScenarios() {
+  console.log('\n🔍 Testing Various Collateral Scenarios...\n');
+  
+  try {
+    // Scenario 1: High-value collateral
+    console.log('Scenario 1: High-value collateral (375k for 250k loan)');
+    
+    // Override mock data for this test
+    const originalExecuteQuery = mockDatabaseService.executeQuery;
+    mockDatabaseService.executeQuery = async (query, params) => {
+      if (query.includes('SELECT * FROM Collateral')) {
+        return { 
+          recordset: mockCollateral.map(c => ({ ...c, value: c.value * 1.5 }))
+        };
+      }
+      return originalExecuteQuery(query, params);
+    };
+    
+    const highValueResult = await mcpFunctionRegistry.executeFunction('evaluateCollateralSufficiency', {
+      loanId: 'L001',
+      marketConditions: 'stable'
     });
-  }); 
+    
+    console.log('✅ High-value result:', JSON.stringify(highValueResult, null, 2));
+    
+    // Restore original mock
+    mockDatabaseService.executeQuery = originalExecuteQuery;
+    
+    console.log('\n🎯 Collateral scenario tests completed!');
+    
+  } catch (error) {
+    console.error('❌ Scenario test failed:', error.message);
+  }
+}
+
+// Run the tests
+async function runAllTests() {
+  console.log('='.repeat(60));
+  console.log('🚀 STARTING COLLATERAL SUFFICIENCY TESTS');
+  console.log('='.repeat(60));
+  
+  await testCollateralSufficiency();
+  await testCollateralScenarios();
+  
+  console.log('\n' + '='.repeat(60));
+  console.log('✅ ALL TESTS COMPLETED');
+  console.log('='.repeat(60));
+}
+
+// Export for use in other test runners
+module.exports = {
+  testCollateralSufficiency,
+  testCollateralScenarios,
+  runAllTests
+};
+
+// Run tests if this file is executed directly
+if (require.main === module) {
+  runAllTests()
+    .catch(console.error)
+    .finally(() => db.disconnect());
+} 

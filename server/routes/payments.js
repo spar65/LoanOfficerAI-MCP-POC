@@ -1,30 +1,46 @@
 const express = require('express');
 const router = express.Router();
-const dataService = require('../services/dataService');
+const mcpDatabaseService = require('../services/mcpDatabaseService');
+const LogService = require('../services/logService');
 
 // Get all payments
-router.get('/', (req, res) => {
-  console.log('GET /api/payments - Fetching all payments');
+router.get('/', async (req, res) => {
+  LogService.info('Fetching all payments');
   
-  const payments = dataService.loadData(dataService.paths.payments);
-  console.log(`Found ${payments.length} payments`);
-  res.json(payments);
+  try {
+    const paymentsResult = await mcpDatabaseService.executeQuery('SELECT * FROM Payments', {});
+    const payments = paymentsResult.recordset || paymentsResult;
+    
+    LogService.info(`Found ${payments.length} payments`);
+    res.json(payments);
+  } catch (error) {
+    LogService.error('Error fetching payments', { error: error.message });
+    res.status(500).json({ error: 'Failed to fetch payments', details: error.message });
+  }
 });
 
 // Get payment by ID
-router.get('/:id', (req, res) => {
+router.get('/:id', async (req, res) => {
   const paymentId = req.params.id;
-  console.log(`GET /api/payments/${paymentId} - Fetching payment details`);
+  LogService.info(`Fetching payment details for ID: ${paymentId}`);
   
-  const payments = dataService.loadData(dataService.paths.payments);
-  const payment = payments.find(p => p.payment_id === paymentId);
-  
-  if (payment) {
-    console.log(`Payment found: ${payment.payment_id}`);
-    res.json(payment);
-  } else {
-    console.log(`Payment not found with ID: ${paymentId}`);
-    res.status(404).json({ error: 'Payment not found' });
+  try {
+    const paymentResult = await mcpDatabaseService.executeQuery(
+      'SELECT * FROM Payments WHERE payment_id = @paymentId', 
+      { paymentId }
+    );
+    const payment = paymentResult.recordset?.[0] || paymentResult[0];
+    
+    if (payment) {
+      LogService.info(`Payment found: ${payment.payment_id}`);
+      res.json(payment);
+    } else {
+      LogService.warn(`Payment not found with ID: ${paymentId}`);
+      res.status(404).json({ error: 'Payment not found' });
+    }
+  } catch (error) {
+    LogService.error(`Error fetching payment ${paymentId}`, { error: error.message });
+    res.status(500).json({ error: 'Failed to fetch payment details', details: error.message });
   }
 });
 

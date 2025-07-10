@@ -5,11 +5,12 @@ const mcpDatabaseService = require('../services/mcpDatabaseService');
 const LogService = require('../services/logService');
 
 // Get all borrowers
-router.get('/', (req, res) => {
+router.get('/', async (req, res) => {
   LogService.info('Fetching all borrowers');
   
   try {
-    const borrowers = dataService.loadData(dataService.paths.borrowers);
+    const borrowersResult = await mcpDatabaseService.executeQuery('SELECT * FROM Borrowers', {});
+    const borrowers = borrowersResult.recordset || borrowersResult;
     LogService.info(`Found ${borrowers.length} borrowers`);
     
     // Debug: Print first few borrower IDs for verification
@@ -32,12 +33,13 @@ router.get('/', (req, res) => {
 });
 
 // Get borrower by ID
-router.get('/:id', (req, res) => {
+router.get('/:id', async (req, res) => {
   const borrowerId = req.params.id;
   LogService.info(`Fetching borrower details for ID: ${borrowerId}`);
   
   try {
-    const borrowers = dataService.loadData(dataService.paths.borrowers);
+    const borrowersResult = await mcpDatabaseService.executeQuery('SELECT * FROM Borrowers', {});
+    const borrowers = borrowersResult.recordset || borrowersResult;
     LogService.debug(`Loaded ${borrowers.length} borrowers for lookup`);
     
     // Debug: Print all borrower IDs if we're looking for a specific one that's causing issues
@@ -122,31 +124,28 @@ router.get('/:id/loans', async (req, res) => {
 });
 
 // Get equipment for a specific borrower
-router.get('/:id/equipment', (req, res) => {
+router.get('/:id/equipment', async (req, res) => {
   const borrowerId = req.params.id;
   LogService.info(`Fetching equipment for borrower ${borrowerId}`);
   
   try {
-    // For testing, use either mock equipment data or an empty array
+    // Try to get equipment data from database
     let equipment = [];
     
     try {
-      if (process.env.NODE_ENV === 'test') {
-        equipment = dataService.loadData(dataService.paths.mockEquipment);
-      } else {
-        // Try to get real equipment data if available
-        equipment = dataService.loadData(dataService.paths.mockEquipment);
-      }
+      const equipmentResult = await mcpDatabaseService.executeQuery(
+        'SELECT * FROM Equipment WHERE borrower_id = @borrowerId', 
+        { borrowerId }
+      );
+      equipment = equipmentResult.recordset || equipmentResult;
     } catch (equipmentError) {
-      LogService.warn('Equipment data not found, using empty array', { 
+      LogService.warn('Equipment data not found in database, using empty array', { 
         message: equipmentError.message 
       });
     }
     
-    const borrowerEquipment = equipment.filter(e => e.borrower_id === borrowerId);
-    
-    LogService.info(`Found ${borrowerEquipment.length} equipment items for borrower ${borrowerId}`);
-    res.json(borrowerEquipment);
+    LogService.info(`Found ${equipment.length} equipment items for borrower ${borrowerId}`);
+    res.json(equipment);
   } catch (error) {
     LogService.error(`Error fetching equipment for borrower ${borrowerId}:`, { 
       message: error.message,
