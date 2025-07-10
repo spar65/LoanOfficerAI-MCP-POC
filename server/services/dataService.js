@@ -226,32 +226,45 @@ async function recommendLoanRestructuring(loanId, restructuringGoal = null) {
   try {
     LogService.info(`Generating loan restructuring recommendations for loan ${loanId}`);
     
-    // Load required data
-    const loans = await mcpDatabaseService.executeQuery('SELECT * FROM Loans', {});
-    const borrowers = await mcpDatabaseService.executeQuery('SELECT * FROM Borrowers', {});
-    const payments = await mcpDatabaseService.executeQuery('SELECT * FROM Payments', {});
+    // Load required data from database
+    const loansResult = await mcpDatabaseService.executeQuery('SELECT * FROM Loans', {});
+    const borrowersResult = await mcpDatabaseService.executeQuery('SELECT * FROM Borrowers', {});
+    const paymentsResult = await mcpDatabaseService.executeQuery('SELECT * FROM Payments', {});
     
-    // Find the loan
+    // Extract arrays from database results properly
+    const loans = loansResult.recordset || loansResult;
+    const borrowers = borrowersResult.recordset || borrowersResult;
+    const payments = paymentsResult.recordset || paymentsResult;
+    
+    LogService.debug(`Found ${loans.length} loans, ${borrowers.length} borrowers, ${payments.length} payments in database`);
+    
+    // Find the loan - ensure case-insensitive comparison
     const loan = loans.find(l => l.loan_id.toUpperCase() === loanId.toUpperCase());
     if (!loan) {
+      LogService.warn(`Loan not found with ID: ${loanId}`);
+      LogService.debug(`Available loans: ${loans.map(l => l.loan_id).join(', ')}`);
       throw new Error(`Loan with ID ${loanId} not found`);
     }
     
-    // Find the borrower
-    const borrower = borrowers.find(b => b.borrower_id === loan.borrower_id);
+    // Find the borrower - ensure case-insensitive comparison
+    const borrower = borrowers.find(b => b.borrower_id.toUpperCase() === loan.borrower_id.toUpperCase());
     if (!borrower) {
+      LogService.warn(`Borrower not found for loan ${loanId}, borrower ID: ${loan.borrower_id}`);
+      LogService.debug(`Available borrowers: ${borrowers.map(b => b.borrower_id).join(', ')}`);
       throw new Error(`Borrower for loan ${loanId} not found`);
     }
     
-    // Get payment history
+    // Get payment history for this loan
     const loanPayments = payments.filter(p => p.loan_id === loanId);
+    
+    LogService.debug(`Found ${loanPayments.length} payments for loan ${loanId}`);
     
     // Calculate current loan structure
     const principal = loan.loan_amount;
     const currentRate = parseFloat(loan.interest_rate);
     const originalTerm = 120; // 10 years in months
     const elapsedTime = loanPayments.length;
-    const termRemaining = originalTerm - elapsedTime;
+    const termRemaining = Math.max(originalTerm - elapsedTime, 12); // At least 12 months remaining
     
     // Calculate monthly payment
     const monthlyRate = currentRate / 100 / 12;
@@ -318,7 +331,7 @@ async function recommendLoanRestructuring(loanId, restructuringGoal = null) {
       recommendation = "Option 3 (Hybrid Restructuring) offers the best balance of payment relief and long-term cost management.";
     }
     
-    return {
+    const result = {
       loan_id: loanId,
       borrower_name: `${borrower.first_name} ${borrower.last_name}`,
       current_structure: {
@@ -333,8 +346,22 @@ async function recommendLoanRestructuring(loanId, restructuringGoal = null) {
       analysis_date: new Date().toISOString().split('T')[0],
       restructuring_goal: restructuringGoal || "general"
     };
+    
+    LogService.info(`Completed loan restructuring recommendation for loan ${loanId}`, {
+      result: { 
+        options_count: restructuringOptions.length,
+        borrower_name: `${borrower.first_name} ${borrower.last_name}`,
+        current_payment: monthlyPayment,
+        best_option: restructuringOptions[0]?.option_name
+      }
+    });
+    
+    return result;
   } catch (error) {
-    LogService.error(`Error generating loan restructuring recommendations: ${error.message}`);
+    LogService.error(`Error generating loan restructuring recommendations: ${error.message}`, {
+      stack: error.stack,
+      loan_id: loanId
+    });
     throw error;
   }
 }
