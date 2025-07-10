@@ -78,10 +78,7 @@ class DbIntegrationTest {
       console.log('✅ Setting up test data...');
       
       // Check if test borrower exists
-      const borrowerResult = await db.query(
-        'SELECT * FROM Borrowers WHERE borrower_id = @param0',
-        [TEST_DATA.borrower.borrower_id]
-      );
+      const borrowerResult = await db.executeQuery('SELECT * FROM Borrowers WHERE borrower_id = @borrowerId', { TEST_DATA.borrower.borrower_id });
       
       // Insert test borrower if it doesn't exist
       if (borrowerResult.recordset.length === 0) {
@@ -102,10 +99,7 @@ class DbIntegrationTest {
       }
       
       // Check if test loan exists
-      const loanResult = await db.query(
-        'SELECT * FROM Loans WHERE loan_id = @param0',
-        [TEST_DATA.loan.loan_id]
-      );
+      const loanResult = await db.executeQuery('SELECT * FROM Loans WHERE loan_id = @loanId', { TEST_DATA.loan.loan_id });
       
       // Insert test loan if it doesn't exist
       if (loanResult.recordset.length === 0) {

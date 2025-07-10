@@ -84,8 +84,8 @@ class McpDatabaseService {
    */
   async getMcpConversation(conversationId) {
     try {
-      const query = 'SELECT * FROM MCPConversations WHERE conversation_id = @param0';
-      const result = await db.query(query, [conversationId]);
+          const query = 'SELECT * FROM MCPConversations WHERE conversation_id = @conversationId';
+    const result = await db.executeQuery(query, { conversationId });
       return result.recordset?.[0] || null;
     } catch (error) {
       LogService.error('Error fetching MCP conversation', { 
@@ -113,9 +113,9 @@ class McpDatabaseService {
     try {
       // In a real implementation, this would call a stored procedure
       // For now, we'll calculate based on loan data
-      const loanResult = await db.query(
-        'SELECT * FROM Loans WHERE loan_id = @param0',
-        [loanId]
+      const loanResult = await db.executeQuery(
+        'SELECT * FROM Loans WHERE loan_id = @loanId',
+        { loanId }
       );
       
       if (loanResult.recordset.length === 0) {
@@ -127,9 +127,9 @@ class McpDatabaseService {
       const loan = loanResult.recordset[0];
       
       // Get borrower details
-      const borrowerResult = await db.query(
-        'SELECT * FROM Borrowers WHERE borrower_id = @param0',
-        [loan.borrower_id]
+      const borrowerResult = await db.executeQuery(
+        'SELECT * FROM Borrowers WHERE borrower_id = @borrowerId',
+        { borrowerId: loan.borrower_id }
       );
       
       if (borrowerResult.recordset.length === 0) {
@@ -169,9 +169,9 @@ class McpDatabaseService {
   async evaluateCollateralSufficiency(loanId) {
     try {
       // Get loan details
-      const loanResult = await db.query(
-        'SELECT * FROM Loans WHERE loan_id = @param0',
-        [loanId]
+      const loanResult = await db.executeQuery(
+        'SELECT * FROM Loans WHERE loan_id = @loanId',
+        { loanId }
       );
       
       if (loanResult.recordset.length === 0) {
@@ -191,9 +191,9 @@ class McpDatabaseService {
       const loan = loanResult.recordset[0];
       
       // Get collateral for loan
-      const collateralResult = await db.query(
-        'SELECT * FROM Collateral WHERE loan_id = @param0',
-        [loanId]
+      const collateralResult = await db.executeQuery(
+        'SELECT * FROM Collateral WHERE loan_id = @loanId',
+        { loanId }
       );
       
       // Calculate total collateral value
@@ -615,9 +615,12 @@ class McpDatabaseService {
                  b.first_name, b.last_name
           FROM Loans l
           JOIN Borrowers b ON l.borrower_id = b.borrower_id
-          WHERE b.first_name LIKE @param0 AND b.last_name LIKE @param1
+          WHERE b.first_name LIKE @firstName AND b.last_name LIKE @lastName
         `;
-        params = [`%${nameParts[0]}%`, `%${nameParts[nameParts.length - 1]}%`];
+        params = { 
+          firstName: `%${nameParts[0]}%`, 
+          lastName: `%${nameParts[nameParts.length - 1]}%` 
+        };
       } else {
         // If only one name provided (search in both first and last name)
         query = `
@@ -625,12 +628,12 @@ class McpDatabaseService {
                  b.first_name, b.last_name
           FROM Loans l
           JOIN Borrowers b ON l.borrower_id = b.borrower_id
-          WHERE b.first_name LIKE @param0 OR b.last_name LIKE @param0
+          WHERE b.first_name LIKE @searchName OR b.last_name LIKE @searchName
         `;
-        params = [`%${nameParts[0]}%`];
+        params = { searchName: `%${nameParts[0]}%` };
       }
 
-      const result = await db.query(query, params);
+      const result = await db.executeQuery(query, params);
       
       return result.recordset.map(loan => ({
         ...loan,
@@ -653,9 +656,9 @@ class McpDatabaseService {
    */
   async getLoanPayments(loanId) {
     try {
-      const result = await db.query(
-        'SELECT * FROM Payments WHERE loan_id = @param0 ORDER BY payment_date DESC',
-        [loanId]
+      const result = await db.executeQuery(
+        'SELECT * FROM Payments WHERE loan_id = @loanId ORDER BY payment_date DESC',
+        { loanId }
       );
       
       return result.recordset;
@@ -676,9 +679,9 @@ class McpDatabaseService {
    */
   async getLoanCollateral(loanId) {
     try {
-      const result = await db.query(
-        'SELECT * FROM Collateral WHERE loan_id = @param0',
-        [loanId]
+      const result = await db.executeQuery(
+        'SELECT * FROM Collateral WHERE loan_id = @loanId',
+        { loanId }
       );
       
       return result.recordset;
@@ -700,9 +703,9 @@ class McpDatabaseService {
   async getBorrowerDefaultRisk(borrowerId) {
     try {
       // First get borrower details
-      const borrowerResult = await db.query(
-        'SELECT * FROM Borrowers WHERE borrower_id = @param0',
-        [borrowerId]
+      const borrowerResult = await db.executeQuery(
+        'SELECT * FROM Borrowers WHERE borrower_id = @borrowerId',
+        { borrowerId }
       );
       
       if (borrowerResult.recordset.length === 0) {
@@ -712,18 +715,18 @@ class McpDatabaseService {
       const borrower = borrowerResult.recordset[0];
       
       // Get borrower's loans and payments
-      const loansResult = await db.query(
-        'SELECT * FROM Loans WHERE borrower_id = @param0',
-        [borrowerId]
+      const loansResult = await db.executeQuery(
+        'SELECT * FROM Loans WHERE borrower_id = @borrowerId',
+        { borrowerId }
       );
       
       // Get payment history for all borrower loans
       let allPayments = [];
       for (const loan of loansResult.recordset) {
-        const paymentsResult = await db.query(
-          'SELECT * FROM Payments WHERE loan_id = @param0',
-          [loan.loan_id]
-        );
+        const paymentsResult = await db.executeQuery(
+        'SELECT * FROM Payments WHERE loan_id = @loanId',
+        { loanId: loan.loan_id }
+      );
         allPayments = [...allPayments, ...paymentsResult.recordset];
       }
       
@@ -756,9 +759,9 @@ class McpDatabaseService {
   async getBorrowerNonAccrualRisk(borrowerId) {
     try {
       // Get borrower details
-      const borrowerResult = await db.query(
-        'SELECT * FROM Borrowers WHERE borrower_id = @param0',
-        [borrowerId]
+      const borrowerResult = await db.executeQuery(
+        'SELECT * FROM Borrowers WHERE borrower_id = @borrowerId',
+        { borrowerId }
       );
       
       if (borrowerResult.recordset.length === 0) {
@@ -768,18 +771,18 @@ class McpDatabaseService {
       const borrower = borrowerResult.recordset[0];
       
       // Get borrower's loans
-      const loansResult = await db.query(
-        'SELECT * FROM Loans WHERE borrower_id = @param0',
-        [borrowerId]
+      const loansResult = await db.executeQuery(
+        'SELECT * FROM Loans WHERE borrower_id = @borrowerId',
+        { borrowerId }
       );
       
       // Get payment history for all borrower loans
       let allPayments = [];
       for (const loan of loansResult.recordset) {
-        const paymentsResult = await db.query(
-          'SELECT * FROM Payments WHERE loan_id = @param0 ORDER BY payment_date DESC',
-          [loan.loan_id]
-        );
+        const paymentsResult = await db.executeQuery(
+        'SELECT * FROM Payments WHERE loan_id = @loanId ORDER BY payment_date DESC',
+        { loanId: loan.loan_id }
+      );
         allPayments = [...allPayments, ...paymentsResult.recordset];
       }
       

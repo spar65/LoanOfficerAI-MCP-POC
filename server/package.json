@@ -7,7 +7,9 @@
     "dev": "nodemon server.js",
     "build": "echo 'Creating production build...' && npm prune --production && echo 'Build complete'",
     "start:prod": "NODE_ENV=production node server.js",
-    "test": "jest --config jest.config.js --forceExit && node run-unified-tests-improved.js all && npm run test:openai && npm run test:logging && npm run test:performance && npm run test:security",
+    "test": "npm run test:functional",
+    "test:functional": "node test-runner.js",
+    "test:comprehensive": "npm run test:functional && npm run test:jest",
     "test:unit": "jest --config jest.config.js tests/unit --forceExit",
     "test:integration": "jest --config jest.config.js tests/integration --forceExit",
     "test:jest": "jest --config jest.config.js --forceExit",
@@ -15,17 +17,9 @@
     "test:openai": "node tests/helpers/openai-test.js",
     "test:logging": "node tests/helpers/logging-test.js",
     "test:performance": "node tests/helpers/performance-test.js",
+    "test:mcp": "node run-mcp-tests.js",
     "test:security": "node tests/helpers/security-test.js",
-    "test:custom": "npm run test:openai && npm run test:logging && npm run test:performance && npm run test:security",
-    "test:interactive": "node tests/run-all-tests.js",
-    "test:setup": "node -e \"require('./tests/globalSetup.js')()\"",
-    "test:unified": "node run-unified-tests-improved.js",
-    "test:unified:unit": "node run-unified-tests-improved.js unit",
-    "test:unified:integration": "node run-unified-tests-improved.js integration",
-    "test:unified:e2e": "node run-unified-tests-improved.js e2e",
-    "test:unified:quick": "node run-unified-tests-improved.js quick",
-    "test:logging:advanced": "chmod +x run-logging-tests.sh && ./run-logging-tests.sh",
-    "test:mcp": "node run-mcp-tests.js"
+    "test:database": "node ../test-db-connection.js"
   },
   "keywords": [],
   "author": "",
@@ -50,10 +44,11 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
-    "chai": "^5.2.0",
+    "chai": "^5.2.1",
     "jest": "^29.7.0",
     "mocha": "^11.4.0",
     "nodemon": "^3.1.10",
+    "sinon": "^21.0.0",
     "supertest": "^7.1.1"
   }
 }

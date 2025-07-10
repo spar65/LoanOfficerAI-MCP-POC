@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node server.js",
     "install:all": "npm install && cd server && npm install && cd ../client && npm install",
-    "test": "jest",
+    "test": "cd server && npm test",
     "test:server": "cd server && npm test",
     "test:client": "cd client && npm test -- --watchAll=false",
     "test:jest": "cd server && npm run test:jest",
