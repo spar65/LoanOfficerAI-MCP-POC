@@ -1564,21 +1564,27 @@ router.get("/loan-restructuring/:loan_id", async (req, res) => {
       restructuring_goal: restructuringGoal
     });
     
-    // Load required data from database
+    // Load required data from database using correct parameter syntax
     const loansResult = await mcpDatabaseService.executeQuery('SELECT * FROM Loans', {});
     const borrowersResult = await mcpDatabaseService.executeQuery('SELECT * FROM Borrowers', {});
     const paymentsResult = await mcpDatabaseService.executeQuery('SELECT * FROM Payments', {});
+    
+    // Extract arrays from database results properly
     const loans = loansResult.recordset || loansResult;
     const borrowers = borrowersResult.recordset || borrowersResult;
     const payments = paymentsResult.recordset || paymentsResult;
+    
+    LogService.debug(`Found ${loans.length} loans, ${borrowers.length} borrowers, ${payments.length} payments in database`);
     
     // Find the loan - ensure case-insensitive comparison
     const loan = loans.find((l) => l.loan_id.toUpperCase() === loanId.toUpperCase());
     if (!loan) {
       LogService.warn(`Loan not found with ID: ${loanId}`);
+      LogService.debug(`Available loans: ${loans.map(l => l.loan_id).join(', ')}`);
       return res.status(404).json({
         error: "Loan not found",
-        loan_id: loanId
+        loan_id: loanId,
+        available_loans: loans.map(l => l.loan_id)
       });
     }
     
@@ -1586,22 +1592,26 @@ router.get("/loan-restructuring/:loan_id", async (req, res) => {
     const borrower = borrowers.find((b) => b.borrower_id.toUpperCase() === loan.borrower_id.toUpperCase());
     if (!borrower) {
       LogService.warn(`Borrower not found for loan ${loanId}, borrower ID: ${loan.borrower_id}`);
+      LogService.debug(`Available borrowers: ${borrowers.map(b => b.borrower_id).join(', ')}`);
       return res.status(404).json({
         error: "Borrower not found for this loan",
         loan_id: loanId,
-        borrower_id: loan.borrower_id
+        borrower_id: loan.borrower_id,
+        available_borrowers: borrowers.map(b => b.borrower_id)
       });
     }
     
     // Get payment history for this loan
     const loanPayments = payments.filter((p) => p.loan_id === loanId);
     
+    LogService.debug(`Found ${loanPayments.length} payments for loan ${loanId}`);
+    
     // Calculate current loan structure
     // For demonstration, we'll simulate this data
     const principal = loan.loan_amount;
     const originalTerm = 120; // 10 years in months
     const elapsedTime = loanPayments.length;
-    const termRemaining = originalTerm - elapsedTime;
+    const termRemaining = Math.max(originalTerm - elapsedTime, 12); // At least 12 months remaining
     const currentRate = parseFloat(loan.interest_rate);
     
     // Calculate simple monthly payment (P * r * (1+r)^n) / ((1+r)^n - 1)
@@ -1634,12 +1644,15 @@ router.get("/loan-restructuring/:loan_id", async (req, res) => {
     );
     
     restructuringOptions.push({
-      option_name: "Term extension",
+      option_id: 1,
+      option_name: "Term Extension",
+      description: "Extend loan term to reduce monthly payments",
       new_term: extendedTerm,
+      new_rate: `${currentRate}%`,
       new_payment: extendedPayment,
       payment_reduction: `${extendedPaymentReduction}%`,
-      pros: ["Immediate payment relief", "No change in interest rate"],
-      cons: ["Longer payoff period", "More interest paid overall"]
+      pros: ["Immediate payment relief", "No change in interest rate", "Improved cash flow"],
+      cons: ["Longer payoff period", "More interest paid overall", "Extended debt obligation"]
     });
     
     // Option 2: Rate reduction
@@ -1656,13 +1669,15 @@ router.get("/loan-restructuring/:loan_id", async (req, res) => {
     );
     
     restructuringOptions.push({
-      option_name: "Rate reduction",
-      new_rate: `${reducedRate}%`,
+      option_id: 2,
+      option_name: "Rate Reduction",
+      description: "Lower interest rate with same term",
       new_term: termRemaining,
+      new_rate: `${reducedRate}%`,
       new_payment: reducedPayment,
       payment_reduction: `${reducedPaymentReduction}%`,
-      pros: ["Lower total interest", "Moderate payment relief"],
-      cons: ["May require additional collateral", "Subject to approval"]
+      pros: ["Lower total interest", "Moderate payment relief", "Same payoff timeline"],
+      cons: ["May require additional collateral", "Subject to credit approval", "Market rate dependent"]
     });
     
     // Option 3: Combined approach (if significant hardship)
@@ -1681,16 +1696,15 @@ router.get("/loan-restructuring/:loan_id", async (req, res) => {
       );
       
       restructuringOptions.push({
-        option_name: "Hardship modification",
+        option_id: 3,
+        option_name: "Hardship Modification",
+        description: "Combination of term extension and rate reduction",
         new_rate: `${combinedRate}%`,
         new_term: combinedTerm,
         new_payment: combinedPayment,
         payment_reduction: `${combinedPaymentReduction}%`,
-        pros: ["Significant payment relief", "Addresses financial hardship"],
-        cons: [
-          "Requires financial hardship documentation",
-          "May affect credit reporting"
-        ]
+        pros: ["Balanced approach", "Significant payment relief", "Moderate term extension"],
+        cons: ["Complex approval process", "May require guarantor", "Slightly more total interest"]
       });
     }
     
@@ -1699,21 +1713,17 @@ router.get("/loan-restructuring/:loan_id", async (req, res) => {
     
     if (restructuringGoal === "reduce_payments") {
       if (extendedPaymentReduction > reducedPaymentReduction) {
-        recommendation =
-          "Term extension option provides the most significant payment relief.";
+        recommendation = "Option 1 (Term Extension) provides the most significant monthly payment relief.";
       } else {
-        recommendation =
-          "Rate reduction option provides the best balance of payment relief and total interest paid.";
+        recommendation = "Option 2 (Rate Reduction) provides the best balance of payment relief and total interest paid.";
       }
     } else if (restructuringGoal === "extend_term") {
-      recommendation =
-        "Term extension option aligns with the requested goal of extending the loan term.";
+      recommendation = "Option 1 (Term Extension) aligns with the requested goal of extending the loan term.";
     } else if (
       restructuringGoal === "address_hardship" &&
       restructuringOptions.length > 2
     ) {
-      recommendation =
-        "The hardship modification option provides comprehensive relief for financial difficulty situations.";
+      recommendation = "Option 3 (Hardship Modification) provides comprehensive relief for financial difficulty situations.";
     } else {
       // Check payment history for guidance
       const latePayments = loanPayments.filter(
@@ -1721,11 +1731,9 @@ router.get("/loan-restructuring/:loan_id", async (req, res) => {
       ).length;
       
       if (latePayments > 2) {
-        recommendation =
-          "Based on payment history showing multiple late payments, the term extension option provides necessary payment relief while maintaining loan viability.";
+        recommendation = "Based on payment history showing multiple late payments, Option 1 (Term Extension) provides necessary payment relief while maintaining loan viability.";
       } else {
-        recommendation =
-          "With a strong payment history, the rate reduction option provides the best long-term financial benefit while still lowering monthly payments.";
+        recommendation = "With a strong payment history, Option 2 (Rate Reduction) provides the best long-term financial benefit while still lowering monthly payments.";
       }
     }
     
@@ -1737,19 +1745,29 @@ router.get("/loan-restructuring/:loan_id", async (req, res) => {
       current_structure: currentStructure,
       restructuring_options: restructuringOptions,
       recommendation: recommendation,
-      analysis_date: new Date().toISOString().split("T")[0]
+      analysis_date: new Date().toISOString().split("T")[0],
+      restructuring_goal: restructuringGoal || "general"
     };
     
     LogService.info(`Completed loan restructuring recommendation for loan ${loanId}`, {
-      result: { options_count: restructuringOptions.length }
+      result: { 
+        options_count: restructuringOptions.length,
+        borrower_name: `${borrower.first_name} ${borrower.last_name}`,
+        current_payment: monthlyPayment,
+        best_option: restructuringOptions[0]?.option_name
+      }
     });
     
     res.json(restructuringRecommendations);
   } catch (error) {
-    LogService.error(`Error in loan restructuring recommendation: ${error.message}`, { stack: error.stack });
+    LogService.error(`Error in loan restructuring recommendation: ${error.message}`, { 
+      stack: error.stack,
+      loan_id: req.params.loan_id
+    });
     res.status(500).json({
       error: "Failed to generate loan restructuring recommendations",
-      details: error.message
+      details: error.message,
+      loan_id: req.params.loan_id
     });
   }
 });
