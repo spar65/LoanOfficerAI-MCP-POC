@@ -33,6 +33,10 @@ const JSON_FILES = {
 function readJsonFile(filename) {
   try {
     const filePath = path.join(DATA_DIR, filename);
+    if (!fs.existsSync(filePath)) {
+      console.warn(`File ${filename} not found, skipping...`);
+      return [];
+    }
     const data = fs.readFileSync(filePath, 'utf8');
     return JSON.parse(data);
   } catch (error) {
@@ -146,69 +150,56 @@ async function migratePayments(payments) {
 
 /**
  * Insert equipment into database
- * @param {sql.Request} request - SQL request object
  * @param {Array} equipment - Equipment data
  */
-async function migrateEquipment(equipment) {
+async function migrateEquipmentItems(equipment) {
   console.log(`Migrating ${equipment.length} equipment items...`);
   for (const item of equipment) {
     try {
-      const purchaseDate = new Date(item.purchase_date);
+      const purchaseDate = item.purchase_date ? new Date(item.purchase_date) : null;
       const currentDate = new Date();
-      const yearsSincePurchase = (currentDate - purchaseDate) / (365 * 24 * 60 * 60 * 1000);
+      const yearsSincePurchase = purchaseDate ? (currentDate - purchaseDate) / (365 * 24 * 60 * 60 * 1000) : 0;
       const depreciationRate = item.depreciation_rate || 0.1;
-      const currentValue = item.purchase_price * Math.pow(1 - depreciationRate, yearsSincePurchase);
+      const currentValue = item.purchase_price && purchaseDate ? item.purchase_price * Math.pow(1 - depreciationRate, yearsSincePurchase) : item.purchase_price;
+      
       await DatabaseManager.executeQuery(
-        `INSERT INTO Equipment (equipment_id, borrower_id, type, purchase_date, condition, purchase_price) VALUES (@equipment_id, @borrower_id, @type, @purchase_date, @condition, @purchase_price)`,
-        { 
-          equipment_id: item.equipment_id, 
-          borrower_id: item.borrower_id, 
-          type: item.type, 
-          purchase_date: item.purchase_date, 
-          condition: item.condition, 
-          purchase_price: item.purchase_price || 0 
-        }
-      );
-      if (item.maintenance_records && Array.isArray(item.maintenance_records)) {
-        for (const record of item.maintenance_records) {
-          await DatabaseManager.executeQuery(
-            `INSERT INTO MaintenanceRecords (equipment_id, date, type, cost, description, predicted_next_maintenance, ai_maintenance_score) VALUES (@equipment_id, @date, @type, @cost, @description, @predicted_next_maintenance, @ai_maintenance_score)`,
-            { equipment_id: item.equipment_id, date: record.date, type: record.type, cost: record.cost || 0, description: record.description || record.type, predicted_next_maintenance: record.predicted_next_maintenance || new Date(new Date(record.date).setFullYear(new Date(record.date).getFullYear() + 1)).toISOString().split('T')[0], ai_maintenance_score: record.ai_maintenance_score || 0.7 }
-          );
-        }
-      }
-    } catch (error) { console.error(`Error inserting equipment ${item.equipment_id}:`, error.message); }
-  }
-}
-
-// New migration functions for analytics tables
-
-async function migrateEquipment() {
-  const equipment = readJsonFile('equipment.json');
-  console.log(`\nMigrating ${equipment.length} equipment items...`);
-  for (const item of equipment) {
-    try {
-      await DatabaseManager.executeQuery(
-        `INSERT INTO Equipment (equipment_id, borrower_id, type, purchase_date, condition, purchase_price, current_value, depreciation_rate, maintenance_cost_ytd)
-         VALUES (@equipment_id, @borrower_id, @type, @purchase_date, @condition, @purchase_price, @current_value, @depreciation_rate, @maintenance_cost_ytd)`,
+        `INSERT INTO Equipment (equipment_id, borrower_id, type, purchase_date, condition, purchase_price, current_value, depreciation_rate, maintenance_cost_ytd) VALUES (@equipment_id, @borrower_id, @type, @purchase_date, @condition, @purchase_price, @current_value, @depreciation_rate, @maintenance_cost_ytd)`,
         { 
           equipment_id: item.equipment_id, 
           borrower_id: item.borrower_id, 
           type: item.type || 'Unknown', 
           purchase_date: item.purchase_date || null, 
           condition: item.condition || null, 
-          purchase_price: item.purchase_price || 0, 
-          current_value: item.current_value || 0, 
-          depreciation_rate: item.depreciation_rate || 0, 
-          maintenance_cost_ytd: item.maintenance_cost_ytd || 0 
+          purchase_price: item.purchase_price || 0,
+          current_value: currentValue || 0,
+          depreciation_rate: depreciationRate,
+          maintenance_cost_ytd: item.maintenance_cost_ytd || 0
         }
       );
-      console.log(`✓ Equipment ${item.equipment_id} inserted`);
-    } catch (error) {
-      console.error(`✗ Error inserting equipment ${item.equipment_id}:`, error.message);
+      
+      if (item.maintenance_records && Array.isArray(item.maintenance_records)) {
+        for (const record of item.maintenance_records) {
+          await DatabaseManager.executeQuery(
+            `INSERT INTO MaintenanceRecords (equipment_id, date, type, cost, description, predicted_next_maintenance, ai_maintenance_score) VALUES (@equipment_id, @date, @type, @cost, @description, @predicted_next_maintenance, @ai_maintenance_score)`,
+            { 
+              equipment_id: item.equipment_id, 
+              date: record.date, 
+              type: record.type, 
+              cost: record.cost || 0, 
+              description: record.description || record.type, 
+              predicted_next_maintenance: record.predicted_next_maintenance || new Date(new Date(record.date).setFullYear(new Date(record.date).getFullYear() + 1)).toISOString().split('T')[0], 
+              ai_maintenance_score: record.ai_maintenance_score || 0.7 
+            }
+          );
+        }
+      }
+    } catch (error) { 
+      console.error(`Error inserting equipment ${item.equipment_id}:`, error.message); 
     }
   }
 }
+
+// New migration functions for analytics tables
 
 // Similar functions for CropYields and MarketPrices
 // Assume crop_yields.json and market_prices.json exist
@@ -271,8 +262,23 @@ async function migrateJsonToDatabase() {
     console.log('Connecting to database for migration...');
     await DatabaseManager.connect();
     
-    // Clear existing data from tables
+    // Clear existing data from tables (order matters due to foreign keys)
     console.log('Clearing existing data...');
+    try {
+      await DatabaseManager.executeQuery('DELETE FROM MaintenanceRecords');
+    } catch (error) {
+      console.log('MaintenanceRecords table may not exist yet');
+    }
+    try {
+      await DatabaseManager.executeQuery('DELETE FROM MarketPrices');
+    } catch (error) {
+      console.log('MarketPrices table may not exist yet');
+    }
+    try {
+      await DatabaseManager.executeQuery('DELETE FROM CropYields');
+    } catch (error) {
+      console.log('CropYields table may not exist yet');
+    }
     await DatabaseManager.executeQuery('DELETE FROM Payments');
     await DatabaseManager.executeQuery('DELETE FROM Collateral');
     await DatabaseManager.executeQuery('DELETE FROM Equipment');
@@ -294,7 +300,7 @@ async function migrateJsonToDatabase() {
     await migrateLoans(loans);
     await migrateCollateral(collateral);
     await migratePayments(payments);
-    await migrateEquipment(equipment);
+    await migrateEquipmentItems(equipment);
     await migrateCropYields();
     await migrateMarketPrices();
     

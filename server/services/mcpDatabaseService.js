@@ -13,6 +13,26 @@ const sql = require('mssql');
 
 class McpDatabaseService {
   /**
+   * Execute a generic database query
+   * @param {string} query - SQL query string
+   * @param {Object} params - Query parameters
+   * @returns {Promise<Object>} Query result
+   */
+  async executeQuery(query, params = {}) {
+    try {
+      LogService.debug('Executing database query', { query: query.substring(0, 100) + '...' });
+      const result = await db.executeQuery(query, params);
+      return result;
+    } catch (error) {
+      LogService.error('Error executing database query', { 
+        error: error.message,
+        query: query.substring(0, 100) + '...'
+      });
+      throw error;
+    }
+  }
+
+  /**
    * Get all loans
    * @returns {Promise<Array>} Array of loan objects
    */

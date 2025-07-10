@@ -237,6 +237,56 @@ class DatabaseManager {
         `);
       }
       
+      if (!existingTables.includes('MaintenanceRecords')) {
+        LogService.info('Creating MaintenanceRecords table...');
+        await pool.request().query(`
+          CREATE TABLE MaintenanceRecords (
+            record_id VARCHAR(50) PRIMARY KEY DEFAULT NEWID(),
+            equipment_id VARCHAR(50) NOT NULL,
+            date DATE NOT NULL,
+            type VARCHAR(50) NOT NULL,
+            cost DECIMAL(15,2) DEFAULT 0,
+            description VARCHAR(255),
+            predicted_next_maintenance DATE,
+            ai_maintenance_score DECIMAL(3,2) DEFAULT 0.7,
+            created_at DATETIME DEFAULT GETDATE(),
+            FOREIGN KEY (equipment_id) REFERENCES Equipment(equipment_id)
+          )
+        `);
+      }
+      
+      if (!existingTables.includes('CropYields')) {
+        LogService.info('Creating CropYields table...');
+        await pool.request().query(`
+          CREATE TABLE CropYields (
+            crop_id VARCHAR(50) PRIMARY KEY,
+            borrower_id VARCHAR(50) NOT NULL,
+            crop_type VARCHAR(50) NOT NULL,
+            season VARCHAR(20) NOT NULL,
+            yield_amount DECIMAL(15,2) DEFAULT 0,
+            risk_score DECIMAL(3,2) DEFAULT 0,
+            risk_factors NVARCHAR(MAX),
+            created_at DATETIME DEFAULT GETDATE(),
+            FOREIGN KEY (borrower_id) REFERENCES Borrowers(borrower_id)
+          )
+        `);
+      }
+      
+      if (!existingTables.includes('MarketPrices')) {
+        LogService.info('Creating MarketPrices table...');
+        await pool.request().query(`
+          CREATE TABLE MarketPrices (
+            market_id VARCHAR(50) PRIMARY KEY,
+            commodity VARCHAR(50) NOT NULL,
+            price DECIMAL(15,2) NOT NULL,
+            price_change_percent DECIMAL(5,2) DEFAULT 0,
+            impact_analysis NVARCHAR(MAX),
+            created_at DATETIME DEFAULT GETDATE(),
+            updated_at DATETIME DEFAULT GETDATE()
+          )
+        `);
+      }
+      
       LogService.info('Database schema setup complete');
     } catch (error) {
       LogService.error('Error creating database schema', {
@@ -375,8 +425,12 @@ class DatabaseManager {
 
       // Add inputs to request with proper type handling
       Object.entries(inputs).forEach(([key, value]) => {
-        if (
+        if (value === null) {
+          // Handle null values explicitly
+          request.input(key, sql.VarChar, null);
+        } else if (
           typeof value === "object" &&
+          value !== null &&
           value.type &&
           value.hasOwnProperty("value")
         ) {
@@ -409,8 +463,12 @@ class DatabaseManager {
       const request = pool.request();
 
       Object.entries(inputs).forEach(([key, value]) => {
-        if (
+        if (value === null) {
+          // Handle null values explicitly
+          request.input(key, sql.VarChar, null);
+        } else if (
           typeof value === "object" &&
+          value !== null &&
           value.type &&
           value.hasOwnProperty("value")
         ) {

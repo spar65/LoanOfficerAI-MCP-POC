@@ -1,20 +1,25 @@
 const express = require('express');
 const router = express.Router();
 const dataService = require('../services/dataService');
+const mcpDatabaseService = require('../services/mcpDatabaseService');
 const LogService = require('../services/logService');
 
 // Get all high risk farmers
-router.get('/high-risk-farmers', (req, res) => {
+router.get('/high-risk-farmers', async (req, res) => {
   const timeHorizon = req.query.time_horizon || '3m';
   const threshold = req.query.threshold || 'high';
   
   LogService.info(`Identifying high risk farmers with time horizon: ${timeHorizon}, threshold: ${threshold}`);
   
   try {
-    // Load data
-    const borrowers = dataService.loadData(dataService.paths.borrowers);
-    const loans = dataService.loadData(dataService.paths.loans);
-    const payments = dataService.loadData(dataService.paths.payments);
+    // Load data from database
+    const borrowersResult = await mcpDatabaseService.executeQuery('SELECT * FROM Borrowers', {});
+    const loansResult = await mcpDatabaseService.executeQuery('SELECT * FROM Loans', {});
+    const paymentsResult = await mcpDatabaseService.executeQuery('SELECT * FROM Payments', {});
+    
+    const borrowers = borrowersResult.recordset || borrowersResult;
+    const loans = loansResult.recordset || loansResult;
+    const payments = paymentsResult.recordset || paymentsResult;
     
     // Define risk thresholds based on the threshold parameter
     let riskThreshold;
@@ -200,16 +205,21 @@ router.get('/high-risk-farmers', (req, res) => {
 });
 
 // Analyze payment patterns for a borrower
-router.get('/payment-patterns/:borrower_id', (req, res) => {
+router.get('/payment-patterns/:borrower_id', async (req, res) => {
   const borrowerId = req.params.borrower_id;
   const period = req.query.period || '1y'; // Default to 1 year
   
   LogService.info(`Analyzing payment patterns for borrower ${borrowerId} with period: ${period}`);
   
-  // Load data
-  const borrowers = dataService.loadData(dataService.paths.borrowers);
-  const loans = dataService.loadData(dataService.paths.loans);
-  const payments = dataService.loadData(dataService.paths.payments);
+  try {
+    // Load data from database
+    const borrowersResult = await mcpDatabaseService.executeQuery('SELECT * FROM Borrowers', {});
+    const loansResult = await mcpDatabaseService.executeQuery('SELECT * FROM Loans', {});
+    const paymentsResult = await mcpDatabaseService.executeQuery('SELECT * FROM Payments', {});
+    
+    const borrowers = borrowersResult.recordset || borrowersResult;
+    const loans = loansResult.recordset || loansResult;
+    const payments = paymentsResult.recordset || paymentsResult;
   
   // Find the borrower
   const borrower = borrowers.find(b => b.borrower_id === borrowerId);
@@ -341,135 +351,164 @@ router.get('/payment-patterns/:borrower_id', (req, res) => {
   
   LogService.info(`Payment pattern analysis completed for borrower ${borrowerId}`);
   res.json(result);
+  } catch (error) {
+    LogService.error(`Error analyzing payment patterns for borrower ${borrowerId}:`, {
+      message: error.message,
+      stack: error.stack
+    });
+    res.status(500).json({ 
+      error: 'Failed to analyze payment patterns',
+      details: error.message
+    });
+  }
 });
 
 // Predict default risk for a specific borrower
-router.get('/predict/default-risk/:borrower_id', (req, res) => {
+router.get('/predict/default-risk/:borrower_id', async (req, res) => {
   const borrowerId = req.params.borrower_id;
   const timeHorizon = req.query.time_horizon || '3m';
   
   LogService.info(`Predicting default risk for borrower ${borrowerId} with time horizon: ${timeHorizon}`);
   
-  // Load data
-  const borrowers = dataService.loadData(dataService.paths.borrowers);
-  const loans = dataService.loadData(dataService.paths.loans);
-  const payments = dataService.loadData(dataService.paths.payments);
-  
-  // Find the borrower
-  const borrower = borrowers.find(b => b.borrower_id === borrowerId);
-  if (!borrower) {
-    return res.status(404).json({ error: 'Borrower not found' });
-  }
-  
-  // Get borrower's loans
-  const borrowerLoans = loans.filter(l => l.borrower_id === borrowerId);
-  if (borrowerLoans.length === 0) {
-    return res.json({
+     try {
+     // Load data from database
+     const borrowersResult = await mcpDatabaseService.executeQuery('SELECT * FROM Borrowers', {});
+     const loansResult = await mcpDatabaseService.executeQuery('SELECT * FROM Loans', {});
+     const paymentsResult = await mcpDatabaseService.executeQuery('SELECT * FROM Payments', {});
+     
+     const borrowers = borrowersResult.recordset || borrowersResult;
+     const loans = loansResult.recordset || loansResult;
+     const payments = paymentsResult.recordset || paymentsResult;
+     
+     // Find the borrower
+     const borrower = borrowers.find(b => b.borrower_id === borrowerId);
+    if (!borrower) {
+      return res.status(404).json({ error: 'Borrower not found' });
+    }
+    
+    // Get borrower's loans
+    const borrowerLoans = loans.filter(l => l.borrower_id === borrowerId);
+    if (borrowerLoans.length === 0) {
+      return res.json({
+        borrower_id: borrowerId,
+        borrower_name: `${borrower.first_name} ${borrower.last_name}`,
+        default_probability: 0,
+        time_horizon: timeHorizon,
+        key_factors: ["No loans found for this borrower"],
+        prediction_confidence: 1.0
+      });
+    }
+    
+    // Get payment history
+    const allPayments = [];
+    borrowerLoans.forEach(loan => {
+      const loanPayments = payments.filter(p => p.loan_id === loan.loan_id);
+      allPayments.push(...loanPayments);
+    });
+    
+    // Calculate recent payment performance
+    const allPaymentsSorted = [...allPayments].sort((a, b) => new Date(b.payment_date) - new Date(a.payment_date));
+    const recentPayments = allPaymentsSorted.slice(0, 6); // Last 6 payments
+    const lateRecentPayments = recentPayments.filter(p => p.status === 'Late').length;
+    const latePaymentRatio = recentPayments.length > 0 ? lateRecentPayments / recentPayments.length : 0;
+    
+    // Calculate debt-to-income ratio
+    const totalLoanAmount = borrowerLoans.reduce((sum, loan) => sum + loan.loan_amount, 0);
+    const debtToIncomeRatio = totalLoanAmount / borrower.income;
+    
+    // Calculate default probability based on time horizon
+    let baseProbability = 0;
+    
+    // More late payments = higher default probability
+    if (latePaymentRatio > 0.5) baseProbability += 0.4;
+    else if (latePaymentRatio > 0.3) baseProbability += 0.25;
+    else if (latePaymentRatio > 0) baseProbability += 0.1;
+    
+    // Higher debt-to-income = higher default probability
+    if (debtToIncomeRatio > 4) baseProbability += 0.3;
+    else if (debtToIncomeRatio > 2) baseProbability += 0.15;
+    else if (debtToIncomeRatio > 1) baseProbability += 0.05;
+    
+    // Lower credit score = higher default probability
+    if (borrower.credit_score < 600) baseProbability += 0.25;
+    else if (borrower.credit_score < 650) baseProbability += 0.15;
+    else if (borrower.credit_score < 700) baseProbability += 0.05;
+    
+    // Farm size factor - smaller farms may have less buffer
+    if (borrower.farm_size < 50) baseProbability += 0.1;
+    
+    // Adjust for time horizon
+    let defaultProbability = 0;
+    if (timeHorizon === '3m') {
+      defaultProbability = baseProbability * 0.7; // Shorter term = lower probability
+    } else if (timeHorizon === '6m') {
+      defaultProbability = baseProbability * 1.0;
+    } else if (timeHorizon === '1y') {
+      defaultProbability = baseProbability * 1.3; // Longer term = higher probability
+    }
+    
+    // Cap probability between 0-1
+    defaultProbability = Math.max(0, Math.min(1, defaultProbability));
+    
+    // Generate key factors behind prediction
+    const keyFactors = [];
+    if (latePaymentRatio > 0) {
+      keyFactors.push(`${Math.round(latePaymentRatio * 100)}% of recent payments were late`);
+    }
+    if (debtToIncomeRatio > 1) {
+      keyFactors.push(`High debt-to-income ratio of ${debtToIncomeRatio.toFixed(1)}`);
+    }
+    if (borrower.credit_score < 700) {
+      keyFactors.push(`Credit score of ${borrower.credit_score} below optimal range`);
+    }
+    if (borrower.farm_size < 50) {
+      keyFactors.push(`Small farm size (${borrower.farm_size} acres) limits financial buffer`);
+    }
+    
+    // Set confidence level based on data quality
+    const predictionConfidence = Math.min(0.95, 0.7 + (recentPayments.length / 10));
+    
+    // Return the prediction
+    const result = {
       borrower_id: borrowerId,
       borrower_name: `${borrower.first_name} ${borrower.last_name}`,
-      default_probability: 0,
+      default_probability: Math.round(defaultProbability * 100) / 100,
+      default_risk_level: defaultProbability > 0.6 ? "high" : (defaultProbability > 0.3 ? "medium" : "low"),
       time_horizon: timeHorizon,
-      key_factors: ["No loans found for this borrower"],
-      prediction_confidence: 1.0
+      key_factors: keyFactors,
+      prediction_confidence: Math.round(predictionConfidence * 100) / 100
+    };
+    
+    LogService.info(`Default risk prediction for borrower ${borrowerId}: ${defaultProbability.toFixed(2)} (${result.default_risk_level})`);
+    res.json(result);
+  } catch (error) {
+    LogService.error(`Error predicting default risk for borrower ${borrowerId}:`, {
+      message: error.message,
+      stack: error.stack
+    });
+    res.status(500).json({ 
+      error: 'Failed to predict default risk',
+      details: error.message
     });
   }
-  
-  // Get payment history
-  const allPayments = [];
-  borrowerLoans.forEach(loan => {
-    const loanPayments = payments.filter(p => p.loan_id === loan.loan_id);
-    allPayments.push(...loanPayments);
-  });
-  
-  // Calculate recent payment performance
-  const allPaymentsSorted = [...allPayments].sort((a, b) => new Date(b.payment_date) - new Date(a.payment_date));
-  const recentPayments = allPaymentsSorted.slice(0, 6); // Last 6 payments
-  const lateRecentPayments = recentPayments.filter(p => p.status === 'Late').length;
-  const latePaymentRatio = recentPayments.length > 0 ? lateRecentPayments / recentPayments.length : 0;
-  
-  // Calculate debt-to-income ratio
-  const totalLoanAmount = borrowerLoans.reduce((sum, loan) => sum + loan.loan_amount, 0);
-  const debtToIncomeRatio = totalLoanAmount / borrower.income;
-  
-  // Calculate default probability based on time horizon
-  let baseProbability = 0;
-  
-  // More late payments = higher default probability
-  if (latePaymentRatio > 0.5) baseProbability += 0.4;
-  else if (latePaymentRatio > 0.3) baseProbability += 0.25;
-  else if (latePaymentRatio > 0) baseProbability += 0.1;
-  
-  // Higher debt-to-income = higher default probability
-  if (debtToIncomeRatio > 4) baseProbability += 0.3;
-  else if (debtToIncomeRatio > 2) baseProbability += 0.15;
-  else if (debtToIncomeRatio > 1) baseProbability += 0.05;
-  
-  // Lower credit score = higher default probability
-  if (borrower.credit_score < 600) baseProbability += 0.25;
-  else if (borrower.credit_score < 650) baseProbability += 0.15;
-  else if (borrower.credit_score < 700) baseProbability += 0.05;
-  
-  // Farm size factor - smaller farms may have less buffer
-  if (borrower.farm_size < 50) baseProbability += 0.1;
-  
-  // Adjust for time horizon
-  let defaultProbability = 0;
-  if (timeHorizon === '3m') {
-    defaultProbability = baseProbability * 0.7; // Shorter term = lower probability
-  } else if (timeHorizon === '6m') {
-    defaultProbability = baseProbability * 1.0;
-  } else if (timeHorizon === '1y') {
-    defaultProbability = baseProbability * 1.3; // Longer term = higher probability
-  }
-  
-  // Cap probability between 0-1
-  defaultProbability = Math.max(0, Math.min(1, defaultProbability));
-  
-  // Generate key factors behind prediction
-  const keyFactors = [];
-  if (latePaymentRatio > 0) {
-    keyFactors.push(`${Math.round(latePaymentRatio * 100)}% of recent payments were late`);
-  }
-  if (debtToIncomeRatio > 1) {
-    keyFactors.push(`High debt-to-income ratio of ${debtToIncomeRatio.toFixed(1)}`);
-  }
-  if (borrower.credit_score < 700) {
-    keyFactors.push(`Credit score of ${borrower.credit_score} below optimal range`);
-  }
-  if (borrower.farm_size < 50) {
-    keyFactors.push(`Small farm size (${borrower.farm_size} acres) limits financial buffer`);
-  }
-  
-  // Set confidence level based on data quality
-  const predictionConfidence = Math.min(0.95, 0.7 + (recentPayments.length / 10));
-  
-  // Return the prediction
-  const result = {
-    borrower_id: borrowerId,
-    borrower_name: `${borrower.first_name} ${borrower.last_name}`,
-    default_probability: Math.round(defaultProbability * 100) / 100,
-    default_risk_level: defaultProbability > 0.6 ? "high" : (defaultProbability > 0.3 ? "medium" : "low"),
-    time_horizon: timeHorizon,
-    key_factors: keyFactors,
-    prediction_confidence: Math.round(predictionConfidence * 100) / 100
-  };
-  
-  LogService.info(`Default risk prediction for borrower ${borrowerId}: ${defaultProbability.toFixed(2)} (${result.default_risk_level})`);
-  res.json(result);
 });
 
 // Predict non-accrual risk for a borrower
-router.get('/predict/non-accrual-risk/:borrower_id', (req, res) => {
+router.get('/predict/non-accrual-risk/:borrower_id', async (req, res) => {
   const borrowerId = req.params.borrower_id;
   
   LogService.info(`Predicting non-accrual risk for borrower ${borrowerId}`);
   
   try {
-    // Load data
+    // Load data from database
     LogService.debug(`Loading data for non-accrual risk prediction for borrower ${borrowerId}`);
-    const borrowers = dataService.loadData(dataService.paths.borrowers);
-    const loans = dataService.loadData(dataService.paths.loans);
-    const payments = dataService.loadData(dataService.paths.payments);
+    const borrowersResult = await mcpDatabaseService.executeQuery('SELECT * FROM Borrowers', {});
+    const loansResult = await mcpDatabaseService.executeQuery('SELECT * FROM Loans', {});
+    const paymentsResult = await mcpDatabaseService.executeQuery('SELECT * FROM Payments', {});
+    
+    const borrowers = borrowersResult.recordset || borrowersResult;
+    const loans = loansResult.recordset || loansResult;
+    const payments = paymentsResult.recordset || paymentsResult;
     
     LogService.debug(`Loaded ${borrowers.length} borrowers, ${loans.length} loans, and ${payments.length} payments`);
     

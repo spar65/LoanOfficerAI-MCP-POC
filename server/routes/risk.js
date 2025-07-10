@@ -1,19 +1,25 @@
 const express = require('express');
 const router = express.Router();
 const dataService = require('../services/dataService');
+const mcpDatabaseService = require('../services/mcpDatabaseService');
 const LogService = require('../services/logService');
 
 // Get default risk assessment for borrower
-router.get('/default/:borrower_id', (req, res) => {
+router.get('/default/:borrower_id', async (req, res) => {
   const borrowerId = req.params.borrower_id;
   const timeHorizon = req.query.time_horizon || 'medium_term';
   
   LogService.info(`Assessing default risk for borrower ${borrowerId} with time horizon: ${timeHorizon}`);
   
-  // Load data
-  const borrowers = dataService.loadData(dataService.paths.borrowers);
-  const loans = dataService.loadData(dataService.paths.loans);
-  const payments = dataService.loadData(dataService.paths.payments);
+  try {
+    // Load data from database
+    const borrowersResult = await mcpDatabaseService.executeQuery('SELECT * FROM Borrowers', {});
+    const loansResult = await mcpDatabaseService.executeQuery('SELECT * FROM Loans', {});
+    const paymentsResult = await mcpDatabaseService.executeQuery('SELECT * FROM Payments', {});
+    
+    const borrowers = borrowersResult.recordset || borrowersResult;
+    const loans = loansResult.recordset || loansResult;
+    const payments = paymentsResult.recordset || paymentsResult;
   
   // Find the borrower
   const borrower = borrowers.find(b => b.borrower_id === borrowerId);
@@ -115,20 +121,35 @@ router.get('/default/:borrower_id', (req, res) => {
   // Log result
   LogService.info(`Risk assessment completed for borrower ${borrowerId}: Score ${riskScore}`);
   res.json(result);
+  } catch (error) {
+    LogService.error(`Error assessing default risk for borrower ${borrowerId}:`, {
+      message: error.message,
+      stack: error.stack
+    });
+    res.status(500).json({ 
+      error: 'Failed to assess default risk',
+      details: error.message
+    });
+  }
 });
 
 // Find farmers at risk based on criteria
-router.get('/farmers-at-risk', (req, res) => {
+router.get('/farmers-at-risk', async (req, res) => {
   const cropType = req.query.crop_type;
   const season = req.query.season;
   const riskLevel = req.query.risk_level || 'high';
   
   LogService.info(`Finding farmers at risk with params: crop=${cropType}, season=${season}, risk=${riskLevel}`);
   
-  // Load data
-  const borrowers = dataService.loadData(dataService.paths.borrowers);
-  const loans = dataService.loadData(dataService.paths.loans);
-  const payments = dataService.loadData(dataService.paths.payments);
+  try {
+    // Load data from database
+    const borrowersResult = await mcpDatabaseService.executeQuery('SELECT * FROM Borrowers', {});
+    const loansResult = await mcpDatabaseService.executeQuery('SELECT * FROM Loans', {});
+    const paymentsResult = await mcpDatabaseService.executeQuery('SELECT * FROM Payments', {});
+    
+    const borrowers = borrowersResult.recordset || borrowersResult;
+    const loans = loansResult.recordset || loansResult;
+    const payments = paymentsResult.recordset || paymentsResult;
   
   // Calculate risk for each borrower (simplified algorithm)
   const borrowersWithRisk = borrowers.map(borrower => {
@@ -245,20 +266,34 @@ router.get('/farmers-at-risk', (req, res) => {
   // Log result
   LogService.info(`Found ${results.length} farmers matching risk criteria`);
   res.json(results);
+  } catch (error) {
+    LogService.error(`Error finding farmers at risk:`, {
+      message: error.message,
+      stack: error.stack
+    });
+    res.status(500).json({ 
+      error: 'Failed to find farmers at risk',
+      details: error.message
+    });
+  }
 });
 
 // Evaluate collateral sufficiency
-router.get('/collateral/:loan_id', (req, res) => {
+router.get('/collateral/:loan_id', async (req, res) => {
   const loanId = req.params.loan_id;
   const marketConditions = req.query.market_conditions || 'stable';
   
   LogService.info(`Evaluating collateral for loan ${loanId} with market conditions: ${marketConditions}`);
   
-  // Load data
-  const loans = dataService.loadData(dataService.paths.loans);
-  const collaterals = dataService.loadData(dataService.paths.collateral);
-  
-  LogService.debug(`Loaded ${loans.length} loans and ${collaterals.length} collateral items`);
+  try {
+    // Load data from database
+    const loansResult = await mcpDatabaseService.executeQuery('SELECT * FROM Loans', {});
+    const collateralsResult = await mcpDatabaseService.executeQuery('SELECT * FROM Collateral', {});
+    
+    const loans = loansResult.recordset || loansResult;
+    const collaterals = collateralsResult.recordset || collateralsResult;
+    
+    LogService.debug(`Loaded ${loans.length} loans and ${collaterals.length} collateral items`);
   
   // Find the loan
   const loan = loans.find(l => l.loan_id === loanId);
@@ -351,20 +386,34 @@ router.get('/collateral/:loan_id', (req, res) => {
   // Log result
   LogService.info(`Collateral evaluation completed for loan ${loanId}: ${isSufficient ? 'Sufficient' : 'Insufficient'} with LTV ${loanToValueRatio.toFixed(2)}`);
   res.json(result);
+  } catch (error) {
+    LogService.error(`Error assessing collateral sufficiency for loan ${loanId}:`, {
+      message: error.message,
+      stack: error.stack
+    });
+    res.status(500).json({ 
+      error: 'Failed to assess collateral sufficiency',
+      details: error.message
+    });
+  }
 });
 
 // Evaluate non-accrual risk for a borrower
-router.get('/non-accrual/:borrower_id', (req, res) => {
+router.get('/non-accrual/:borrower_id', async (req, res) => {
   const borrowerId = req.params.borrower_id;
   
   LogService.info(`Evaluating non-accrual risk for borrower ${borrowerId}`);
   
   try {
-    // Load data
+    // Load data from database
     LogService.debug(`Loading data for non-accrual risk assessment for borrower ${borrowerId}`);
-    const borrowers = dataService.loadData(dataService.paths.borrowers);
-    const loans = dataService.loadData(dataService.paths.loans);
-    const payments = dataService.loadData(dataService.paths.payments);
+    const borrowersResult = await mcpDatabaseService.executeQuery('SELECT * FROM Borrowers', {});
+    const loansResult = await mcpDatabaseService.executeQuery('SELECT * FROM Loans', {});
+    const paymentsResult = await mcpDatabaseService.executeQuery('SELECT * FROM Payments', {});
+    
+    const borrowers = borrowersResult.recordset || borrowersResult;
+    const loans = loansResult.recordset || loansResult;
+    const payments = paymentsResult.recordset || paymentsResult;
     
     LogService.debug(`Loaded ${borrowers.length} borrowers, ${loans.length} loans, and ${payments.length} payments`);
     
@@ -475,14 +524,18 @@ router.get('/non-accrual/:borrower_id', (req, res) => {
 });
 
 // Get high risk farmers
-router.get('/high-risk-farmers', (req, res) => {
+router.get('/high-risk-farmers', async (req, res) => {
   LogService.info('Fetching high-risk farmers');
   
   try {
-    // Load data
-    const borrowers = dataService.loadData(dataService.paths.borrowers);
-    const loans = dataService.loadData(dataService.paths.loans);
-    const payments = dataService.loadData(dataService.paths.payments);
+    // Load data from database
+    const borrowersResult = await mcpDatabaseService.executeQuery('SELECT * FROM Borrowers', {});
+    const loansResult = await mcpDatabaseService.executeQuery('SELECT * FROM Loans', {});
+    const paymentsResult = await mcpDatabaseService.executeQuery('SELECT * FROM Payments', {});
+    
+    const borrowers = borrowersResult.recordset || borrowersResult;
+    const loans = loansResult.recordset || loansResult;
+    const payments = paymentsResult.recordset || paymentsResult;
     
     // Calculate risk for each borrower (simplified algorithm)
     const borrowersWithRisk = borrowers.map(borrower => {

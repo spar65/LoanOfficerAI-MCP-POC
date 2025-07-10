@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const dataService = require('../services/dataService');
+const mcpDatabaseService = require('../services/mcpDatabaseService');
 const LogService = require('../services/logService');
 
 // Get all borrowers
@@ -100,13 +101,14 @@ router.get('/:id', (req, res) => {
 });
 
 // Get borrower loans
-router.get('/:id/loans', (req, res) => {
+router.get('/:id/loans', async (req, res) => {
   const borrowerId = req.params.id;
   LogService.info(`Fetching loans for borrower ${borrowerId}`);
   
   try {
-    const loans = dataService.loadData(dataService.paths.loans);
-    const borrowerLoans = loans.filter(l => l.borrower_id === borrowerId);
+    // Load loans from database
+    const loansResult = await mcpDatabaseService.executeQuery('SELECT * FROM Loans WHERE borrower_id = @borrowerId', { borrowerId });
+    const borrowerLoans = loansResult.recordset || loansResult;
     
     LogService.info(`Found ${borrowerLoans.length} loans for borrower ${borrowerId}`);
     res.json(borrowerLoans);
