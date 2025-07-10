@@ -112,25 +112,24 @@ async function getBorrowerDefaultRisk(args, context) {
 
 ### ✅ Fully Implemented (Database + Logic)
 
-- `getLoanDetails`
-- `getLoanStatus`
-- `getLoanSummary`
-- `getActiveLoans`
-- `getLoansByBorrower`
-- `getBorrowerDetails`
-- `getBorrowerDefaultRisk`
-- `getBorrowerNonAccrualRisk`
-- `evaluateCollateralSufficiency`
-- `getHighRiskFarmers`
+All 16 functions now fully integrated with database services:
 
-### ⚠️ Partially Implemented (JSON + Logic)
-
-- `forecastEquipmentMaintenance` - Uses dataService (JSON files)
-- `assessCropYieldRisk` - Uses dataService (JSON files)
-- `analyzeMarketPriceImpact` - Uses dataService (JSON files)
-- `getRefinancingOptions` - Uses dataService (JSON files)
-- `analyzePaymentPatterns` - Uses dataService (JSON files)
-- `recommendLoanRestructuring` - Uses dataService (JSON files)
+- `getLoanDetails` - Get detailed information about a specific loan
+- `getLoanStatus` - Get the status of a specific loan
+- `getLoanSummary` - Get a summary of loans in the system
+- `getActiveLoans` - Get a list of all active loans in the system
+- `getLoansByBorrower` - Get a list of loans for a specific borrower
+- `getBorrowerDetails` - Get detailed information about a specific borrower
+- `getBorrowerDefaultRisk` - Get default risk assessment for a specific borrower
+- `getBorrowerNonAccrualRisk` - Get non-accrual risk assessment for a specific borrower
+- `getHighRiskFarmers` - Identify farmers with high risk of default across the portfolio
+- `evaluateCollateralSufficiency` - Evaluate collateral sufficiency for a specific loan
+- `forecastEquipmentMaintenance` - Forecast equipment maintenance for a specific borrower
+- `assessCropYieldRisk` - Assess crop yield risk for a specific borrower
+- `analyzeMarketPriceImpact` - Analyze market price impact for a specific borrower
+- `getRefinancingOptions` - Get refinancing options for a specific loan
+- `analyzePaymentPatterns` - Analyze payment patterns for a specific borrower
+- `recommendLoanRestructuring` - Recommend loan restructuring for a specific loan
 
 ## 🚀 Future Architecture Considerations
 

@@ -191,3 +191,46 @@ CREATE INDEX IX_AuditLog_User_Time ON AuditLog(user_id, timestamp DESC);
 CREATE INDEX IX_LoanAnalysis_Loan_Type ON LoanAnalysis(loan_id, analysis_type, analyzed_at DESC);
 CREATE INDEX IX_Borrowers_Risk_Score ON Borrowers(risk_score DESC);
 CREATE INDEX IX_Equipment_Borrower_Value ON Equipment(borrower_id, current_value DESC); 
+
+-- New tables for analytics migration
+
+CREATE TABLE Equipment (
+    equipment_id VARCHAR(50) PRIMARY KEY,
+    borrower_id VARCHAR(50) NOT NULL,
+    type VARCHAR(50) NOT NULL,
+    purchase_date DATE,
+    condition VARCHAR(20),
+    purchase_price DECIMAL(15,2),
+    current_value DECIMAL(15,2),
+    depreciation_rate DECIMAL(5,2),
+    maintenance_cost_ytd DECIMAL(15,2) DEFAULT 0,
+    created_at DATETIME DEFAULT GETDATE(),
+    updated_at DATETIME DEFAULT GETDATE(),
+    FOREIGN KEY (borrower_id) REFERENCES Borrowers(borrower_id)
+);
+
+-- Index for frequent queries
+CREATE INDEX IX_Equipment_BorrowerId ON Equipment(borrower_id);
+
+CREATE TABLE CropYields (
+    crop_id VARCHAR(50) PRIMARY KEY,
+    borrower_id VARCHAR(50) NOT NULL,
+    crop_type VARCHAR(50) NOT NULL,
+    season VARCHAR(20) NOT NULL,
+    yield_amount DECIMAL(10,2),
+    risk_score DECIMAL(5,2),
+    risk_factors NVARCHAR(MAX) -- JSON array
+);
+
+CREATE INDEX IX_CropYields_BorrowerSeason ON CropYields(borrower_id, season);
+
+CREATE TABLE MarketPrices (
+    market_id VARCHAR(50) PRIMARY KEY,
+    commodity VARCHAR(50) NOT NULL,
+    price DECIMAL(10,2) NOT NULL,
+    price_change_percent DECIMAL(5,2),
+    update_date DATE DEFAULT GETDATE(),
+    impact_analysis NVARCHAR(MAX) -- JSON object
+);
+
+-- Add more tables as needed for other analytics 

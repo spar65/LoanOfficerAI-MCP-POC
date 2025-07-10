@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const LogService = require('./logService');
+const mcpDatabaseService = require('./mcpDatabaseService'); // Added for database operations
 
 // Data paths
 const dataDir = path.join(__dirname, '..', 'data');
@@ -133,7 +134,7 @@ const ensureBorrowerB001 = () => {
 };
 
 // Data loading function
-const loadData = (filePath) => {
+const loadData = async (filePath) => {
   try {
     // Ensure B001 exists in borrowers data if we're loading borrowers
     if (filePath === borrowersPath) {
@@ -335,9 +336,9 @@ async function recommendLoanRestructuring(loanId, restructuringGoal = null) {
     LogService.info(`Generating loan restructuring recommendations for loan ${loanId}`);
     
     // Load required data
-    const loans = loadData(loansPath);
-    const borrowers = loadData(borrowersPath);
-    const payments = loadData(paymentsPath);
+    const loans = await mcpDatabaseService.executeQuery('SELECT * FROM Loans', {});
+    const borrowers = await mcpDatabaseService.executeQuery('SELECT * FROM Borrowers', {});
+    const payments = await mcpDatabaseService.executeQuery('SELECT * FROM Payments', {});
     
     // Find the loan
     const loan = loans.find(l => l.loan_id.toUpperCase() === loanId.toUpperCase());
@@ -459,8 +460,8 @@ async function assessCropYieldRisk(borrowerId, cropType, season) {
     LogService.info(`Assessing crop yield risk for borrower ${borrowerId}, crop: ${cropType}, season: ${season}`);
     
     // Load required data
-    const borrowers = loadData(borrowersPath);
-    const loans = loadData(loansPath);
+    const borrowers = await mcpDatabaseService.executeQuery('SELECT * FROM Borrowers', {});
+    const loans = await mcpDatabaseService.executeQuery('SELECT * FROM Loans', {});
     
     // Find the borrower
     const borrower = borrowers.find(b => b.borrower_id.toUpperCase() === borrowerId.toUpperCase());
@@ -566,8 +567,8 @@ async function analyzeMarketPriceImpact(commodity, priceChangePercent) {
     LogService.info(`Analyzing market price impact for ${commodity}, change: ${priceChangePercent}`);
     
     // Load required data
-    const borrowers = loadData(borrowersPath);
-    const loans = loadData(loansPath);
+    const borrowers = await mcpDatabaseService.executeQuery('SELECT * FROM Borrowers', {});
+    const loans = await mcpDatabaseService.executeQuery('SELECT * FROM Loans', {});
     
     // Parse price change
     const priceChange = parseFloat(priceChangePercent.toString().replace('%', '')) / 100;
@@ -691,9 +692,9 @@ async function analyzePaymentPatterns(borrowerId) {
     LogService.info(`Analyzing payment patterns for borrower ${borrowerId}`);
     
     // Load required data
-    const borrowers = loadData(borrowersPath);
-    const loans = loadData(loansPath);
-    const payments = loadData(paymentsPath);
+    const borrowers = await mcpDatabaseService.executeQuery('SELECT * FROM Borrowers', {});
+    const loans = await mcpDatabaseService.executeQuery('SELECT * FROM Loans', {});
+    const payments = await mcpDatabaseService.executeQuery('SELECT * FROM Payments', {});
     
     // Find the borrower
     const borrower = borrowers.find(b => b.borrower_id.toUpperCase() === borrowerId.toUpperCase());
@@ -769,9 +770,8 @@ async function forecastEquipmentMaintenance(borrowerId) {
     LogService.info(`Forecasting equipment maintenance for borrower ${borrowerId}`);
     
     // Load required data
-    const borrowers = loadData(borrowersPath);
-    const equipmentPath = path.join(__dirname, '..', 'data', 'equipment.json');
-    const equipment = loadData(equipmentPath);
+    const borrowers = await mcpDatabaseService.executeQuery('SELECT * FROM Borrowers', {});
+    const equipment = await mcpDatabaseService.executeQuery('SELECT * FROM Equipment', {});
     
     // Find the borrower
     const borrower = borrowers.find(b => b.borrower_id.toUpperCase() === borrowerId.toUpperCase());
@@ -830,9 +830,9 @@ async function getHighRiskFarmers() {
     LogService.info('Identifying high-risk farmers');
     
     // Load required data
-    const borrowers = loadData(borrowersPath);
-    const loans = loadData(loansPath);
-    const payments = loadData(paymentsPath);
+    const borrowers = await mcpDatabaseService.executeQuery('SELECT * FROM Borrowers', {});
+    const loans = await mcpDatabaseService.executeQuery('SELECT * FROM Loans', {});
+    const payments = await mcpDatabaseService.executeQuery('SELECT * FROM Payments', {});
     
     const highRiskFarmers = [];
     

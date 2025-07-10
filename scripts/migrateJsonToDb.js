@@ -181,6 +181,85 @@ async function migrateEquipment(equipment) {
   }
 }
 
+// New migration functions for analytics tables
+
+async function migrateEquipment() {
+  const equipment = readJsonFile('equipment.json');
+  console.log(`\nMigrating ${equipment.length} equipment items...`);
+  for (const item of equipment) {
+    try {
+      await DatabaseManager.executeQuery(
+        `INSERT INTO Equipment (equipment_id, borrower_id, type, purchase_date, condition, purchase_price, current_value, depreciation_rate, maintenance_cost_ytd)
+         VALUES (@equipment_id, @borrower_id, @type, @purchase_date, @condition, @purchase_price, @current_value, @depreciation_rate, @maintenance_cost_ytd)`,
+        { 
+          equipment_id: item.equipment_id, 
+          borrower_id: item.borrower_id, 
+          type: item.type || 'Unknown', 
+          purchase_date: item.purchase_date || null, 
+          condition: item.condition || null, 
+          purchase_price: item.purchase_price || 0, 
+          current_value: item.current_value || 0, 
+          depreciation_rate: item.depreciation_rate || 0, 
+          maintenance_cost_ytd: item.maintenance_cost_ytd || 0 
+        }
+      );
+      console.log(`✓ Equipment ${item.equipment_id} inserted`);
+    } catch (error) {
+      console.error(`✗ Error inserting equipment ${item.equipment_id}:`, error.message);
+    }
+  }
+}
+
+// Similar functions for CropYields and MarketPrices
+// Assume crop_yields.json and market_prices.json exist
+async function migrateCropYields() {
+  const cropYields = readJsonFile('crop_yields.json');
+  console.log(`\nMigrating ${cropYields.length} crop yield records...`);
+  for (const item of cropYields) {
+    try {
+      await DatabaseManager.executeQuery(
+        `INSERT INTO CropYields (crop_id, borrower_id, crop_type, season, yield_amount, risk_score, risk_factors)
+         VALUES (@crop_id, @borrower_id, @crop_type, @season, @yield_amount, @risk_score, @risk_factors)`,
+        { 
+          crop_id: item.crop_id, 
+          borrower_id: item.borrower_id, 
+          crop_type: item.crop_type, 
+          season: item.season, 
+          yield_amount: item.yield_amount || 0, 
+          risk_score: item.risk_score || 0, 
+          risk_factors: JSON.stringify(item.risk_factors || []) 
+        }
+      );
+      console.log(`✓ Crop yield ${item.crop_id} inserted`);
+    } catch (error) {
+      console.error(`✗ Error inserting crop yield ${item.crop_id}:`, error.message);
+    }
+  }
+}
+
+async function migrateMarketPrices() {
+  const marketPrices = readJsonFile('market_prices.json');
+  console.log(`\nMigrating ${marketPrices.length} market price records...`);
+  for (const item of marketPrices) {
+    try {
+      await DatabaseManager.executeQuery(
+        `INSERT INTO MarketPrices (market_id, commodity, price, price_change_percent, impact_analysis)
+         VALUES (@market_id, @commodity, @price, @price_change_percent, @impact_analysis)`,
+        { 
+          market_id: item.market_id, 
+          commodity: item.commodity, 
+          price: item.price, 
+          price_change_percent: item.price_change_percent || 0, 
+          impact_analysis: JSON.stringify(item.impact_analysis || {}) 
+        }
+      );
+      console.log(`✓ Market price ${item.market_id} inserted`);
+    } catch (error) {
+      console.error(`✗ Error inserting market price ${item.market_id}:`, error.message);
+    }
+  }
+}
+
 /**
  * Migrate all JSON data to the database
  */
@@ -216,6 +295,8 @@ async function migrateJsonToDatabase() {
     await migrateCollateral(collateral);
     await migratePayments(payments);
     await migrateEquipment(equipment);
+    await migrateCropYields();
+    await migrateMarketPrices();
     
     console.log('Migration completed successfully!');
   } catch (error) {
