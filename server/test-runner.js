@@ -75,10 +75,20 @@ function printResult(testName, status, details = '') {
  */
 function runTest(command, testName, category) {
   try {
+    // Determine the correct working directory for the test
+    const isServerTest = command.includes('tests/mcp-core/') || 
+                        command.includes('tests/mcp-infrastructure/');
+    
+    // If we're already in the server directory, don't add another 'server' to the path
+    const currentDir = process.cwd();
+    const isAlreadyInServer = currentDir.endsWith('/server') || currentDir.endsWith('\\server');
+    const cwd = isServerTest && !isAlreadyInServer ? path.join(currentDir, 'server') : currentDir;
+    
     const output = execSync(command, { 
       encoding: 'utf8', 
       stdio: 'pipe',
-      timeout: 30000 // 30 second timeout
+      timeout: 30000, // 30 second timeout
+      cwd: cwd
     });
     
     // Check if output indicates success
@@ -251,7 +261,16 @@ async function runAllTests() {
   printSection('UNIT TESTS (Jest)');
   
   try {
-    execSync('npm run test:unit', { stdio: 'pipe', timeout: 15000 });
+    // Use the same directory logic for Jest tests
+    const currentDir = process.cwd();
+    const isAlreadyInServer = currentDir.endsWith('/server') || currentDir.endsWith('\\server');
+    const jestCwd = isAlreadyInServer ? currentDir : path.join(currentDir, 'server');
+    
+    execSync('npm run test:unit', { 
+      stdio: 'pipe', 
+      timeout: 15000,
+      cwd: jestCwd
+    });
     printResult('Jest Unit Tests', 'PASSED', 'All unit tests passing');
     if (!testResults.categories['Unit Tests']) testResults.categories['Unit Tests'] = { passed: 0, failed: 0 };
     testResults.categories['Unit Tests'].passed++;
