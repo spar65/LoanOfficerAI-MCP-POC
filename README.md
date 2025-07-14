@@ -2,6 +2,18 @@
 
 A proof-of-concept application demonstrating AI-powered agricultural lending intelligence with Model Completion Protocol (MCP) integration and complete SQL Server database integration.
 
+## 🚀 Quick Start (Three Simple Commands)
+
+```bash
+npm run check    # 1. Check system requirements (30 seconds)
+npm run setup    # 2. Configure and install everything (2-5 minutes)
+npm start        # 3. Launch the application (10 seconds)
+```
+
+**Result**: Full AI-powered agricultural lending system running at http://localhost:3000
+
+👉 **For detailed instructions, see [README-START-GUIDE.md](README-START-GUIDE.md)**
+
 ## 🎯 FOR NEWCOMERS: What This System Does
 
 **If you're new to AI integration or MCP**, this system demonstrates how artificial intelligence can revolutionize agricultural lending by providing instant access to loan data, automated risk analysis, and intelligent decision support—all through natural conversation. Here's how it works:

@@ -124,19 +124,24 @@ async function init() {
   
   // Initialize database connection if enabled
   if (process.env.USE_DATABASE === 'true') {
+    LogService.info('Database mode enabled - connection MUST succeed');
     try {
       LogService.info('Initializing database connection...');
       const isConnected = await DatabaseManager.testConnection();
       if (!isConnected) {
-        LogService.error('Database connection failed');
+        const error = new Error('Database connection failed - server cannot start with USE_DATABASE=true');
+        LogService.error('CRITICAL: Database connection failed', error);
+        throw error;
       } else {
         LogService.info('Database connection established successfully');
       }
     } catch (error) {
-      LogService.error('Failed to connect to database', {
+      LogService.error('CRITICAL: Failed to connect to database', {
         error: error.message,
         stack: error.stack
       });
+      // FAIL FAST - don't start server if database is required but not working
+      throw new Error(`Server cannot start: Database is required (USE_DATABASE=true) but connection failed: ${error.message}`);
     }
   } else {
     LogService.info('Database usage disabled by configuration, using JSON files');

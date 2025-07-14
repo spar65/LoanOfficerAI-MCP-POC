@@ -514,7 +514,7 @@ class McpDatabaseService {
   async getLoanStatus(loanId) {
     try {
       const result = await db.executeQuery(
-        `SELECT loan_id, status, updated_at as last_updated FROM Loans 
+        `SELECT loan_id, status, updated_date as last_updated FROM Loans 
          WHERE loan_id = @loanId`,
         { loanId }
       );

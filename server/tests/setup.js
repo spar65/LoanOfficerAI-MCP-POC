@@ -15,6 +15,13 @@ process.env.TEST_PORT = process.env.TEST_PORT || '3002';
 process.env.ALLOW_TEST_AUTH = 'true';
 process.env.LOG_LEVEL = 'error'; // Reduce logging noise during tests
 
+// Force database usage for tests - NO JSON FILES!
+process.env.USE_DATABASE = 'true';
+process.env.DB_SERVER = process.env.DB_SERVER || 'localhost';
+process.env.DB_NAME = process.env.DB_NAME || 'LoanOfficerAI_MCP_POC';
+process.env.DB_USER = process.env.DB_USER || 'sa';
+process.env.DB_PASSWORD = process.env.DB_PASSWORD || 'YourStrong@Passw0rd';
+
 // Import test utilities
 const testUtils = require('./helpers/test-utils');
 global.testUtils = testUtils;

@@ -8,12 +8,17 @@ const LogService = require('../services/logService');
 
 class DatabaseManager {
   constructor() {
+    // NO FALLBACKS - If database is configured, it MUST work
+    if (process.env.USE_DATABASE === 'true') {
+      LogService.info('Database mode enabled - NO FALLBACKS will be used');
+    }
+    
     // Parse server and port from DB_SERVER env var
     const serverConfig = process.env.DB_SERVER || 'localhost';
     
     this.config = {
       server: serverConfig.split(',')[0], // Extract server name without port
-      database: process.env.DB_NAME || 'LoanOfficerDB', // Default to LoanOfficerDB
+      database: process.env.DB_NAME || 'LoanOfficerAI_MCP_POC', // Use the correct database name
       user: process.env.DB_USER || 'sa',
       password: process.env.DB_PASSWORD || 'YourStrong@Passw0rd',
       options: { 
@@ -112,20 +117,33 @@ class DatabaseManager {
       
       const existingTables = tableCheckResult.recordset.map(r => r.TABLE_NAME);
       
-      // Create tables if they don't exist
+      // If we already have the core tables, assume schema is complete
+      if (existingTables.includes('Borrowers') && existingTables.includes('Loans') && existingTables.includes('Payments')) {
+        LogService.info('Database schema already exists, skipping creation');
+        return;
+      }
+      
+      // Create tables if they don't exist - matching the automated setup script schema
       if (!existingTables.includes('Borrowers')) {
         LogService.info('Creating Borrowers table...');
         await pool.request().query(`
           CREATE TABLE Borrowers (
-            borrower_id VARCHAR(50) PRIMARY KEY,
-            first_name VARCHAR(100) NOT NULL,
-            last_name VARCHAR(100) NOT NULL,
-            email VARCHAR(255),
-            phone VARCHAR(50),
+            borrower_id NVARCHAR(50) PRIMARY KEY,
+            first_name NVARCHAR(100),
+            last_name NVARCHAR(100),
+            email NVARCHAR(255),
+            phone NVARCHAR(50),
+            address NVARCHAR(500),
+            city NVARCHAR(100),
+            state NVARCHAR(50),
+            zip_code NVARCHAR(20),
             credit_score INT,
-            debt_to_income_ratio DECIMAL(5,2),
-            created_at DATETIME DEFAULT GETDATE(),
-            updated_at DATETIME DEFAULT GETDATE()
+            income DECIMAL(15,2),
+            farm_type NVARCHAR(100),
+            farm_size DECIMAL(10,2),
+            years_farming INT,
+            created_date DATETIME DEFAULT GETDATE(),
+            updated_date DATETIME DEFAULT GETDATE()
           )
         `);
       }
@@ -134,16 +152,40 @@ class DatabaseManager {
         LogService.info('Creating Loans table...');
         await pool.request().query(`
           CREATE TABLE Loans (
-            loan_id VARCHAR(50) PRIMARY KEY,
-            borrower_id VARCHAR(50) NOT NULL,
-            loan_amount DECIMAL(18,2) NOT NULL,
-            interest_rate DECIMAL(5,2) NOT NULL,
-            term_months INT NOT NULL,
-            status VARCHAR(50) NOT NULL,
-            loan_type VARCHAR(50) NOT NULL,
-            created_at DATETIME DEFAULT GETDATE(),
-            updated_at DATETIME DEFAULT GETDATE(),
+            loan_id NVARCHAR(50) PRIMARY KEY,
+            borrower_id NVARCHAR(50),
+            loan_amount DECIMAL(15,2),
+            interest_rate DECIMAL(5,2),
+            term_months INT,
+            loan_type NVARCHAR(100),
+            purpose NVARCHAR(500),
+            status NVARCHAR(50),
+            application_date DATETIME,
+            approval_date DATETIME,
+            disbursement_date DATETIME,
+            maturity_date DATETIME,
+            created_date DATETIME DEFAULT GETDATE(),
+            updated_date DATETIME DEFAULT GETDATE(),
             FOREIGN KEY (borrower_id) REFERENCES Borrowers(borrower_id)
+          )
+        `);
+      }
+      
+      if (!existingTables.includes('Payments')) {
+        LogService.info('Creating Payments table...');
+        await pool.request().query(`
+          CREATE TABLE Payments (
+            payment_id NVARCHAR(50) PRIMARY KEY,
+            loan_id NVARCHAR(50),
+            payment_date DATETIME,
+            amount DECIMAL(15,2),
+            principal_amount DECIMAL(15,2),
+            interest_amount DECIMAL(15,2),
+            status NVARCHAR(50),
+            payment_method NVARCHAR(100),
+            days_late INT DEFAULT 0,
+            created_date DATETIME DEFAULT GETDATE(),
+            FOREIGN KEY (loan_id) REFERENCES Loans(loan_id)
           )
         `);
       }
@@ -152,24 +194,47 @@ class DatabaseManager {
         LogService.info('Creating Collateral table...');
         await pool.request().query(`
           CREATE TABLE Collateral (
-            collateral_id VARCHAR(50) PRIMARY KEY,
-            loan_id VARCHAR(50) NOT NULL,
-            type VARCHAR(100) NOT NULL,
-            description VARCHAR(255),
-            value DECIMAL(18,2) NOT NULL,
-            created_at DATETIME DEFAULT GETDATE(),
-            updated_at DATETIME DEFAULT GETDATE(),
+            collateral_id NVARCHAR(50) PRIMARY KEY,
+            loan_id NVARCHAR(50),
+            type NVARCHAR(100),
+            description NVARCHAR(500),
+            value DECIMAL(15,2),
+            valuation_date DATETIME,
+            status NVARCHAR(50),
+            created_date DATETIME DEFAULT GETDATE(),
+            updated_date DATETIME DEFAULT GETDATE(),
             FOREIGN KEY (loan_id) REFERENCES Loans(loan_id)
           )
         `);
       }
       
+      if (!existingTables.includes('Equipment')) {
+        LogService.info('Creating Equipment table...');
+        await pool.request().query(`
+          CREATE TABLE Equipment (
+            equipment_id NVARCHAR(50) PRIMARY KEY,
+            borrower_id NVARCHAR(50),
+            equipment_type NVARCHAR(100),
+            brand NVARCHAR(100),
+            model NVARCHAR(100),
+            year_manufactured INT,
+            purchase_price DECIMAL(15,2),
+            current_value DECIMAL(15,2),
+            condition_status NVARCHAR(50),
+            created_date DATETIME DEFAULT GETDATE(),
+            updated_date DATETIME DEFAULT GETDATE(),
+            FOREIGN KEY (borrower_id) REFERENCES Borrowers(borrower_id)
+          )
+        `);
+      }
+      
+      // Optional tables for extended functionality
       if (!existingTables.includes('MCPConversations')) {
         LogService.info('Creating MCPConversations table...');
         await pool.request().query(`
           CREATE TABLE MCPConversations (
-            conversation_id VARCHAR(50) PRIMARY KEY,
-            user_id VARCHAR(50) NOT NULL,
+            conversation_id NVARCHAR(50) PRIMARY KEY,
+            user_id NVARCHAR(50) NOT NULL,
             query NVARCHAR(MAX),
             response NVARCHAR(MAX),
             timestamp DATETIME,
@@ -182,107 +247,19 @@ class DatabaseManager {
         LogService.info('Creating Users table...');
         await pool.request().query(`
           CREATE TABLE Users (
-            id VARCHAR(50) PRIMARY KEY,
-            username VARCHAR(50) UNIQUE NOT NULL,
-            email VARCHAR(100) UNIQUE NOT NULL,
-            passwordHash VARCHAR(255) NOT NULL,
-            firstName VARCHAR(50),
-            lastName VARCHAR(50),
-            role VARCHAR(50) DEFAULT 'loan_officer',
-            tenantId VARCHAR(50) NOT NULL DEFAULT 'default',
+            id NVARCHAR(50) PRIMARY KEY,
+            username NVARCHAR(50) UNIQUE NOT NULL,
+            email NVARCHAR(100) UNIQUE NOT NULL,
+            passwordHash NVARCHAR(255) NOT NULL,
+            firstName NVARCHAR(50),
+            lastName NVARCHAR(50),
+            role NVARCHAR(50) DEFAULT 'loan_officer',
+            tenantId NVARCHAR(50) NOT NULL DEFAULT 'default',
             active BIT DEFAULT 1,
             lastLogin DATETIME,
-            preferredAIModel VARCHAR(50) DEFAULT 'claude-sonnet-4',
+            preferredAIModel NVARCHAR(50) DEFAULT 'claude-sonnet-4',
             createdAt DATETIME DEFAULT GETDATE(),
             updatedAt DATETIME DEFAULT GETDATE()
-          )
-        `);
-      }
-      
-      if (!existingTables.includes('Payments')) {
-        LogService.info('Creating Payments table...');
-        await pool.request().query(`
-          CREATE TABLE Payments (
-            payment_id VARCHAR(50) PRIMARY KEY,
-            loan_id VARCHAR(50) NOT NULL,
-            payment_date DATE NOT NULL,
-            amount DECIMAL(15,2) NOT NULL,
-            status VARCHAR(20) DEFAULT 'pending',
-            payment_method VARCHAR(50) DEFAULT 'ACH',
-            late_fee DECIMAL(15,2) DEFAULT 0,
-            days_late INT DEFAULT 0,
-            created_at DATETIME DEFAULT GETDATE(),
-            FOREIGN KEY (loan_id) REFERENCES Loans(loan_id)
-          )
-        `);
-      }
-      
-      if (!existingTables.includes('Equipment')) {
-        LogService.info('Creating Equipment table...');
-        await pool.request().query(`
-          CREATE TABLE Equipment (
-            equipment_id VARCHAR(50) PRIMARY KEY,
-            borrower_id VARCHAR(50) NOT NULL,
-            type VARCHAR(50) NOT NULL,
-            purchase_date DATE,
-            condition VARCHAR(20),
-            purchase_price DECIMAL(15,2),
-            current_value DECIMAL(15,2),
-            depreciation_rate DECIMAL(5,2),
-            maintenance_cost_ytd DECIMAL(15,2) DEFAULT 0,
-            created_at DATETIME DEFAULT GETDATE(),
-            updated_at DATETIME DEFAULT GETDATE(),
-            FOREIGN KEY (borrower_id) REFERENCES Borrowers(borrower_id)
-          )
-        `);
-      }
-      
-      if (!existingTables.includes('MaintenanceRecords')) {
-        LogService.info('Creating MaintenanceRecords table...');
-        await pool.request().query(`
-          CREATE TABLE MaintenanceRecords (
-            record_id VARCHAR(50) PRIMARY KEY DEFAULT NEWID(),
-            equipment_id VARCHAR(50) NOT NULL,
-            date DATE NOT NULL,
-            type VARCHAR(50) NOT NULL,
-            cost DECIMAL(15,2) DEFAULT 0,
-            description VARCHAR(255),
-            predicted_next_maintenance DATE,
-            ai_maintenance_score DECIMAL(3,2) DEFAULT 0.7,
-            created_at DATETIME DEFAULT GETDATE(),
-            FOREIGN KEY (equipment_id) REFERENCES Equipment(equipment_id)
-          )
-        `);
-      }
-      
-      if (!existingTables.includes('CropYields')) {
-        LogService.info('Creating CropYields table...');
-        await pool.request().query(`
-          CREATE TABLE CropYields (
-            crop_id VARCHAR(50) PRIMARY KEY,
-            borrower_id VARCHAR(50) NOT NULL,
-            crop_type VARCHAR(50) NOT NULL,
-            season VARCHAR(20) NOT NULL,
-            yield_amount DECIMAL(15,2) DEFAULT 0,
-            risk_score DECIMAL(3,2) DEFAULT 0,
-            risk_factors NVARCHAR(MAX),
-            created_at DATETIME DEFAULT GETDATE(),
-            FOREIGN KEY (borrower_id) REFERENCES Borrowers(borrower_id)
-          )
-        `);
-      }
-      
-      if (!existingTables.includes('MarketPrices')) {
-        LogService.info('Creating MarketPrices table...');
-        await pool.request().query(`
-          CREATE TABLE MarketPrices (
-            market_id VARCHAR(50) PRIMARY KEY,
-            commodity VARCHAR(50) NOT NULL,
-            price DECIMAL(15,2) NOT NULL,
-            price_change_percent DECIMAL(5,2) DEFAULT 0,
-            impact_analysis NVARCHAR(MAX),
-            created_at DATETIME DEFAULT GETDATE(),
-            updated_at DATETIME DEFAULT GETDATE()
           )
         `);
       }
@@ -293,7 +270,12 @@ class DatabaseManager {
         error: error.message,
         stack: error.stack
       });
-      throw error;
+      // Don't throw error if tables already exist
+      if (!error.message.includes('already exists') && !error.message.includes('constraint or index')) {
+        throw error;
+      } else {
+        LogService.info('Schema creation skipped - tables already exist');
+      }
     }
   }
 

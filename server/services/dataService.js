@@ -165,36 +165,36 @@ const loadData = async (filePath) => {
     return data;
     
   } catch (error) {
-    LogService.error(`Error loading data from database for ${filePath}:`, {
+    LogService.error(`CRITICAL DATABASE ERROR for ${filePath}:`, {
       message: error.message,
       stack: error.stack
     });
     
-    // For testing, try to use mock data
-    if (process.env.NODE_ENV === 'test') {
+    // NO FALLBACKS! If database is configured, it MUST work
+    if (process.env.USE_DATABASE === 'true') {
+      throw new Error(`Database is configured (USE_DATABASE=true) but failed to load data from ${filePath}: ${error.message}`);
+    }
+    
+    // For testing with mock data (only when database is disabled)
+    if (process.env.NODE_ENV === 'test' && process.env.USE_DATABASE !== 'true') {
       const fileName = path.basename(filePath);
       const mockFilePath = path.join(mockDataDir, fileName);
       
-      // Try to load the mock data
       if (typeof fs.existsSync === 'function' && fs.existsSync(mockFilePath)) {
         try {
           const data = fs.readFileSync(mockFilePath, 'utf8');
-          
           if (!data || data.trim() === '') {
-            LogService.warn(`Mock data file is empty: ${mockFilePath}`);
-            return [];
+            throw new Error(`Mock data file is empty: ${mockFilePath}`);
           }
-          
           return JSON.parse(data);
         } catch (mockError) {
-          LogService.error(`Error reading mock data at ${mockFilePath}: ${mockError.message}`);
-          return [];
+          throw new Error(`Error reading mock data at ${mockFilePath}: ${mockError.message}`);
         }
       }
     }
     
-    // Return empty array as fallback
-    return [];
+    // If we get here, database is disabled and no mock data available
+    throw new Error(`No data source available for ${filePath}`);
   }
 };
 
