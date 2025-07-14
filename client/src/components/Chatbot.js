@@ -647,4 +647,5 @@ const Chatbot = ({ onClose }) => {
   );
 };
 
-export default Chatbot; 
+export default Chatbot;
+export { MCP_FUNCTIONS }; 

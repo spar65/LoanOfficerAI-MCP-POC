@@ -6,7 +6,7 @@
     "start": "react-scripts start",
     "dev": "react-scripts start",
     "build": "react-scripts build",
-    "test": "react-scripts test",
+    "test": "react-scripts test --watchAll=false",
     "test:auth": "react-scripts test auth.test.js client-api.test.js",
     "eject": "react-scripts eject"
   },
@@ -26,11 +26,20 @@
       "last 1 safari version"
     ]
   },
+  "jest": {
+    "transformIgnorePatterns": [
+      "node_modules/(?!(axios)/)"
+    ],
+    "moduleNameMapper": {
+      "^axios$": "<rootDir>/src/tests/mocks/axiosMock.js"
+    }
+  },
   "dependencies": {
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.0",
     "@mui/icons-material": "^7.1.0",
     "@mui/material": "^7.1.0",
+    "@mui/x-charts": "^7.23.1",
     "axios": "^1.9.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
@@ -39,6 +48,8 @@
     "@modelcontextprotocol/sdk": "^1.12.1"
   },
   "devDependencies": {
+    "@babel/preset-env": "^7.26.0",
+    "@babel/preset-react": "^7.26.3",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^14.6.1",

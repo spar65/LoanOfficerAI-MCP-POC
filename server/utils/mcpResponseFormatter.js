@@ -66,14 +66,32 @@ function formatError(error, functionName, context = {}) {
     context
   });
   
-  // Return standardized error format
-  return {
+  // Build base error response
+  const baseResponse = {
     error: true,
     message: errorMessage,
     function: functionName,
     timestamp: new Date().toISOString(),
     context: Object.keys(context).length > 0 ? context : undefined
   };
+  
+  // Handle specific error types with additional properties
+  if (error instanceof Error && error.code) {
+    baseResponse.code = error.code;
+    
+    // Handle entity not found errors
+    if (error.code === 'ENTITY_NOT_FOUND' && error.details) {
+      if (error.details.entity_type) baseResponse.entity_type = error.details.entity_type;
+      if (error.details.entity_id) baseResponse.entity_id = error.details.entity_id;
+    }
+    
+    // Handle validation errors
+    if (error.code === 'VALIDATION_ERROR' && error.details) {
+      if (error.details.validation_errors) baseResponse.validation_errors = error.details.validation_errors;
+    }
+  }
+  
+  return baseResponse;
 }
 
 /**

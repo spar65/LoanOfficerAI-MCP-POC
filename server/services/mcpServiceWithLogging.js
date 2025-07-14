@@ -52,8 +52,8 @@ class MCPServiceWithLogging {
         args: this.redactPII(normalizedArgs)
       });
       
-      // Rethrow with consistent error format
-      throw new Error(`MCP function '${functionName}' failed: ${error.message}`);
+      // Rethrow the original error to preserve all properties
+      throw error;
     }
   }
   

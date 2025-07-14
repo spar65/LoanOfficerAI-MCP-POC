@@ -6,7 +6,13 @@ const axios = {
       role: 'assistant'
     }
   }),
-  get: jest.fn().mockResolvedValue({ data: {} }),
+  get: jest.fn().mockResolvedValue({ 
+    data: {
+      loans: [],
+      borrowers: [],
+      message: 'Mock data response'
+    }
+  }),
   defaults: {
     baseURL: '',
     headers: {
@@ -27,5 +33,8 @@ const axios = {
   },
 };
 
-// Export axios mock object
+// Default export for ES modules
+export default axios;
+
+// Named export for CommonJS
 module.exports = axios; 

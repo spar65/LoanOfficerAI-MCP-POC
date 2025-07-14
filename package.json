@@ -4,8 +4,12 @@
   "description": "Loan Officer AI with MCP Integration - Proof of Concept",
   "main": "index.js",
   "scripts": {
+    "setup": "node setup.js",
     "start": "node server.js",
     "install:all": "npm install && cd server && npm install && cd ../client && npm install",
+    "dev:server": "cd server && npm start",
+    "dev:client": "cd client && npm start",
+    "dev": "echo '🚀 LoanOfficerAI Development Setup' && echo '' && echo 'Open two terminals and run:' && echo '  Terminal 1: npm run dev:server' && echo '  Terminal 2: npm run dev:client' && echo '' && echo 'Then open: http://localhost:3000'",
     "test": "cd server && npm test",
     "test:server": "cd server && npm test",
     "test:client": "cd client && npm test -- --watchAll=false",
@@ -17,7 +21,6 @@
     "test:custom": "cd server && npm run test:custom",
     "test:interactive": "cd server && npm run test:interactive",
     "test:mcp": "cd server && npm run test:mcp",
-    "dev": "nodemon server.js",
     "migrate": "node scripts/migrateJsonToDb.js"
   },
   "keywords": [

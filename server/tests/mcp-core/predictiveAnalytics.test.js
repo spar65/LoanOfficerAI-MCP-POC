@@ -6,14 +6,18 @@
  * - assessCropYieldRisk
  * - analyzeMarketPriceImpact
  */
-const { registry, executeFunction } = require('../../services/mcpFunctionRegistry');
+
+// Create proper mock functions
+const mockRecommendLoanRestructuring = jest.fn();
+const mockAssessCropYieldRisk = jest.fn();
+const mockAnalyzeMarketPriceImpact = jest.fn();
 
 // Mock the mcpFunctionRegistry
 jest.mock('../../services/mcpFunctionRegistry', () => {
   const mockRegistry = {
-    recommendLoanRestructuring: jest.fn(),
-    assessCropYieldRisk: jest.fn(),
-    analyzeMarketPriceImpact: jest.fn()
+    recommendLoanRestructuring: mockRecommendLoanRestructuring,
+    assessCropYieldRisk: mockAssessCropYieldRisk,
+    analyzeMarketPriceImpact: mockAnalyzeMarketPriceImpact
   };
   
   return {
@@ -34,120 +38,167 @@ jest.mock('../../services/mcpFunctionRegistry', () => {
           return {
             error: true,
             message: error.message,
-            code: error.code || 'FUNCTION_ERROR'
+            code: error.code || 'FUNCTION_ERROR',
+            function: functionName,
+            timestamp: new Date().toISOString()
           };
         }
       } else {
         return {
           error: true,
           message: `Unknown function: ${functionName}`,
-          code: 'UNKNOWN_FUNCTION'
+          code: 'UNKNOWN_FUNCTION',
+          function: functionName,
+          timestamp: new Date().toISOString()
         };
       }
     })
   };
 });
 
+const { registry, executeFunction } = require('../../services/mcpFunctionRegistry');
+
 describe('Predictive Analytics MCP Functions', () => {
   beforeEach(() => {
+    // Clear all mocks before each test
     jest.clearAllMocks();
   });
-  
-  // Test recommendLoanRestructuring function
+
   describe('recommendLoanRestructuring', () => {
     test('should return restructuring options for valid loan ID', async () => {
       // Mock the implementation for this test
-      registry.recommendLoanRestructuring.mockResolvedValue({
+      mockRecommendLoanRestructuring.mockResolvedValue({
         loan_id: 'L001',
         current_structure: {
           loan_amount: 50000,
           interest_rate: 3.5,
-          term_length: 60,
-          monthly_payment: 911.38
+          term_months: 60,
+          monthly_payment: 909.09
         },
         restructuring_options: [
           {
-            option_id: 1,
-            description: "Extended term with same rate",
+            option_type: 'Term Extension',
+            new_term_months: 84,
+            new_monthly_payment: 694.44,
             interest_rate: 3.5,
-            term_length: 84,
-            monthly_payment: 673.27,
-            savings_per_month: 238.11
+            total_interest_saved: 2500,
+            recommendation_score: 85
           },
           {
-            option_id: 2,
-            description: "Lower rate with same term",
+            option_type: 'Rate Reduction',
+            new_term_months: 60,
+            new_monthly_payment: 854.17,
             interest_rate: 3.0,
-            term_length: 60,
-            monthly_payment: 878.65,
-            savings_per_month: 32.73
+            total_interest_saved: 3300,
+            recommendation_score: 90
+          },
+          {
+            option_type: 'Payment Holiday',
+            deferred_months: 3,
+            new_monthly_payment: 909.09,
+            interest_rate: 3.5,
+            total_additional_cost: 1500,
+            recommendation_score: 70
           }
         ],
-        recommendation: "Option 1 provides the most monthly payment relief"
+        borrower_profile: {
+          borrower_id: 'B001',
+          name: 'John Doe',
+          credit_score: 720,
+          debt_to_income_ratio: 0.35
+        }
       });
       
       const result = await executeFunction('recommendLoanRestructuring', { loan_id: 'L001' });
       
-      expect(result).toHaveProperty('_metadata.success', true);
-      expect(result).toHaveProperty('loan_id', 'L001');
-      expect(result).toHaveProperty('current_structure');
-      expect(result).toHaveProperty('restructuring_options');
-      expect(Array.isArray(result.restructuring_options)).toBe(true);
-      expect(result.restructuring_options.length).toBeGreaterThan(0);
-      expect(result).toHaveProperty('recommendation');
+      // Verify the result structure
+      expect(result).toBeDefined();
+      expect(result._metadata).toBeDefined();
+      expect(result._metadata.success).toBe(true);
+      expect(result._metadata.function).toBe('recommendLoanRestructuring');
+      expect(result.loan_id).toBe('L001');
+      expect(result.restructuring_options).toHaveLength(3);
+      expect(result.restructuring_options[0]).toHaveProperty('option_type');
+      expect(result.restructuring_options[0]).toHaveProperty('recommendation_score');
+      expect(result.borrower_profile).toHaveProperty('borrower_id', 'B001');
       
-      expect(registry.recommendLoanRestructuring).toHaveBeenCalledWith({ loan_id: 'L001' });
+      // Verify the mock was called correctly
+      expect(mockRecommendLoanRestructuring).toHaveBeenCalledWith({ loan_id: 'L001' });
     });
     
     test('should handle error for non-existent loan ID', async () => {
       // Mock the implementation to throw an error
-      registry.recommendLoanRestructuring.mockRejectedValue(new Error('Loan not found'));
+      mockRecommendLoanRestructuring.mockRejectedValue(new Error('Loan not found'));
       
       const result = await executeFunction('recommendLoanRestructuring', { loan_id: 'L999' });
       
-      expect(result).toHaveProperty('error', true);
-      expect(result).toHaveProperty('message', 'Loan not found');
-      
-      expect(registry.recommendLoanRestructuring).toHaveBeenCalledWith({ loan_id: 'L999' });
+      // Verify error handling
+      expect(result.error).toBe(true);
+      expect(result.message).toBe('Loan not found');
+      expect(result.code).toBe('FUNCTION_ERROR');
+      expect(result.function).toBe('recommendLoanRestructuring');
     });
   });
-  
-  // Test assessCropYieldRisk function
+
   describe('assessCropYieldRisk', () => {
     test('should return crop yield risk assessment for valid borrower ID', async () => {
       // Mock the implementation for this test
-      registry.assessCropYieldRisk.mockResolvedValue({
+      mockAssessCropYieldRisk.mockResolvedValue({
         borrower_id: 'B001',
         crop_type: 'corn',
         yield_risk_score: 65,
         risk_level: 'medium',
         risk_factors: [
-          "Drought conditions in region",
-          "Historical yield variability"
+          {
+            factor: 'Weather Conditions',
+            impact: 'high',
+            description: 'Drought conditions in the region'
+          },
+          {
+            factor: 'Soil Quality',
+            impact: 'medium',
+            description: 'Moderate soil degradation observed'
+          },
+          {
+            factor: 'Market Demand',
+            impact: 'low',
+            description: 'Stable demand for corn products'
+          }
+        ],
+        historical_yields: [
+          { year: 2023, yield_per_acre: 175, weather_impact: 'normal' },
+          { year: 2022, yield_per_acre: 160, weather_impact: 'drought' },
+          { year: 2021, yield_per_acre: 185, weather_impact: 'favorable' }
         ],
         recommendations: [
-          "Consider drought-resistant varieties",
-          "Implement irrigation improvements"
+          'Consider drought-resistant seed varieties',
+          'Implement soil conservation practices',
+          'Diversify crop portfolio to reduce risk'
         ]
       });
       
       const result = await executeFunction('assessCropYieldRisk', { 
-        borrower_id: 'B001',
+        borrower_id: 'B001', 
         crop_type: 'corn',
         season: 'current'
       });
       
-      expect(result).toHaveProperty('_metadata.success', true);
-      expect(result).toHaveProperty('borrower_id', 'B001');
-      expect(result).toHaveProperty('crop_type', 'corn');
-      expect(result).toHaveProperty('yield_risk_score');
-      expect(result).toHaveProperty('risk_level');
-      expect(result).toHaveProperty('risk_factors');
-      expect(Array.isArray(result.risk_factors)).toBe(true);
-      expect(result).toHaveProperty('recommendations');
+      // Verify the result structure
+      expect(result).toBeDefined();
+      expect(result._metadata).toBeDefined();
+      expect(result._metadata.success).toBe(true);
+      expect(result._metadata.function).toBe('assessCropYieldRisk');
+      expect(result.borrower_id).toBe('B001');
+      expect(result.crop_type).toBe('corn');
+      expect(result.yield_risk_score).toBe(65);
+      expect(result.risk_level).toBe('medium');
+      expect(result.risk_factors).toHaveLength(3);
+      expect(result.historical_yields).toHaveLength(3);
+      expect(result.recommendations).toHaveLength(3);
       
-      expect(registry.assessCropYieldRisk).toHaveBeenCalledWith({ 
-        borrower_id: 'B001',
+      // Verify the mock was called correctly
+      expect(mockAssessCropYieldRisk).toHaveBeenCalledWith({ 
+        borrower_id: 'B001', 
         crop_type: 'corn',
         season: 'current'
       });
@@ -155,71 +206,94 @@ describe('Predictive Analytics MCP Functions', () => {
     
     test('should handle error for non-existent borrower ID', async () => {
       // Mock the implementation to throw an error
-      registry.assessCropYieldRisk.mockRejectedValue(new Error('Borrower not found'));
+      mockAssessCropYieldRisk.mockRejectedValue(new Error('Borrower not found'));
       
       const result = await executeFunction('assessCropYieldRisk', { borrower_id: 'B999' });
       
-      expect(result).toHaveProperty('error', true);
-      expect(result).toHaveProperty('message', 'Borrower not found');
-      
-      expect(registry.assessCropYieldRisk).toHaveBeenCalledWith({ borrower_id: 'B999' });
+      // Verify error handling
+      expect(result.error).toBe(true);
+      expect(result.message).toBe('Borrower not found');
+      expect(result.code).toBe('FUNCTION_ERROR');
+      expect(result.function).toBe('assessCropYieldRisk');
     });
   });
-  
-  // Test analyzeMarketPriceImpact function
+
   describe('analyzeMarketPriceImpact', () => {
     test('should return market price impact analysis for valid commodity', async () => {
       // Mock the implementation for this test
-      registry.analyzeMarketPriceImpact.mockResolvedValue({
+      mockAnalyzeMarketPriceImpact.mockResolvedValue({
         commodity: 'corn',
         price_change_percent: '-10%',
         affected_loans_count: 3,
-        affected_loans: [
-          { loan_id: 'L001', impact_level: 'high' },
-          { loan_id: 'L003', impact_level: 'medium' },
-          { loan_id: 'L005', impact_level: 'low' }
+        total_portfolio_exposure: 125000,
+        impact_analysis: {
+          high_risk_loans: 1,
+          medium_risk_loans: 2,
+          low_risk_loans: 0
+        },
+        borrower_impacts: [
+          {
+            borrower_id: 'B001',
+            name: 'John Doe',
+            loan_amount: 50000,
+            exposure_percentage: 80,
+            estimated_impact: -4000,
+            risk_level: 'high'
+          },
+          {
+            borrower_id: 'B002',
+            name: 'Jane Smith',
+            loan_amount: 75000,
+            exposure_percentage: 60,
+            estimated_impact: -4500,
+            risk_level: 'medium'
+          }
         ],
-        portfolio_impact_summary: "A 10% decrease in corn prices would affect 3 loans with a total exposure of $125,000",
         recommendations: [
-          "Consider commodity price hedging for high-impact loans",
-          "Review loan terms for affected borrowers"
+          'Monitor affected borrowers closely',
+          'Consider loan restructuring for high-risk borrowers',
+          'Implement hedging strategies for future loans'
         ]
       });
       
       const result = await executeFunction('analyzeMarketPriceImpact', { 
         commodity: 'corn',
-        price_change_percent: '-10%'
+        price_change_percent: -10
       });
       
-      expect(result).toHaveProperty('_metadata.success', true);
-      expect(result).toHaveProperty('commodity', 'corn');
-      expect(result).toHaveProperty('price_change_percent', '-10%');
-      expect(result).toHaveProperty('affected_loans_count');
-      expect(result).toHaveProperty('affected_loans');
-      expect(Array.isArray(result.affected_loans)).toBe(true);
-      expect(result).toHaveProperty('portfolio_impact_summary');
-      expect(result).toHaveProperty('recommendations');
+      // Verify the result structure
+      expect(result).toBeDefined();
+      expect(result._metadata).toBeDefined();
+      expect(result._metadata.success).toBe(true);
+      expect(result._metadata.function).toBe('analyzeMarketPriceImpact');
+      expect(result.commodity).toBe('corn');
+      expect(result.price_change_percent).toBe('-10%');
+      expect(result.affected_loans_count).toBe(3);
+      expect(result.total_portfolio_exposure).toBe(125000);
+      expect(result.impact_analysis).toBeDefined();
+      expect(result.borrower_impacts).toHaveLength(2);
+      expect(result.recommendations).toHaveLength(3);
       
-      expect(registry.analyzeMarketPriceImpact).toHaveBeenCalledWith({ 
+      // Verify the mock was called correctly
+      expect(mockAnalyzeMarketPriceImpact).toHaveBeenCalledWith({ 
         commodity: 'corn',
-        price_change_percent: '-10%'
+        price_change_percent: -10
       });
     });
     
     test('should handle error for invalid commodity', async () => {
       // Mock the implementation to throw an error
-      registry.analyzeMarketPriceImpact.mockRejectedValue(new Error('Invalid commodity'));
+      mockAnalyzeMarketPriceImpact.mockRejectedValue(new Error('Invalid commodity'));
       
       const result = await executeFunction('analyzeMarketPriceImpact', { 
         commodity: 'invalidCommodity'
       });
       
-      expect(result).toHaveProperty('error', true);
-      expect(result).toHaveProperty('message', 'Invalid commodity');
-      
-      expect(registry.analyzeMarketPriceImpact).toHaveBeenCalledWith({ 
-        commodity: 'invalidCommodity'
-      });
+      // Verify error handling
+      expect(result.error).toBe(true);
+      expect(result.message).toBe('Invalid commodity');
+      expect(result.code).toBe('FUNCTION_ERROR');
+      expect(result.function).toBe('analyzeMarketPriceImpact');
     });
   });
 }); 

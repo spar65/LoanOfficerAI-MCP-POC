@@ -15,13 +15,13 @@ module.exports = {
   testMatch: [
     '**/tests/**/*.test.js',
     '**/tests/unit/**/*.test.js',
-    '**/tests/integration/**/*.test.js'
+    '**/tests/integration/**/*.test.js',
+    '**/tests/mcp-core/**/*.test.js',
+    '**/tests/mcp-infrastructure/**/*.test.js'
   ],
   testPathIgnorePatterns: [
     '/node_modules/',
-    '/tests/deprecated/',
-    '/tests/mcp-core/',
-    '/tests/mcp-infrastructure/'
+    '/tests/deprecated/'
   ],
   setupFilesAfterEnv: ['<rootDir>/tests/setup.js'],
   globalSetup: '<rootDir>/tests/globalSetup.js',
@@ -30,19 +30,5 @@ module.exports = {
   forceExit: true,
   detectOpenHandles: true,
   maxWorkers: 1,
-  // Handle ES6 modules
-  transform: {
-    '^.+\\\\.js$': 'babel-jest'
-  },
-  // Transform node_modules if needed
-  transformIgnorePatterns: [
-    'node_modules/(?!(chai)/)'
-  ],
-  // Module name mapping for problematic modules
-  moduleNameMapper: {
-    '^chai$': '<rootDir>/node_modules/chai/lib/chai.js'
-  },
-  // Use require instead of import for certain modules
-  moduleFileExtensions: ['js', 'json'],
   testTimeout: 30000
 }; 

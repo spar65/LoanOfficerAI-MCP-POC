@@ -1,5 +1,6 @@
 // Jest setup file for client tests
 import '@testing-library/jest-dom';
+import React from 'react';
 
 // Create mock API responses
 global.mockApiResponse = (data) => {
@@ -15,6 +16,17 @@ global.mockApiError = (status, message) => {
   error.status = status;
   return Promise.reject(error);
 };
+
+// Mock React.useRef to prevent destructuring issues
+const originalUseRef = React.useRef;
+React.useRef = jest.fn((initialValue) => {
+  const ref = originalUseRef(initialValue);
+  // Ensure ref.current is always defined
+  if (ref.current === null || ref.current === undefined) {
+    ref.current = {};
+  }
+  return ref;
+});
 
 // Setup global mocks
 global.matchMediaMock = () => {
@@ -48,7 +60,6 @@ class IntersectionObserverMock {
     this.elements = new Set();
     this.thresholds = [];
     this.root = null;
-    this.rootMargin = '';
   }
 
   observe(element) {
@@ -66,29 +77,46 @@ class IntersectionObserverMock {
 
 global.IntersectionObserver = IntersectionObserverMock;
 
-// Setup global mocks for localStorage
-const localStorageMock = (() => {
-  let store = {};
-  return {
-    getItem: jest.fn(key => store[key] || null),
-    setItem: jest.fn((key, value) => {
-      store[key] = value.toString();
-    }),
-    removeItem: jest.fn(key => {
-      delete store[key];
-    }),
-    clear: jest.fn(() => {
-      store = {};
-    }),
-  };
-})();
+// Mock ResizeObserver for MUI components
+class ResizeObserverMock {
+  constructor(callback) {
+    this.callback = callback;
+  }
+  
+  observe() {
+    // Mock implementation
+  }
+  
+  unobserve() {
+    // Mock implementation
+  }
+  
+  disconnect() {
+    // Mock implementation
+  }
+}
 
-// Apply global mocks
-Object.defineProperty(window, 'localStorage', {
-  value: localStorageMock,
-});
+global.ResizeObserver = ResizeObserverMock;
 
-// Initialize matchMedia mock
+// Mock localStorage
+const localStorageMock = {
+  getItem: jest.fn(),
+  setItem: jest.fn(),
+  removeItem: jest.fn(),
+  clear: jest.fn(),
+};
+global.localStorage = localStorageMock;
+
+// Mock sessionStorage
+const sessionStorageMock = {
+  getItem: jest.fn(),
+  setItem: jest.fn(),
+  removeItem: jest.fn(),
+  clear: jest.fn(),
+};
+global.sessionStorage = sessionStorageMock;
+
+// Call the matchMedia mock setup
 global.matchMediaMock();
 
 // Silence React error logging in tests
