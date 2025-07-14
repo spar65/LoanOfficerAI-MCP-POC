@@ -16,8 +16,11 @@ const DATABASE_CONFIG = {
     DEFAULT_DB_PORT: process.env.DB_PORT || '1433'
 };
 
-// Default OpenAI API Key (you can set your own here)
-const DEFAULT_OPENAI_API_KEY = 'your-openai-api-key-here';
+// Load environment variables to get default OpenAI API Key
+require('dotenv').config();
+
+// Default OpenAI API Key from .env file
+const DEFAULT_OPENAI_API_KEY = process.env.OPENAI_API_KEY || 'your-openai-api-key-here';
 
 // Colors for console output
 const colors = {
@@ -230,15 +233,16 @@ class SetupValidator {
             console.log(`\n${colors.cyan}🤖 OpenAI API Key Configuration${colors.reset}`);
             console.log('━'.repeat(40));
             console.log('To enable full chatbot functionality, you need an OpenAI API key.');
-            console.log('Get one from: https://platform.openai.com/api-keys\n');
+            console.log('Get one from: https://platform.openai.com/api-keys');
+            console.log('You can also set OPENAI_API_KEY in your .env file\n');
             
-            rl.question(`Enter your OpenAI API key (or press Enter for default): `, (answer) => {
+            rl.question(`Enter your OpenAI API key (or press Enter to use .env default): `, (answer) => {
                 rl.close();
                 
                 const apiKey = answer.trim() || DEFAULT_OPENAI_API_KEY;
                 
-                if (apiKey === DEFAULT_OPENAI_API_KEY) {
-                    log.warning('Using default API key - replace with your own for production use');
+                if (apiKey === DEFAULT_OPENAI_API_KEY || apiKey === 'your-openai-api-key-here') {
+                    log.warning('Using placeholder API key - update OPENAI_API_KEY in .env file for chatbot functionality');
                 } else {
                     log.success('OpenAI API key configured');
                 }
