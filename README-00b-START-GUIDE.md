@@ -1,8 +1,21 @@
 # 🚀 Quick Start Guide - LoanOfficerAI MCP
 
-## Three Simple Steps
+## UAT Deployment - 4 Simple Steps
 
-### 1. Check Your System
+### Step 1: Install Dependencies (After Unzipping)
+
+```bash
+node bootstrap.js
+```
+
+**What this does:**
+
+- 📦 Installs root dependencies (including dotenv)
+- 🔧 Installs server dependencies
+- 🎨 Installs client dependencies
+- ✅ **ONLY** installs - no configuration
+
+### Step 2: Check System Requirements
 
 ```bash
 npm run check
@@ -13,10 +26,10 @@ npm run check
 - ✅ Validates Node.js and npm versions
 - ✅ Checks Docker installation and containers
 - ✅ Verifies required files exist
-- ✅ Tests database connectivity
+- ✅ Tests database connectivity (if configured)
 - ✅ Confirms environment readiness
 
-### 2. Setup Everything
+### Step 3: Setup & Configure
 
 ```bash
 npm run setup
@@ -25,13 +38,12 @@ npm run setup
 **What this does:**
 
 - 🔑 Prompts for OpenAI API key
-- 📝 Creates environment files
-- 📦 Installs all dependencies (server + client)
+- 📝 Creates environment files (.env)
 - 🗄️ Sets up database (optional)
 - 🧪 Runs comprehensive tests
 - 🔧 Fixes any issues found
 
-### 3. Start the Application
+### Step 4: Start the Application
 
 ```bash
 npm start
@@ -40,30 +52,40 @@ npm start
 **What this does:**
 
 - ✅ Validates project setup
-- 🖥️ Launches server on port 3001 (in new terminal)
-- 🌐 Launches client on port 3000 (in new terminal)
-- 📱 Opens browser automatically to http://localhost:3000
-- 📊 Monitors both processes
+- 🖥️ Launches server on port 3001
+- 🌐 Launches client on port 3000
+- 📱 Opens browser to http://localhost:3000
 
-## Super Simple - One Line Summary
-
-```bash
-npm check && npm setup && npm start
-```
-
-## Alternative Commands
-
-### Development Mode
+## One-Line UAT Flow
 
 ```bash
-npm run dev
+node bootstrap.js && npm run check && npm run setup && npm start
 ```
 
-Same as `npm start` - launches both server and client automatically.
+## Alternative: Manual Dependencies
 
-### Manual Terminal Setup
+If `node bootstrap.js` fails:
 
-If you prefer to manage terminals yourself:
+```bash
+# Install dependencies manually
+npm install
+cd server && npm install
+cd ../client && npm install
+cd ..
+
+# Then continue with normal flow
+npm run check && npm run setup && npm start
+```
+
+## Development Mode
+
+For ongoing development work:
+
+```bash
+npm run dev    # Same as npm start
+```
+
+### Manual Terminal Management
 
 ```bash
 # Terminal 1 - Server
@@ -73,7 +95,7 @@ npm run dev:server
 npm run dev:client
 ```
 
-### Testing
+## Testing
 
 ```bash
 npm test           # Run all tests
@@ -81,7 +103,7 @@ npm run test:server # Server tests only
 npm run test:client # Client tests only
 ```
 
-### Cleanup & Reset
+## Cleanup & Reset
 
 ```bash
 npm run clean      # Remove all node_modules
@@ -90,7 +112,7 @@ npm run reset      # Clean + install + setup
 
 ## What You'll See
 
-After running `npm start`, you'll see:
+After `npm start`:
 
 1. **✅ System Validation** - Quick checks pass
 2. **🖥️ Server Terminal** - New window with server logs
@@ -98,13 +120,27 @@ After running `npm start`, you'll see:
 4. **📱 Browser Opens** - Automatic launch to http://localhost:3000
 5. **🎯 Ready to Demo** - Full AI agricultural lending system
 
-## Troubleshooting
+## Common UAT Issues & Solutions
 
-If something goes wrong:
+### "Cannot find module 'dotenv'"
 
-1. **Check System**: `npm check` - See what's missing
-2. **Reset Everything**: `npm run reset` - Clean slate
-3. **Manual Setup**: Follow individual terminal commands above
+**Cause**: Dependencies not installed  
+**Solution**: Run `node bootstrap.js` first
+
+### "Port already in use"
+
+**Cause**: Something using ports 3000/3001  
+**Solution**: Run `npm run check` to identify conflicts
+
+### "Database connection failed"
+
+**Cause**: Database not configured  
+**Solution**: Database is optional - app works with JSON files
+
+### "OpenAI API key required"
+
+**Cause**: No API key configured  
+**Solution**: Get key from https://platform.openai.com/api-keys
 
 ## What's Running
 
@@ -112,11 +148,20 @@ If something goes wrong:
 - **Client**: http://localhost:3000 (React UI + Chatbot)
 - **Database**: SQL Server container (if configured)
 
-## Next Steps
+## Test the Chatbot
 
-Once running, try these in the chatbot:
+Once running, try these queries:
 
 - "Show me all active loans"
-- "What's the risk assessment for borrower 1?"
+- "What's the risk assessment for borrower B001?"
 - "Find high-risk agricultural borrowers"
-- "Calculate collateral sufficiency for loan 3"
+- "Calculate collateral sufficiency for loan L003"
+
+## Summary: Perfect UAT Flow
+
+1. **Unzip** the project
+2. **Bootstrap**: `node bootstrap.js` (install dependencies)
+3. **Check**: `npm run check` (verify system)
+4. **Setup**: `npm run setup` (configure everything)
+5. **Start**: `npm start` (launch application)
+6. **Test**: Use the chatbot and dashboard

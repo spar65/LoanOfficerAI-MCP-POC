@@ -77,6 +77,10 @@ node setup-database-complete.js
 ### 1. Install Dependencies
 
 ```powershell
+# Use bootstrap script for all dependencies
+node bootstrap.js
+
+# OR manually (if bootstrap script fails):
 # Root dependencies
 npm install
 

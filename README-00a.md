@@ -131,6 +131,13 @@ node setup-and-test.js
 # 1. Clone and setup
 git clone <repository-url>
 cd LoanOfficerAI-MCP-POC
+
+# Use bootstrap script for easy setup
+node bootstrap.js
+npm run check
+npm run setup
+
+# OR manual installation (if bootstrap fails)
 npm install
 cd server && npm install && cd ..
 cd client && npm install && cd ..
@@ -263,6 +270,11 @@ The setup script will validate your environment, install dependencies, set up th
 4. **Install dependencies and start the server**:
 
    ```bash
+   # If you ran bootstrap.js already, just start:
+   cd server
+   npm start
+
+   # If bootstrap.js wasn't run, install first:
    cd server
    npm install
    npm start
@@ -278,6 +290,11 @@ The setup script will validate your environment, install dependencies, set up th
 5. **Install dependencies and start the client** (in a new terminal):
 
    ```bash
+   # If you ran bootstrap.js already, just start:
+   cd client
+   npm start
+
+   # If bootstrap.js wasn't run, install first:
    cd client
    npm install
    npm start

@@ -83,6 +83,10 @@ node check-system.js
 4. **Install dependencies** (if missing):
 
 ```bash
+# Use bootstrap script for all dependencies
+node bootstrap.js
+
+# OR manually (if bootstrap script fails):
 npm install
 cd server && npm install
 cd ../client && npm install

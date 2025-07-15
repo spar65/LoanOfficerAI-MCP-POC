@@ -409,7 +409,13 @@ Overall Results:
 3. **Start the system**:
 
    ```bash
-   npm install
+   # Use the bootstrap script for fresh installation
+   node bootstrap.js
+   npm run check
+   npm run setup
+   npm start
+
+   # OR for existing installations:
    npm start
    ```
 

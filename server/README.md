@@ -19,6 +19,8 @@ This is the Node.js/Express server implementing the Model Completion Protocol (M
 2. Install dependencies:
 
    ```bash
+   # If you ran bootstrap.js from the root directory, dependencies are already installed
+   # Otherwise install manually:
    npm install
    ```
 
