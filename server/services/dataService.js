@@ -1,22 +1,65 @@
+/**
+ * ⚠️  WARNING: TEST DATA SERVICE ONLY ⚠️ 
+ * 
+ * This service is ONLY for testing and development purposes.
+ * It should NEVER be used in production.
+ * 
+ * For production, all data operations MUST go through mcpDatabaseService.js
+ * which connects to SQL Server database.
+ * 
+ * This file provides predictive analytics functions that work with mock data
+ * for testing the analytical algorithms.
+ */
+
 const fs = require('fs');
 const path = require('path');
 const LogService = require('./logService');
-const mcpDatabaseService = require('./mcpDatabaseService'); // Added for database operations
+const mcpDatabaseService = require('./mcpDatabaseService');
 
-// Data paths
-const dataDir = path.join(__dirname, '..', 'data');
-const loansPath = path.join(dataDir, 'loans.json');
-const borrowersPath = path.join(dataDir, 'borrowers.json');
-const paymentsPath = path.join(dataDir, 'payments.json');
-const collateralPath = path.join(dataDir, 'collateral.json');
+// PRODUCTION WARNING: Log that this service should not be used in production
+if (process.env.NODE_ENV === 'production') {
+  LogService.error('⚠️  CRITICAL: dataService.js is being loaded in production environment. This should NEVER happen. Use mcpDatabaseService.js instead.');
+  throw new Error('dataService.js is for testing only and cannot be used in production environment. Use mcpDatabaseService.js for all database operations.');
+}
 
-// Mock data paths for testing
+// Mock data paths for testing ONLY
 const mockDataDir = path.join(__dirname, '..', 'tests', 'mock-data');
 const mockLoansPath = path.join(mockDataDir, 'loans.json');
 const mockBorrowersPath = path.join(mockDataDir, 'borrowers.json');
 const mockPaymentsPath = path.join(mockDataDir, 'payments.json');
 const mockCollateralPath = path.join(mockDataDir, 'collateral.json');
 const mockEquipmentPath = path.join(mockDataDir, 'equipment.json');
+
+/**
+ * ⚠️  TEST ONLY: Load mock data for testing
+ * This function should NEVER be used in production
+ */
+const loadMockData = async (mockFilePath) => {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('Mock data loading is not allowed in production environment');
+  }
+  
+  try {
+    LogService.warn(`⚠️  Loading MOCK data from ${mockFilePath} - TEST ENVIRONMENT ONLY`);
+    
+    if (!fs.existsSync(mockFilePath)) {
+      throw new Error(`Mock data file not found: ${mockFilePath}`);
+    }
+    
+    const data = fs.readFileSync(mockFilePath, 'utf8');
+    if (!data || data.trim() === '') {
+      throw new Error(`Mock data file is empty: ${mockFilePath}`);
+    }
+    
+    return JSON.parse(data);
+  } catch (error) {
+    LogService.error(`Error loading mock data from ${mockFilePath}:`, {
+      message: error.message,
+      stack: error.stack
+    });
+    throw new Error(`Failed to load mock test data: ${error.message}`);
+  }
+};
 
 // Fix for the "existsSync is not a function" error
 fs.existsSync = fs.existsSync || ((p) => {
@@ -122,81 +165,12 @@ const ensureBorrowerB001 = async () => {
   }
 };
 
-// Data loading function
-const loadData = async (filePath) => {
-  try {
-    LogService.debug(`Loading data from database instead of file: ${filePath}`);
-    
-    // Determine which table to query based on file path
-    let tableName = '';
-    if (filePath.includes('borrowers.json')) {
-      tableName = 'Borrowers';
-    } else if (filePath.includes('loans.json')) {
-      tableName = 'Loans';
-    } else if (filePath.includes('payments.json')) {
-      tableName = 'Payments';
-    } else if (filePath.includes('collateral.json')) {
-      tableName = 'Collateral';
-    } else if (filePath.includes('equipment.json')) {
-      tableName = 'Equipment';
-    } else {
-      LogService.warn(`Unknown data file: ${filePath}, returning empty array`);
-      return [];
-    }
-    
-    // Query database
-    const result = await mcpDatabaseService.executeQuery(`SELECT * FROM ${tableName}`, {});
-    const data = result.recordset || result || [];
-    
-    // Special handling for borrowers - ensure B001 exists
-    if (tableName === 'Borrowers') {
-      const hasB001 = data.some(b => b.borrower_id === 'B001');
-      if (!hasB001) {
-        LogService.warn('B001 not found in database, attempting to create...');
-        await ensureBorrowerB001();
-        
-        // Re-query to get updated data
-        const updatedResult = await mcpDatabaseService.executeQuery(`SELECT * FROM ${tableName}`, {});
-        return updatedResult.recordset || updatedResult || [];
-      }
-    }
-    
-    LogService.debug(`Successfully loaded ${data.length} records from ${tableName}`);
-    return data;
-    
-  } catch (error) {
-    LogService.error(`CRITICAL DATABASE ERROR for ${filePath}:`, {
-      message: error.message,
-      stack: error.stack
-    });
-    
-    // NO FALLBACKS! If database is configured, it MUST work
-    if (process.env.USE_DATABASE === 'true') {
-      throw new Error(`Database is configured (USE_DATABASE=true) but failed to load data from ${filePath}: ${error.message}`);
-    }
-    
-    // For testing with mock data (only when database is disabled)
-    if (process.env.NODE_ENV === 'test' && process.env.USE_DATABASE !== 'true') {
-      const fileName = path.basename(filePath);
-      const mockFilePath = path.join(mockDataDir, fileName);
-      
-      if (typeof fs.existsSync === 'function' && fs.existsSync(mockFilePath)) {
-        try {
-          const data = fs.readFileSync(mockFilePath, 'utf8');
-          if (!data || data.trim() === '') {
-            throw new Error(`Mock data file is empty: ${mockFilePath}`);
-          }
-          return JSON.parse(data);
-        } catch (mockError) {
-          throw new Error(`Error reading mock data at ${mockFilePath}: ${mockError.message}`);
-        }
-      }
-    }
-    
-    // If we get here, database is disabled and no mock data available
-    throw new Error(`No data source available for ${filePath}`);
-  }
-};
+/**
+ * ⚠️  DEPRECATED: This function has been removed
+ * 
+ * All data loading should be done through mcpDatabaseService.js
+ * For testing, use loadMockData() function above.
+ */
 
 // Helper function to get related data
 const getRelatedData = (id, data, foreignKey) => {
@@ -857,7 +831,8 @@ async function getHighRiskFarmers() {
 }
 
 module.exports = {
-  loadData,
+  // loadData removed - use mcpDatabaseService for all database operations
+  loadMockData, // For testing only
   getRelatedData,
   getTenantFilteredData,
   verifyBorrowersData,
@@ -871,10 +846,8 @@ module.exports = {
   forecastEquipmentMaintenance,
   getHighRiskFarmers,
   paths: {
-    loans: loansPath,
-    borrowers: borrowersPath,
-    payments: paymentsPath,
-    collateral: collateralPath,
+    // Production data comes from database only - no file paths
+    // Test data paths:
     mockLoans: mockLoansPath,
     mockBorrowers: mockBorrowersPath,
     mockPayments: mockPaymentsPath,

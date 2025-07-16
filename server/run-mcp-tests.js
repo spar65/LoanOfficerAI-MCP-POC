@@ -62,7 +62,7 @@ function runTest(testFile) {
 }
 
 /**
- * Get all test files in a directory
+ * Get all test files in a directory (standalone tests only, not Jest tests)
  * @param {string} dir - Directory to search
  * @returns {Array<string>} - Array of test file paths
  */
@@ -72,7 +72,10 @@ function getTestFiles(dir) {
   }
   
   return fs.readdirSync(dir)
-    .filter(file => file.endsWith('.js'))
+    .filter(file => {
+      // Include .js files but exclude Jest test files (*.test.js)
+      return file.endsWith('.js') && !file.endsWith('.test.js');
+    })
     .map(file => path.join(dir, file));
 }
 

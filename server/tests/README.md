@@ -32,20 +32,48 @@ These tests have been deprecated as part of the test restructuring effort:
 
 ## Running Tests
 
-### Running All MCP Tests
+### 🧪 **Recommended Test Commands**
+
+#### **Jest Comprehensive Tests (70 tests)**
 
 ```bash
-cd server
-node run-mcp-tests.js
+# From project root or server directory - cleanest output
+npm test
 ```
 
-### Running Individual Tests
+**Output:**
+
+```
+Test Suites: 9 passed, 9 total
+Tests:       70 passed, 70 total
+Snapshots:   0 total
+Time:        2.256 s
+```
+
+#### **Functional POC Tests (13 tests)**
 
 ```bash
-# Run a core test
-node tests/mcp-core/test-basic-loan-info.js
+# From project root or server directory
+npm run test:mcp
+```
 
-# Run an infrastructure test
+**Output:**
+
+```
+Total Tests: 13
+Passed: 13
+Failed: 0
+```
+
+### Legacy Test Execution
+
+```bash
+# Run all MCP tests (legacy runner)
+cd server
+node run-mcp-tests.js
+
+# Run individual tests directly
+node tests/mcp-core/test-basic-loan-info.js
 node tests/mcp-infrastructure/test-logging.js
 ```
 

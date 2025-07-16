@@ -17,35 +17,52 @@ The tests are organized into the following categories:
 
 ## Running Tests
 
-Use the following npm scripts to run tests:
+### 🧪 **Current Test Commands**
+
+#### **Jest Comprehensive Tests (70 tests)**
 
 ```bash
-# Run all tests
+# Run all 70 Jest tests with clean output
 npm test
+```
 
-# Run unit tests only
-npm run test:unit
+**Output:**
 
-# Run integration tests only
-npm run test:integration
+```
+Test Suites: 9 passed, 9 total
+Tests:       70 passed, 70 total
+Time:        2.256 s
+```
 
-# Run jest tests with coverage
-npm run test:coverage
+#### **Functional POC Tests (13 tests)**
 
-# Run OpenAI integration tests
-npm run test:openai
+```bash
+# Run 13 core business logic tests
+npm run test:mcp
+```
 
-# Run logging tests
-npm run test:logging
+**Output:**
 
-# Run performance tests
-npm run test:performance
+```
+Total Tests: 13
+Passed: 13
+Failed: 0
+```
 
-# Run security tests
-npm run test:security
+### Additional Test Scripts
 
-# Run custom test suite
-npm run test:custom
+```bash
+# Test categories
+npm run test:unit            # Unit tests only
+npm run test:integration     # Integration tests only
+npm run test:coverage        # Jest tests with coverage
+npm run test:database        # Database integration tests
+
+# Legacy test scripts (deprecated)
+npm run test:openai          # OpenAI integration tests
+npm run test:logging         # Logging tests
+npm run test:performance     # Performance tests
+npm run test:security        # Security tests
 ```
 
 ## Test Architecture

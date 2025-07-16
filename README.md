@@ -390,64 +390,80 @@ The application includes 16 MCP functions that the AI can call, all integrated w
 
 ## Testing
 
-### Running Tests
+### 🧪 **Comprehensive Test Commands**
 
-To run all tests across the entire application (both client and server):
+The application provides two main testing approaches optimized for different purposes:
+
+#### **1. Jest Comprehensive Tests (Recommended)**
 
 ```bash
+# Run 70 comprehensive Jest tests with clean output
 npm test
 ```
 
-To run only server tests:
+**Output Example:**
 
-```bash
-npm run test:server
+```
+Test Suites: 9 passed, 9 total
+Tests:       70 passed, 70 total
+Snapshots:   0 total
+Time:        2.256 s
+Ran all test suites.
 ```
 
-To run only client tests:
+#### **2. Functional POC Tests**
 
 ```bash
-npm run test:client
-```
-
-### Test Categories
-
-The application provides specialized test commands for different components:
-
-```bash
-# Server-side Jest tests only
-npm run test:jest
-
-# Component-specific tests
-npm run test:openai     # Test OpenAI function calling integration
-npm run test:logging    # Test logging and PII redaction functionality
-npm run test:performance # Test API performance characteristics
-npm run test:security   # Test authentication and security mechanisms
-
-# Run all custom tests (excluding Jest tests)
-npm run test:custom
-
-# Run interactive test selection menu
-npm run test:interactive
-```
-
-These test suites validate critical aspects of the application:
-
-1. **OpenAI Tests**: Verify that OpenAI function calling works correctly, returning natural language responses based on structured data.
-2. **Logging Tests**: Ensure all operations are logged appropriately with sensitive information redacted and request context propagated through the system.
-3. **Performance Tests**: Measure response times, throughput, and stability under various loads.
-4. **Security Tests**: Verify authentication, input validation, and protection against common vulnerabilities.
-
-### Testing MCP Functions
-
-The application includes specific tests for MCP functions. You can run these with:
-
-```bash
-cd server
+# Run 13 core business logic tests
 npm run test:mcp
 ```
 
-This validates that all MCP functions return the expected data structures.
+**Output Example:**
+
+```
+Total Tests: 13
+Passed: 13
+Failed: 0
+```
+
+### Test Suite Breakdown
+
+#### **Jest Tests (70 tests) - Infrastructure & Integration**
+
+```bash
+npm test                    # All Jest tests
+npm run test:server        # Server tests only
+npm run test:client        # Client tests only
+```
+
+**What's Tested:**
+
+- ✅ **OpenAI Integration** (11 tests) - Function calling, response handling, schema validation
+- ✅ **MCP Infrastructure** (11 tests) - Function registry, logging, error handling
+- ✅ **Core Services** (15 tests) - Database operations, predictive analytics, risk assessment
+- ✅ **Authentication** (6 tests) - JWT tokens, password validation, role-based access
+- ✅ **Unit Tests** (27 tests) - Mock data, utilities, edge cases
+
+#### **Functional Tests (13 tests) - Business Logic**
+
+```bash
+npm run test:mcp            # Core POC functionality
+```
+
+**What's Tested:**
+
+- ✅ **Basic Loan Information** - Loan details, borrower lookup, active loans
+- ✅ **Risk Assessment** - Default risk, non-accrual risk, collateral sufficiency
+- ✅ **High Risk Analysis** - High-risk farmer identification
+- ✅ **OpenAI Integration** - End-to-end function calling with real AI
+- ✅ **Authentication & Logging** - Security and audit trails
+
+### Test Categories by Purpose
+
+1. **Development Testing**: Use `npm test` for comprehensive validation during development
+2. **POC Demonstrations**: Use `npm run test:mcp` to validate core business functionality
+3. **CI/CD Pipelines**: Use `npm test` for automated quality gates
+4. **Manual Validation**: Use both commands to ensure complete system health
 
 ## Troubleshooting
 

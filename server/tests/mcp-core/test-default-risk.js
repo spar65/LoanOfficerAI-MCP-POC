@@ -37,7 +37,7 @@ async function testDefaultRiskAssessment() {
     // Test 1: Standard default risk assessment
     console.log('Test 1: Default risk assessment for borrower B001');
     const result1 = await mcpFunctionRegistry.executeFunction('getBorrowerDefaultRisk', {
-      borrowerId: 'B001',
+      borrower_id: 'B001',
       timeHorizon: 'medium_term'
     });
     
@@ -46,7 +46,7 @@ async function testDefaultRiskAssessment() {
     // Test 2: High risk borrower
     console.log('\nTest 2: Default risk assessment for high-risk borrower B002');
     const result2 = await mcpFunctionRegistry.executeFunction('getBorrowerDefaultRisk', {
-      borrowerId: 'B002',
+      borrower_id: 'B002',
       timeHorizon: 'short_term'
     });
     
@@ -55,7 +55,7 @@ async function testDefaultRiskAssessment() {
     // Test 3: Non-existent borrower
     console.log('\nTest 3: Non-existent borrower test');
     const result3 = await mcpFunctionRegistry.executeFunction('getBorrowerDefaultRisk', {
-      borrowerId: 'B999',
+      borrower_id: 'B999',
       timeHorizon: 'medium_term'
     });
     

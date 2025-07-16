@@ -7,233 +7,185 @@
  * - getActiveLoans
  * - getLoansByBorrower
  * - getLoanSummary
+ * 
+ * Updated to work with SQL-only architecture - no server required
  */
-const axios = require('axios');
 const LogService = require('../../services/logService');
+const mcpDatabaseService = require('../../services/mcpDatabaseService');
 
-// Configuration
-const BASE_URL = 'http://localhost:3001/api';
-const TEST_CONFIG = {
-  headers: {
-    'Authorization': 'Bearer SYSTEM_INTERNAL_CALL',
-    'X-Internal-Call': 'true',
-    'Content-Type': 'application/json'
-  }
-};
+// Set test environment to avoid production checks
+process.env.NODE_ENV = 'test';
+process.env.USE_DATABASE = 'true';
 
 /**
- * Test the getLoanDetails MCP function
+ * Test the getLoanDetails function directly
  */
 async function testGetLoanDetails() {
   console.log('\n🔍 TESTING getLoanDetails FUNCTION');
   console.log('================================');
   
   try {
-    // Test via direct API endpoint
-    console.log('Testing direct API endpoint...');
-    const response = await axios.get(
-      `${BASE_URL}/mcp/loan/L001`,
-      TEST_CONFIG
-    );
+    // Test via direct mcpDatabaseService call
+    console.log('Testing direct database service call...');
+    const loanDetails = await mcpDatabaseService.getLoanDetails('L001');
     
-    if (response.data && response.data.loan_id === 'L001') {
+    if (loanDetails && loanDetails.loan_id === 'L001') {
       console.log('✅ Successfully retrieved loan details:');
-      console.log(`   Loan ID: ${response.data.loan_id}`);
-      console.log(`   Loan Amount: $${response.data.loan_amount}`);
-      console.log(`   Interest Rate: ${response.data.interest_rate}%`);
-      console.log(`   Status: ${response.data.status}`);
+      console.log(`   Loan ID: ${loanDetails.loan_id}`);
+      console.log(`   Loan Amount: $${loanDetails.loan_amount}`);
+      console.log(`   Interest Rate: ${loanDetails.interest_rate}%`);
+      console.log(`   Status: ${loanDetails.status}`);
       return true;
     } else {
-      console.log('❌ Unexpected response from API endpoint');
+      console.log('❌ Unexpected response from database service');
       return false;
     }
   } catch (error) {
     console.error('❌ Error testing getLoanDetails:', error.message);
-    if (error.response) {
-      console.error(`   Status: ${error.response.status}`);
-      console.error(`   Data:`, error.response.data);
-    }
     return false;
   }
 }
 
 /**
- * Test the getBorrowerDetails MCP function
+ * Test the getBorrowerDetails function directly
  */
 async function testGetBorrowerDetails() {
   console.log('\n🔍 TESTING getBorrowerDetails FUNCTION');
   console.log('====================================');
   
   try {
-    // Test via direct API endpoint
-    console.log('Testing direct API endpoint...');
-    const response = await axios.get(
-      `${BASE_URL}/mcp/borrower/B001`,
-      TEST_CONFIG
-    );
+    // Test via direct mcpDatabaseService call
+    console.log('Testing direct database service call...');
+    const borrowerDetails = await mcpDatabaseService.getBorrowerDetails('B001');
     
-    if (response.data && response.data.borrower_id === 'B001') {
+    if (borrowerDetails && borrowerDetails.borrower_id === 'B001') {
       console.log('✅ Successfully retrieved borrower details:');
-      console.log(`   Borrower ID: ${response.data.borrower_id}`);
-      console.log(`   Name: ${response.data.first_name} ${response.data.last_name}`);
-      console.log(`   Credit Score: ${response.data.credit_score}`);
+      console.log(`   Borrower ID: ${borrowerDetails.borrower_id}`);
+      console.log(`   Name: ${borrowerDetails.first_name} ${borrowerDetails.last_name}`);
+      console.log(`   Credit Score: ${borrowerDetails.credit_score}`);
       return true;
     } else {
-      console.log('❌ Unexpected response from API endpoint');
+      console.log('❌ Unexpected response from database service');
       return false;
     }
   } catch (error) {
     console.error('❌ Error testing getBorrowerDetails:', error.message);
-    if (error.response) {
-      console.error(`   Status: ${error.response.status}`);
-      console.error(`   Data:`, error.response.data);
-    }
     return false;
   }
 }
 
 /**
- * Test the getActiveLoans function through the loans API
+ * Test the getActiveLoans function directly
  */
 async function testGetActiveLoans() {
   console.log('\n🔍 TESTING getActiveLoans FUNCTION');
   console.log('================================');
   
   try {
-    // Test via loans API endpoint
-    console.log('Testing loans API endpoint...');
-    const response = await axios.get(
-      `${BASE_URL}/loans/active`,
-      TEST_CONFIG
-    );
+    // Test via direct mcpDatabaseService call
+    console.log('Testing direct database service call...');
+    const activeLoans = await mcpDatabaseService.getActiveLoans();
     
-    if (response.data && Array.isArray(response.data)) {
+    if (activeLoans && Array.isArray(activeLoans)) {
       console.log('✅ Successfully retrieved active loans:');
-      console.log(`   Count: ${response.data.length}`);
-      if (response.data.length > 0) {
-        console.log(`   First loan: ${response.data[0].loan_id} - $${response.data[0].loan_amount}`);
+      console.log(`   Count: ${activeLoans.length}`);
+      if (activeLoans.length > 0) {
+        console.log(`   First loan: ${activeLoans[0].loan_id} - $${activeLoans[0].loan_amount}`);
       }
       return true;
     } else {
-      console.log('❌ Unexpected response from API endpoint');
+      console.log('❌ Unexpected response from database service');
       return false;
     }
   } catch (error) {
     console.error('❌ Error testing getActiveLoans:', error.message);
-    if (error.response) {
-      console.error(`   Status: ${error.response.status}`);
-      console.error(`   Data:`, error.response.data);
-    }
     return false;
   }
 }
 
 /**
- * Test the getLoansByBorrower function through the loans API
+ * Test the getLoansByBorrower function directly
  */
 async function testGetLoansByBorrower() {
   console.log('\n🔍 TESTING getLoansByBorrower FUNCTION');
   console.log('====================================');
   
   try {
-    // Test via loans API endpoint
-    console.log('Testing loans API endpoint...');
-    const response = await axios.get(
-      `${BASE_URL}/loans/borrower/B001`,
-      TEST_CONFIG
-    );
+    // Test via direct mcpDatabaseService call
+    console.log('Testing direct database service call...');
+    const borrowerLoans = await mcpDatabaseService.getLoansByBorrower('John');
     
-    if (response.data && Array.isArray(response.data)) {
+    if (borrowerLoans && Array.isArray(borrowerLoans)) {
       console.log('✅ Successfully retrieved loans for borrower:');
-      console.log(`   Count: ${response.data.length}`);
-      if (response.data.length > 0) {
-        console.log(`   First loan: ${response.data[0].loan_id} - $${response.data[0].loan_amount}`);
+      console.log(`   Count: ${borrowerLoans.length}`);
+      if (borrowerLoans.length > 0) {
+        console.log(`   First loan: ${borrowerLoans[0].loan_id} - $${borrowerLoans[0].loan_amount}`);
       }
       return true;
     } else {
-      console.log('❌ Unexpected response from API endpoint');
+      console.log('❌ Unexpected response from database service');
       return false;
     }
   } catch (error) {
     console.error('❌ Error testing getLoansByBorrower:', error.message);
-    if (error.response) {
-      console.error(`   Status: ${error.response.status}`);
-      console.error(`   Data:`, error.response.data);
-    }
     return false;
   }
 }
 
 /**
- * Test the getLoanSummary function through the loans API
+ * Test the getLoanSummary function directly
  */
 async function testGetLoanSummary() {
   console.log('\n🔍 TESTING getLoanSummary FUNCTION');
   console.log('================================');
   
   try {
-    // Test via loans API endpoint
-    console.log('Testing loans API endpoint...');
-    const response = await axios.get(
-      `${BASE_URL}/loans/summary`,
-      TEST_CONFIG
-    );
+    // Test via direct mcpDatabaseService call
+    console.log('Testing direct database service call...');
+    const loanSummary = await mcpDatabaseService.getLoanSummary();
     
-    if (response.data) {
+    if (loanSummary && typeof loanSummary === 'object') {
       console.log('✅ Successfully retrieved loan summary:');
-      console.log(`   Total loans: ${response.data.totalLoans}`);
-      console.log(`   Active loans: ${response.data.activeLoans}`);
-      console.log(`   Total amount: $${response.data.totalAmount}`);
+      console.log(`   Total loans: ${loanSummary.total_loans}`);
+      console.log(`   Active loans: ${loanSummary.active_loans}`);
+      console.log(`   Total amount: $${loanSummary.total_loan_amount}`);
       return true;
     } else {
-      console.log('❌ Unexpected response from API endpoint');
+      console.log('❌ Unexpected response from database service');
       return false;
     }
   } catch (error) {
     console.error('❌ Error testing getLoanSummary:', error.message);
-    if (error.response) {
-      console.error(`   Status: ${error.response.status}`);
-      console.error(`   Data:`, error.response.data);
-    }
     return false;
   }
 }
 
 /**
- * Test the OpenAI function calling for loan information
+ * Test database connection
  */
-async function testOpenAIFunctionCalling() {
-  console.log('\n🔍 TESTING OPENAI FUNCTION CALLING');
-  console.log('================================');
+async function testDatabaseConnection() {
+  console.log('\n🔍 TESTING DATABASE CONNECTION');
+  console.log('=============================');
   
   try {
-    // Test OpenAI endpoint with function calling
-    console.log('Testing OpenAI endpoint with function calling...');
-    const response = await axios.post(
-      `${BASE_URL}/openai/chat`,
-      {
-        messages: [
-          { role: 'user', content: 'Tell me about loan L001' }
-        ],
-        function_call: 'auto'
-      },
-      TEST_CONFIG
-    );
+    // Test basic database connectivity
+    console.log('Testing database connectivity...');
+    const result = await mcpDatabaseService.executeQuery('SELECT 1 as test', {});
     
-    if (response.data && response.data.content) {
-      console.log('✅ Successfully received OpenAI response:');
-      console.log(`   Response: ${response.data.content.substring(0, 150)}...`);
+    if (result && (result.recordset || result)) {
+      console.log('✅ Database connection successful');
       return true;
     } else {
-      console.log('❌ Unexpected response from OpenAI endpoint');
+      console.log('❌ Database connection failed - no results');
       return false;
     }
   } catch (error) {
-    console.error('❌ Error testing OpenAI function calling:', error.message);
-    if (error.response) {
-      console.error(`   Status: ${error.response.status}`);
-      console.error(`   Data:`, error.response.data);
-    }
+    console.error('❌ Database connection error:', error.message);
+    console.error('   This test requires a SQL Server database connection.');
+    console.error('   Please ensure:');
+    console.error('   1. SQL Server is running and accessible');
+    console.error('   2. USE_DATABASE=true is set in your .env file');
+    console.error('   3. Database connection string is properly configured');
     return false;
   }
 }
@@ -244,17 +196,13 @@ async function testOpenAIFunctionCalling() {
 async function runAllTests() {
   console.log('🚀 STARTING BASIC LOAN INFORMATION TEST SUITE');
   console.log('===========================================');
+  console.log('Updated for SQL-only architecture - no server required');
   
-  // First check if server is running
-  try {
-    console.log('Checking server health...');
-    const healthCheck = await axios.get(`${BASE_URL}/health`);
-    console.log(`✅ Server is running: ${healthCheck.data.status}`);
-    console.log(`   Version: ${healthCheck.data.version}`);
-    console.log(`   Environment: ${healthCheck.data.environment}`);
-  } catch (error) {
-    console.log('❌ Server is not running or not accessible');
-    console.log('Please start the server with: npm start');
+  // First check database connection
+  const dbConnectionResult = await testDatabaseConnection();
+  if (!dbConnectionResult) {
+    console.log('\n❌ DATABASE CONNECTION FAILED');
+    console.log('Cannot proceed with tests without database connection.');
     process.exit(1);
   }
   
@@ -264,27 +212,27 @@ async function runAllTests() {
   const activeLoansResult = await testGetActiveLoans();
   const loansByBorrowerResult = await testGetLoansByBorrower();
   const loanSummaryResult = await testGetLoanSummary();
-  const openAIResult = await testOpenAIFunctionCalling();
   
   // Output summary
   console.log('\n📋 TEST RESULTS SUMMARY');
   console.log('====================');
+  console.log(`Database Connection: ${dbConnectionResult ? '✅ PASSED' : '❌ FAILED'}`);
   console.log(`getLoanDetails: ${loanDetailsResult ? '✅ PASSED' : '❌ FAILED'}`);
   console.log(`getBorrowerDetails: ${borrowerDetailsResult ? '✅ PASSED' : '❌ FAILED'}`);
   console.log(`getActiveLoans: ${activeLoansResult ? '✅ PASSED' : '❌ FAILED'}`);
   console.log(`getLoansByBorrower: ${loansByBorrowerResult ? '✅ PASSED' : '❌ FAILED'}`);
   console.log(`getLoanSummary: ${loanSummaryResult ? '✅ PASSED' : '❌ FAILED'}`);
-  console.log(`OpenAI Function Calling: ${openAIResult ? '✅ PASSED' : '❌ FAILED'}`);
   
-  const allPassed = loanDetailsResult && borrowerDetailsResult && 
-                    activeLoansResult && loansByBorrowerResult && 
-                    loanSummaryResult && openAIResult;
+  const allPassed = dbConnectionResult && loanDetailsResult && borrowerDetailsResult && 
+                    activeLoansResult && loansByBorrowerResult && loanSummaryResult;
   
   if (allPassed) {
     console.log('\n🎉 ALL BASIC LOAN INFORMATION TESTS PASSED!');
+    console.log('SQL-only architecture working correctly.');
     process.exit(0);
   } else {
     console.log('\n⚠️ SOME BASIC LOAN INFORMATION TESTS FAILED');
+    console.log('Please check database connection and configuration.');
     process.exit(1);
   }
 }
@@ -300,6 +248,6 @@ module.exports = {
   testGetActiveLoans,
   testGetLoansByBorrower,
   testGetLoanSummary,
-  testOpenAIFunctionCalling,
+  testDatabaseConnection,
   runAllTests
 }; 

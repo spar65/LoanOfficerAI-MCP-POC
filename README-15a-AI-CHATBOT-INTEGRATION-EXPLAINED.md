@@ -60,6 +60,14 @@ const handleSendMessage = async (message) => {
 };
 ```
 
+> 📚 **Want to understand the Client-Server architecture?**  
+> See [Document 15b](./README-15b-MCP-CLIENT-SERVER-EXPLAINED.md) for:
+>
+> - How the client sends messages to the server
+> - Authentication and error handling
+> - The complete request/response flow
+> - Server-side MCP function registry
+
 ### Step 3: Backend Adds MCP Functions as Tools
 
 ```javascript
@@ -114,21 +122,29 @@ const functionResult = await mcpFunctionRegistry.executeFunction(
 ```javascript
 // server/services/mcpDatabaseService.js
 async getLoanSummary(loanId) {
-    // Try SQL first
-    if (this.isConnected) {
-        const query = `
+  // Try SQL first
+  if (this.isConnected) {
+    const query = `
             SELECT l.*, b.name as borrower_name
             FROM loans l
             JOIN borrowers b ON l.borrowerId = b.id
             WHERE l.id = @loanId
         `;
-        return await this.db.query(query, { loanId });
-    } else {
-        // Fallback to JSON files
-        return dataService.getLoanSummary(loanId);
-    }
+    return await this.db.query(query, { loanId });
+  } else {
+    // Fallback to JSON files
+    return dataService.getLoanSummary(loanId);
+  }
 }
 ```
+
+> 📚 **Want to learn about database connections?**  
+> See [Document 15c](./README-15c-MCP-DATABASE-CONNECTION-EXPLAINED.md) for:
+>
+> - Complete SQL database architecture
+> - Connection pooling and security
+> - Automatic JSON fallback system
+> - Error handling and recovery
 
 ### Step 8: Return Formatted Data to OpenAI
 
@@ -384,9 +400,16 @@ try {
 
 ## 🚀 Next Steps
 
-Ready to dive deeper? Check out:
+Ready to dive deeper? Follow this learning path:
 
-- [How MCP Protocol Works](./README-15b-MCP-CLIENT-SERVER-EXPLAINED.md)
-- [MCP Database Connection](./README-15c-MCP-DATABASE-CONNECTION-EXPLAINED.md)
+1. **You are here** → Document 15a: AI Chatbot & MCP Integration
+2. **Next** → [Document 15b: MCP Client-Server Architecture](./README-15b-MCP-CLIENT-SERVER-EXPLAINED.md)
+   - Deep dive into how client and server communicate
+   - Authentication and error handling
+   - Complete request/response flow
+3. **Then** → [Document 15c: MCP Database Connection](./README-15c-MCP-DATABASE-CONNECTION-EXPLAINED.md)
+   - SQL database architecture
+   - Connection security and pooling
+   - Automatic fallback systems
 
 Remember: MCP is your **security guard** - it makes sure the AI only accesses what it should, how it should, when it should! 🛡️

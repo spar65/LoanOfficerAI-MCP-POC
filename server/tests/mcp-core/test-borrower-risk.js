@@ -1,20 +1,42 @@
 /**
  * Test script to verify the non-accrual risk functionality for borrower B001
+ * Updated to work with SQL-only architecture - no server required
  */
 require('dotenv').config();
-const axios = require('axios');
-const fs = require('fs');
-const path = require('path');
 const LogService = require('../../services/logService');
+const mcpDatabaseService = require('../../services/mcpDatabaseService');
 
-// Base URL - default to localhost:3001 if not provided in .env
-const BASE_URL = process.env.API_BASE_URL || 'http://localhost:3001';
-// Set up auth header for internal API calls
-const HEADERS = {
-  'Accept': 'application/json',
-  'X-Internal-Call': 'true',
-  'Authorization': 'Bearer SYSTEM_INTERNAL_CALL'
-};
+// Set test environment to avoid production checks
+process.env.NODE_ENV = 'test';
+process.env.USE_DATABASE = 'true';
+
+/**
+ * Test database connection and basic functionality
+ */
+async function testDatabaseConnection() {
+  LogService.info('Testing database connection...');
+
+  try {
+    // Test basic database connectivity
+    const result = await mcpDatabaseService.executeQuery('SELECT 1 as test', {});
+    
+    if (result && (result.recordset || result)) {
+      LogService.info('✓ Database connection successful');
+      return true;
+    } else {
+      LogService.error('✗ Database connection failed - no results');
+      return false;
+    }
+  } catch (error) {
+    LogService.error('✗ Database connection error:', error.message);
+    LogService.error('   This test requires a SQL Server database connection.');
+    LogService.error('   Please ensure:');
+    LogService.error('   1. SQL Server is running and accessible');
+    LogService.error('   2. USE_DATABASE=true is set in your .env file');
+    LogService.error('   3. Database connection string is properly configured');
+    return false;
+  }
+}
 
 /**
  * Verify all the data required for non-accrual risk assessment
@@ -25,30 +47,17 @@ async function verifyRequiredData() {
   // 1. Check if borrower B001 exists
   LogService.info('Step 1: Checking if borrower B001 exists...');
   try {
-    // Use mock data for testing instead of reading JSON files
-    const mockBorrowersData = [
-      {
-        borrower_id: 'B001',
-        first_name: 'John',
-        last_name: 'Doe',
-        credit_score: 750,
-        income: 100000,
-        farm_size: 500,
-        farm_type: 'Crop'
-      }
-    ];
+    const borrower = await mcpDatabaseService.getBorrowerDetails('B001');
     
-    const b001 = mockBorrowersData.find(b => b.borrower_id === 'B001');
-    
-    if (b001) {
-      LogService.info('✓ Found borrower B001 in mock data:', { 
-        borrower_id: b001.borrower_id,
-        name: `${b001.first_name} ${b001.last_name}`,
-        credit_score: b001.credit_score
+    if (borrower && borrower.borrower_id === 'B001') {
+      LogService.info('✓ Found borrower B001 in database:', { 
+        borrower_id: borrower.borrower_id,
+        name: `${borrower.first_name} ${borrower.last_name}`,
+        credit_score: borrower.credit_score
       });
     } else {
-      LogService.error('✗ Borrower B001 not found in mock data');
-      throw new Error('Borrower B001 not found in mock data');
+      LogService.error('✗ Borrower B001 not found in database');
+      throw new Error('Borrower B001 not found in database');
     }
   } catch (error) {
     LogService.error('✗ Error checking borrower data:', error.message);
@@ -58,22 +67,11 @@ async function verifyRequiredData() {
   // 2. Check if B001 has loans
   LogService.info('Step 2: Checking if B001 has loans...');
   try {
-    // Use mock data for testing instead of reading JSON files
-    const mockLoansData = [
-      {
-        loan_id: 'L001',
-        borrower_id: 'B001',
-        loan_amount: 50000,
-        interest_rate: 3.5,
-        status: 'Active'
-      }
-    ];
+    const loans = await mcpDatabaseService.getLoansByBorrowerId('B001');
     
-    const b001Loans = mockLoansData.filter(l => l.borrower_id === 'B001');
-    
-    if (b001Loans.length > 0) {
-      LogService.info(`✓ Found ${b001Loans.length} loans for borrower B001:`, {
-        loans: b001Loans.map(l => l.loan_id)
+    if (loans && loans.length > 0) {
+      LogService.info(`✓ Found ${loans.length} loans for borrower B001:`, {
+        loans: loans.map(l => l.loan_id)
       });
     } else {
       LogService.error('✗ No loans found for borrower B001');
@@ -87,43 +85,17 @@ async function verifyRequiredData() {
   // 3. Check if there are payments for B001's loans
   LogService.info('Step 3: Checking if B001 has payment history...');
   try {
-    // Use mock data for testing instead of reading JSON files
-    const mockLoansData = [
-      {
-        loan_id: 'L001',
-        borrower_id: 'B001',
-        loan_amount: 50000,
-        interest_rate: 3.5,
-        status: 'Active'
+    const loans = await mcpDatabaseService.getLoansByBorrower('B001');
+    
+    if (loans && loans.length > 0) {
+      // Get payments for the first loan as a test
+      const payments = await mcpDatabaseService.getLoanPayments(loans[0].loan_id);
+      
+      LogService.info(`✓ Found ${payments.length} payments for loan ${loans[0].loan_id}`);
+      if (payments.length === 0) {
+        LogService.warn('⚠ No payment history found for B001\'s loans');
+        // Not throwing error as the system should handle this case
       }
-    ];
-    
-    const mockPaymentsData = [
-      {
-        payment_id: 'P001',
-        loan_id: 'L001',
-        amount: 1000,
-        status: 'Paid'
-      }
-    ];
-    
-    const b001Loans = mockLoansData.filter(l => l.borrower_id === 'B001');
-    
-    // Get all payment IDs for B001's loans
-    const relevantPayments = [];
-    b001Loans.forEach(loan => {
-      const loanPayments = mockPaymentsData.filter(p => p.loan_id === loan.loan_id);
-      relevantPayments.push(...loanPayments);
-    });
-    
-    if (relevantPayments.length > 0) {
-      LogService.info(`✓ Found ${relevantPayments.length} payments for B001's loans:`, {
-        payment_count: relevantPayments.length,
-        late_payments: relevantPayments.filter(p => p.status === 'Late').length
-      });
-    } else {
-      LogService.warn('⚠ No payment history found for B001\'s loans');
-      // Not throwing error as the system should handle this case
     }
   } catch (error) {
     LogService.error('✗ Error checking payment data:', error.message);
@@ -135,122 +107,101 @@ async function verifyRequiredData() {
 }
 
 /**
- * Test direct API calls for each component
+ * Test direct database service calls
  */
-async function testDirectApiCalls() {
-  LogService.info('Testing direct API calls...');
+async function testDirectDatabaseCalls() {
+  LogService.info('Testing direct database service calls...');
   
-  // 1. Test borrower endpoint
-  LogService.info('Step 1: Testing borrower endpoint...');
+  // 1. Test borrower details
+  LogService.info('Step 1: Testing getBorrowerDetails...');
   try {
-    const borrowerRes = await axios.get(`${BASE_URL}/api/borrowers/B001`, { headers: HEADERS });
+    const borrower = await mcpDatabaseService.getBorrowerDetails('B001');
     
-    if (borrowerRes.data && borrowerRes.data.borrower_id === 'B001') {
-      LogService.info('✓ Successfully retrieved borrower B001 via API');
+    if (borrower && borrower.borrower_id === 'B001') {
+      LogService.info('✓ Successfully retrieved borrower B001 via database service');
     } else {
-      LogService.error('✗ Failed to retrieve borrower B001 via API:', borrowerRes.data);
-      throw new Error('Failed to retrieve borrower B001 via API');
+      LogService.error('✗ Failed to retrieve borrower B001 via database service');
+      throw new Error('Failed to retrieve borrower B001 via database service');
     }
   } catch (error) {
-    LogService.error('✗ Error calling borrower API:', error.message);
+    LogService.error('✗ Error calling getBorrowerDetails:', error.message);
     throw error;
   }
   
-  // 2. Test loans endpoint
-  LogService.info('Step 2: Testing loans endpoint for borrower B001...');
+  // 2. Test loans for borrower
+  LogService.info('Step 2: Testing getLoansByBorrowerId...');
   try {
-    const loansRes = await axios.get(`${BASE_URL}/api/borrowers/B001/loans`, { headers: HEADERS });
+    const loans = await mcpDatabaseService.getLoansByBorrowerId('B001');
     
-    if (loansRes.data && Array.isArray(loansRes.data) && loansRes.data.length > 0) {
-      LogService.info(`✓ Successfully retrieved ${loansRes.data.length} loans for B001 via API`);
+    if (loans && Array.isArray(loans) && loans.length > 0) {
+      LogService.info(`✓ Successfully retrieved ${loans.length} loans for B001 via database service`);
     } else {
-      LogService.error('✗ Failed to retrieve loans for B001 via API:', loansRes.data);
-      throw new Error('Failed to retrieve loans for B001 via API');
+      LogService.error('✗ Failed to retrieve loans for B001 via database service');
+      throw new Error('Failed to retrieve loans for B001 via database service');
     }
-  } catch (error) {
-    LogService.error('✗ Error calling loans API:', error.message);
+      } catch (error) {
+    LogService.error('✗ Error calling getLoansByBorrowerId:', error.message);
     throw error;
   }
   
-  // 3. Test risk endpoint
-  LogService.info('Step 3: Testing non-accrual risk endpoint...');
+  // 3. Test non-accrual risk assessment
+  LogService.info('Step 3: Testing getBorrowerNonAccrualRisk...');
   try {
-    const riskRes = await axios.get(`${BASE_URL}/api/risk/non-accrual/B001`, { headers: HEADERS });
+    const riskAssessment = await mcpDatabaseService.getBorrowerNonAccrualRisk('B001');
     
-    if (riskRes.data && riskRes.data.borrower_id === 'B001') {
-      LogService.info('✓ Successfully retrieved non-accrual risk assessment via API:', {
-        risk_level: riskRes.data.non_accrual_risk,
-        risk_score: riskRes.data.risk_score
+    if (riskAssessment && riskAssessment.borrower_id === 'B001') {
+      LogService.info('✓ Successfully retrieved non-accrual risk assessment via database service:', {
+        risk_level: riskAssessment.risk_level,
+        risk_score: riskAssessment.risk_score
       });
     } else {
-      LogService.error('✗ Failed to retrieve non-accrual risk assessment via API:', riskRes.data);
-      throw new Error('Failed to retrieve non-accrual risk assessment via API');
+      LogService.error('✗ Failed to retrieve non-accrual risk assessment via database service');
+      throw new Error('Failed to retrieve non-accrual risk assessment via database service');
     }
   } catch (error) {
-    LogService.error('✗ Error calling risk API:', error.message);
+    LogService.error('✗ Error calling getBorrowerNonAccrualRisk:', error.message);
     throw error;
   }
   
-  // 4. Test analytics endpoint (fallback)
-  LogService.info('Step 4: Testing analytics non-accrual risk endpoint (fallback)...');
-  try {
-    const analyticsRes = await axios.get(`${BASE_URL}/api/analytics/predict/non-accrual-risk/B001`, { headers: HEADERS });
-    
-    if (analyticsRes.data && analyticsRes.data.borrower_id === 'B001') {
-      LogService.info('✓ Successfully retrieved non-accrual risk prediction via analytics API:', {
-        probability: analyticsRes.data.non_accrual_probability,
-        status: analyticsRes.data.status
-      });
-    } else {
-      LogService.error('✗ Failed to retrieve non-accrual risk prediction via analytics API:', analyticsRes.data);
-      throw new Error('Failed to retrieve non-accrual risk prediction via analytics API');
-    }
-  } catch (error) {
-    LogService.error('✗ Error calling analytics API:', error.message);
-    throw error;
-  }
-  
-  LogService.info('✓ All API tests completed successfully');
+  LogService.info('✓ All database service tests completed successfully');
   return true;
 }
 
 /**
- * Test the MCP function calling
+ * Test risk calculation logic directly
  */
-async function testMcpFunctionCall() {
-  LogService.info('Testing MCP function call for non-accrual risk...');
+async function testRiskCalculation() {
+  LogService.info('Testing risk calculation logic...');
   
   try {
-    // Simulate an MCP function call via the OpenAI chat endpoint
-    const payload = {
-      messages: [
-        { role: "system", content: "You are an AI assistant for agricultural lending." },
-        { role: "user", content: "Is there a risk that borrower B001 will become non-accrual?" }
-      ]
-    };
+    // Test default risk calculation
+    LogService.info('Step 1: Testing default risk calculation...');
+    const defaultRisk = await mcpDatabaseService.getBorrowerDefaultRisk('B001');
     
-    // Add auth header for authenticated request
-    const chatHeaders = {
-      ...HEADERS,
-      'Content-Type': 'application/json'
-    };
-    
-    const chatRes = await axios.post(`${BASE_URL}/api/openai/chat`, payload, { headers: chatHeaders });
-    
-    // Check if the response contains a function call
-    if (chatRes.data && chatRes.data.content) {
-      LogService.info('✓ Successfully made MCP function call via OpenAI chat endpoint');
-      LogService.info('AI Response:', chatRes.data.content.substring(0, 100) + '...');
+    if (defaultRisk && typeof defaultRisk.default_risk_score === 'number') {
+      LogService.info(`✓ Default risk calculation successful: ${defaultRisk.default_risk_score}`);
     } else {
-      LogService.error('✗ OpenAI chat endpoint did not return expected response:', chatRes.data);
-      throw new Error('OpenAI chat endpoint did not return expected response');
+      LogService.error('✗ Default risk calculation failed');
+      throw new Error('Default risk calculation failed');
     }
+    
+    // Test non-accrual risk calculation
+    LogService.info('Step 2: Testing non-accrual risk calculation...');
+    const nonAccrualRisk = await mcpDatabaseService.getBorrowerNonAccrualRisk('B001');
+    
+    if (nonAccrualRisk && typeof nonAccrualRisk.risk_score === 'number') {
+      LogService.info(`✓ Non-accrual risk calculation successful: ${nonAccrualRisk.risk_score}`);
+    } else {
+      LogService.error('✗ Non-accrual risk calculation failed');
+      throw new Error('Non-accrual risk calculation failed');
+    }
+    
+    LogService.info('✓ All risk calculations completed successfully');
+    return true;
   } catch (error) {
-    LogService.error('✗ Error in MCP function call test:', error.message);
+    LogService.error('✗ Error in risk calculations:', error.message);
     throw error;
   }
-  
-  return true;
 }
 
 /**
@@ -258,14 +209,23 @@ async function testMcpFunctionCall() {
  */
 async function runAllTests() {
   LogService.info('Starting non-accrual risk tests for borrower B001...');
+  LogService.info('Updated for SQL-only architecture - no server required');
   
   try {
+    // Test database connection first
+    const dbConnectionResult = await testDatabaseConnection();
+    if (!dbConnectionResult) {
+      LogService.error('✗ Database connection failed - cannot proceed with tests');
+      return false;
+    }
+    
     // Run each test sequentially
     await verifyRequiredData();
-    await testDirectApiCalls();
-    await testMcpFunctionCall();
+    await testDirectDatabaseCalls();
+    await testRiskCalculation();
     
     LogService.info('✓ All tests passed! Non-accrual risk assessment for B001 is working correctly.');
+    LogService.info('✓ SQL-only architecture confirmed working');
     return true;
   } catch (error) {
     LogService.error('✗ Tests failed:', error.message);

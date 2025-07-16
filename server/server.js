@@ -326,6 +326,17 @@ async function startServer(port = process.env.PORT || 3001) {
 
 // Only start the server if this file is run directly
 if (require.main === module) {
+  // Check database connection requirement
+  if (process.env.USE_DATABASE !== 'true') {
+    LogService.error('⚠️  CRITICAL: Database connection is REQUIRED. Set USE_DATABASE=true in your .env file and ensure SQL Server is running.');
+    console.error('⚠️  ERROR: This system requires a SQL Server database connection.');
+    console.error('Please ensure:');
+    console.error('1. SQL Server is running and accessible');
+    console.error('2. USE_DATABASE=true is set in your .env file');
+    console.error('3. Database connection string is properly configured');
+    process.exit(1);
+  }
+  
   // Load refresh tokens
   const refreshTokens = TokenService.loadRefreshTokens();
   console.log(`Loaded ${refreshTokens.length} refresh tokens`);

@@ -56,7 +56,7 @@ async function testCollateralSufficiency() {
     // Test 1: Standard collateral evaluation
     console.log('Test 1: Standard collateral evaluation for loan L001');
     const result1 = await mcpFunctionRegistry.executeFunction('evaluateCollateralSufficiency', {
-      loanId: 'L001',
+      loan_id: 'L001',
       marketConditions: 'stable'
     });
     
@@ -65,7 +65,7 @@ async function testCollateralSufficiency() {
     // Test 2: Declining market conditions
     console.log('\nTest 2: Collateral evaluation with declining market');
     const result2 = await mcpFunctionRegistry.executeFunction('evaluateCollateralSufficiency', {
-      loanId: 'L001', 
+      loan_id: 'L001', 
       marketConditions: 'declining'
     });
     
@@ -74,7 +74,7 @@ async function testCollateralSufficiency() {
     // Test 3: Non-existent loan
     console.log('\nTest 3: Non-existent loan test');
     const result3 = await mcpFunctionRegistry.executeFunction('evaluateCollateralSufficiency', {
-      loanId: 'L999',
+      loan_id: 'L999',
       marketConditions: 'stable'
     });
     
@@ -108,7 +108,7 @@ async function testCollateralScenarios() {
     };
     
     const highValueResult = await mcpFunctionRegistry.executeFunction('evaluateCollateralSufficiency', {
-      loanId: 'L001',
+      loan_id: 'L001',
       marketConditions: 'stable'
     });
     

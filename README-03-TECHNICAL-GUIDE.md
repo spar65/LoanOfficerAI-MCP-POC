@@ -383,17 +383,50 @@ class DatabaseManager {
 
 ## 🧪 TESTING FRAMEWORK
 
+### **Two-Tier Testing Strategy**
+
+#### **1. Jest Comprehensive Tests (Recommended)**
+
+```bash
+# Run 70 comprehensive Jest tests with clean output
+npm test
+```
+
+**Output:**
+
+```
+Test Suites: 9 passed, 9 total
+Tests:       70 passed, 70 total
+Snapshots:   0 total
+Time:        2.256 s
+Ran all test suites.
+```
+
+#### **2. Functional POC Tests**
+
+```bash
+# Run 13 core business logic tests
+npm run test:mcp
+```
+
+**Output:**
+
+```
+Total Tests: 13
+Passed: 13
+Failed: 0
+```
+
 ### Test Categories
 
 ```bash
-# Run all tests
-npm test                     # Comprehensive functional tests
-
 # Server tests
 cd server
-npm run test:jest            # Jest unit tests
-npm run test:mcp             # MCP function tests
-npm run test:integration     # API integration tests
+npm test                     # All Jest tests (70 tests)
+npm run test:mcp             # Functional tests (13 tests)
+npm run test:unit            # Unit tests only
+npm run test:integration     # Integration tests only
+npm run test:coverage        # Coverage report
 npm run test:database        # Database integration tests
 
 # Client tests

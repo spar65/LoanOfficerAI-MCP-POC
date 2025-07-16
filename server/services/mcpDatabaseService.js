@@ -2,8 +2,8 @@
  * MCP Database Service
  * 
  * This service provides database access functions for the MCP system.
- * It acts as an intermediary between MCP functions and the SQL Server database,
- * replacing direct JSON file access.
+ * It acts as an intermediary between MCP functions and the SQL Server database.
+ * NO FALLBACK TO JSON FILES - DATABASE CONNECTION IS REQUIRED.
  */
 
 const db = require('../../utils/database');
@@ -20,6 +20,10 @@ class McpDatabaseService {
    */
   async executeQuery(query, params = {}) {
     try {
+      if (!db) {
+        throw new Error('Database connection required. Please ensure SQL Server is running and properly configured.');
+      }
+      
       LogService.debug('Executing database query', { query: query.substring(0, 100) + '...' });
       const result = await db.executeQuery(query, params);
       return result;
@@ -28,7 +32,7 @@ class McpDatabaseService {
         error: error.message,
         query: query.substring(0, 100) + '...'
       });
-      throw error;
+      throw new Error(`Database operation failed: ${error.message}. Please ensure SQL Server is running and properly configured.`);
     }
   }
 
@@ -38,11 +42,15 @@ class McpDatabaseService {
    */
   async getLoans() {
     try {
+      if (!db) {
+        throw new Error('Database connection required. Please ensure SQL Server is running and properly configured.');
+      }
+      
       const result = await db.query('SELECT * FROM loans');
       return result.recordset || [];
     } catch (error) {
       LogService.error('Error fetching loans', { error: error.message });
-      return [];
+      throw new Error(`Failed to fetch loans from database: ${error.message}. Please ensure SQL Server is running and properly configured.`);
     }
   }
 
@@ -53,11 +61,15 @@ class McpDatabaseService {
    */
   async getLoanById(loanId) {
     try {
+      if (!db) {
+        throw new Error('Database connection required. Please ensure SQL Server is running and properly configured.');
+      }
+      
       const result = await db.executeQuery('SELECT * FROM loans WHERE loan_id = @loanId', { loanId });
       return result.recordset?.[0] || null;
     } catch (error) {
       LogService.error('Error fetching loan by ID', { error: error.message, loanId });
-      return null;
+      throw new Error(`Failed to fetch loan from database: ${error.message}. Please ensure SQL Server is running and properly configured.`);
     }
   }
 
@@ -609,6 +621,35 @@ class McpDatabaseService {
       };
     } catch (error) {
       LogService.error('Error retrieving loan summary from database', {
+        error: error.message
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Get loans by borrower ID
+   * 
+   * @param {string} borrowerId - The ID of the borrower
+   * @returns {Promise<Array>} - Array of loans for the borrower
+   */
+  async getLoansByBorrowerId(borrowerId) {
+    try {
+      const result = await db.executeQuery(`
+        SELECT l.loan_id, l.borrower_id, l.loan_amount, l.interest_rate, l.status,
+               b.first_name, b.last_name
+        FROM Loans l
+        JOIN Borrowers b ON l.borrower_id = b.borrower_id
+        WHERE l.borrower_id = @borrowerId
+      `, { borrowerId });
+      
+      return result.recordset.map(loan => ({
+        ...loan,
+        borrower_name: `${loan.first_name} ${loan.last_name}`
+      }));
+    } catch (error) {
+      LogService.error('Error retrieving loans by borrower ID from database', {
+        borrowerId,
         error: error.message
       });
       throw error;

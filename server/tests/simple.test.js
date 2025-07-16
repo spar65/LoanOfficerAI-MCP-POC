@@ -11,7 +11,26 @@ const dataService = require('../services/dataService');
 const BASE_URL = 'http://localhost:3001';
 const API_TOKEN = 'test-token-123';
 
+// Create axios instance with proper cleanup configuration
+const axiosInstance = axios.create({
+  timeout: 5000,
+  maxRedirects: 0,
+  httpAgent: false,
+  httpsAgent: false
+});
+
 describe('LoanOfficerAI MCP Integration Tests', () => {
+  
+  // Clean up axios connections after all tests
+  afterAll(async () => {
+    // Force close any remaining connections
+    if (axiosInstance.defaults.httpAgent) {
+      axiosInstance.defaults.httpAgent.destroy();
+    }
+    if (axiosInstance.defaults.httpsAgent) {
+      axiosInstance.defaults.httpsAgent.destroy();
+    }
+  });
   
   describe('Database Service Tests', () => {
     test('should connect to database and retrieve active loans', async () => {
@@ -107,7 +126,7 @@ describe('LoanOfficerAI MCP Integration Tests', () => {
   describe('API Endpoint Tests', () => {
     test('should get server health status', async () => {
       try {
-        const response = await axios.get(`${BASE_URL}/api/health`);
+        const response = await axiosInstance.get(`${BASE_URL}/api/health`);
         assert(response.status === 200, 'Health check should return 200');
         assert(response.data.status === 'ok', 'Health status should be ok');
         console.log(`✅ Server health: ${response.data.status}`);
@@ -119,7 +138,7 @@ describe('LoanOfficerAI MCP Integration Tests', () => {
 
     test('should access MCP loan endpoint', async () => {
       try {
-        const response = await axios.get(`${BASE_URL}/api/mcp/loan/L001`, {
+        const response = await axiosInstance.get(`${BASE_URL}/api/mcp/loan/L001`, {
           headers: { 'Authorization': `Bearer ${API_TOKEN}` }
         });
         assert(response.status === 200, 'MCP loan endpoint should return 200');

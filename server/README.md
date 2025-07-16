@@ -133,17 +133,67 @@ The server will run at http://localhost:3001.
 
 ## Testing
 
-```bash
-# Run all tests
-npm test
+### 🧪 **Two-Tier Testing Strategy**
 
-# Run database integration tests
+#### **1. Jest Comprehensive Tests (Recommended)**
+
+```bash
+# Run 70 comprehensive Jest tests - cleanest output
+npm test
+```
+
+**Output:**
+
+```
+Test Suites: 9 passed, 9 total
+Tests:       70 passed, 70 total
+Snapshots:   0 total
+Time:        2.256 s
+Ran all test suites.
+```
+
+**What's Tested:**
+
+- ✅ **OpenAI Integration** (11 tests) - Function calling, response handling
+- ✅ **MCP Infrastructure** (11 tests) - Function registry, logging, error handling
+- ✅ **Database Operations** (15 tests) - SQL operations, predictive analytics
+- ✅ **Authentication** (6 tests) - JWT tokens, security validation
+- ✅ **Unit Components** (27 tests) - Mock data, utilities, edge cases
+
+#### **2. Functional POC Tests**
+
+```bash
+# Run 13 core business logic tests
+npm run test:mcp
+```
+
+**Output:**
+
+```
+Total Tests: 13
+Passed: 13
+Failed: 0
+```
+
+**What's Tested:**
+
+- ✅ **Core Loan Operations** - Database-driven loan information
+- ✅ **Risk Assessment Functions** - AI-powered risk calculations
+- ✅ **High-Risk Analysis** - Farmer risk identification
+- ✅ **OpenAI End-to-End** - Complete AI function calling workflow
+
+### Additional Test Commands
+
+```bash
+# Database integration validation
 npm run test:database
 
-# Run MCP function tests
-npm run test:mcp
+# Individual test categories
+npm run test:unit           # Unit tests only
+npm run test:integration    # Integration tests only
+npm run test:coverage       # Coverage report
 
-# Check system health
+# System health check
 curl http://localhost:3001/api/system/status
 ```
 

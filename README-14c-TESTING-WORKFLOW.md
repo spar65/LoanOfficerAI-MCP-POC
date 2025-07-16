@@ -48,8 +48,11 @@ This will:
 # Check system again - should show everything installed
 node check-system.js
 
-# Run the test suite
-cd server && npm run test:jest
+# Run the comprehensive test suite (70 tests)
+npm test
+
+# OR run functional POC tests (13 tests)
+npm run test:mcp
 ```
 
 ### Step 5: Start the Application

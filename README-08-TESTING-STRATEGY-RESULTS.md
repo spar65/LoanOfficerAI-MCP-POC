@@ -142,11 +142,11 @@ All core POC functionality is **100% operational**:
 #### Quick Start
 
 ```bash
-# Functional tests (recommended)
+# Jest comprehensive tests (recommended) - 70 tests with clean output
 npm test
 
-# Full Jest suite
-npx jest --testPathPattern="tests/" --verbose
+# Functional POC tests - 13 core business logic tests
+npm run test:mcp
 ```
 
 #### Expected Output

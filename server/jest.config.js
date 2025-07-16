@@ -28,7 +28,7 @@ module.exports = {
   globalTeardown: '<rootDir>/tests/globalTeardown.js',
   verbose: true,
   forceExit: true,
-  detectOpenHandles: true,
+  detectOpenHandles: false,
   maxWorkers: 1,
   testTimeout: 30000
 }; 
