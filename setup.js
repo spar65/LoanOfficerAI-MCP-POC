@@ -16,11 +16,14 @@ const DATABASE_CONFIG = {
     DEFAULT_DB_PORT: process.env.DB_PORT || '1433'
 };
 
-// Load environment variables to get default OpenAI API Key
-require('dotenv').config();
-
-// Default OpenAI API Key from .env file
-const DEFAULT_OPENAI_API_KEY = process.env.OPENAI_API_KEY || 'your-openai-api-key-here';
+// Try to load environment variables, but don't fail if dotenv isn't installed yet
+let DEFAULT_OPENAI_API_KEY = 'your-openai-api-key-here';
+try {
+    require('dotenv').config();
+    DEFAULT_OPENAI_API_KEY = process.env.OPENAI_API_KEY || 'your-openai-api-key-here';
+} catch (error) {
+    console.log('📋 Note: dotenv not installed yet, will install dependencies first...');
+}
 
 // Colors for console output
 const colors = {
