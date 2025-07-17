@@ -8,6 +8,8 @@
 **Request Context**: **COMPLETE** ✅  
 **Error Handling**: **COMPLETE** ✅
 
+> **UPDATE:** Logging now assumes a mandatory SQL DB; fallback logging paths removed.
+
 ## 🏗️ Current Architecture
 
 ### Core Components

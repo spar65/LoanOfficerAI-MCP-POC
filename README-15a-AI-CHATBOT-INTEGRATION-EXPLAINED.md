@@ -113,8 +113,7 @@ const functionResult = await mcpFunctionRegistry.executeFunction(
 // The MCP function internally:
 // 1. Validates the request
 // 2. Calls mcpDatabaseService
-// 3. Handles SQL or JSON fallback
-// 4. Formats the response
+// 3. Formats the response
 ```
 
 ### Step 7: MCP Function Gets Data
@@ -122,19 +121,23 @@ const functionResult = await mcpFunctionRegistry.executeFunction(
 ```javascript
 // server/services/mcpDatabaseService.js
 async getLoanSummary(loanId) {
-  // Try SQL first
-  if (this.isConnected) {
-    const query = `
-            SELECT l.*, b.name as borrower_name
-            FROM loans l
-            JOIN borrowers b ON l.borrowerId = b.id
-            WHERE l.id = @loanId
-        `;
-    return await this.db.query(query, { loanId });
-  } else {
-    // Fallback to JSON files
-    return dataService.getLoanSummary(loanId);
+  // SQL path - database connection is REQUIRED
+  if (!this.isConnected) {
+    throw new Error("Database connection required");
   }
+
+  // Execute SQL query
+  const result = await db.executeQuery(`
+    SELECT l.*, b.name as borrower_name
+    FROM loans l
+    JOIN borrowers b ON l.borrowerId = b.id
+    WHERE l.id = @loanId
+  `, { loanId });
+
+  return result.recordset.map(loan => ({
+    ...loan,
+    borrower_name: loan.borrower_name
+  }));
 }
 ```
 
@@ -142,9 +145,8 @@ async getLoanSummary(loanId) {
 > See [Document 15c](./README-15c-MCP-DATABASE-CONNECTION-EXPLAINED.md) for:
 >
 > - Complete SQL database architecture
-> - Connection pooling and security
-> - Automatic JSON fallback system
-> - Error handling and recovery
+> - Connection pooling
+> - Error handling
 
 ### Step 8: Return Formatted Data to OpenAI
 
@@ -178,7 +180,7 @@ INGREDIENTS:
 - 1 farmer question
 - 1 OpenAI API key
 - 16 MCP functions (pre-defined)
-- SQL database (or JSON fallback)
+- SQL Server database (required)
 
 STEPS:
 1. RECEIVE question from farmer via React frontend
@@ -245,18 +247,10 @@ this.server.tool(
     // Step 1: Log the MCP call
     LogService.mcp(`Evaluating risk for borrower ${borrowerId}`);
 
-    // Step 2: Use database service (with fallback)
-    if (process.env.USE_DATABASE === "true") {
-      // SQL path
-      const risk = await mcpDatabaseService.getBorrowerNonAccrualRisk(
-        borrowerId
-      );
-      return risk;
-    } else {
-      // JSON fallback path
-      const risk = await dataService.calculateBorrowerRiskScore(borrowerId);
-      return risk;
-    }
+    // Step 2: Use database service (REQUIRED, no fallback)
+    const risk = await mcpDatabaseService.getBorrowerNonAccrualRisk(borrowerId);
+
+    return risk;
   }
 );
 ```
@@ -343,18 +337,13 @@ if (message.function_call) {
 
 ```javascript
 try {
-  // Try SQL database first
+  // Execute SQL database query
   const result = await sqlQuery(params);
   return result;
 } catch (sqlError) {
-  // Fall back to JSON files
-  try {
-    const result = await jsonQuery(params);
-    return result;
-  } catch (jsonError) {
-    // Return safe error message
-    return { error: "Unable to retrieve data", details: "Please try again" };
-  }
+  // Log and throw error (no fallback)
+  LogService.error("Database operation failed", sqlError);
+  throw new Error("Service unavailable - database required");
 }
 ```
 
@@ -363,8 +352,7 @@ try {
 1. **MCP = Model Context Protocol** - The bridge between AI and your data
 2. **16 Pre-defined Functions** - AI can ONLY use these specific functions
 3. **No Direct Database Access** - AI never touches SQL directly
-4. **Automatic Fallback** - SQL → JSON files if database is down
-5. **Everything is Logged** - Complete audit trail of all operations
+4. **Everything is Logged** - Complete audit trail of all operations
 
 ## 📊 The Real Flow Diagram
 
@@ -385,7 +373,7 @@ try {
        ↓
 [MCP Validates Input]
        ↓
-[MCP Queries Database/JSON]
+[MCP Queries Database]
        ↓
 [MCP Formats Response]
        ↓
@@ -408,8 +396,9 @@ Ready to dive deeper? Follow this learning path:
    - Authentication and error handling
    - Complete request/response flow
 3. **Then** → [Document 15c: MCP Database Connection](./README-15c-MCP-DATABASE-CONNECTION-EXPLAINED.md)
-   - SQL database architecture
-   - Connection security and pooling
-   - Automatic fallback systems
+   - Complete SQL database architecture
+   - When it happens
+   - Connection pooling
+   - Error handling
 
 Remember: MCP is your **security guard** - it makes sure the AI only accesses what it should, how it should, when it should! 🛡️

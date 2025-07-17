@@ -183,13 +183,12 @@ router.post("/chat", async (req, res) => {
    - Executes function handler
    ↓
 7️⃣ MCP FUNCTION (in mcp/server.js)
-   - Checks if USE_DATABASE=true
-   - Calls mcpDatabaseService.getLoanSummary()
+   - Calls mcpDatabaseService.getLoanSummary() (database connection required)
    ↓
 8️⃣ mcpDatabaseService
    - Executes SQL query
    - Formats response
-   - Returns data to MCP function
+   - Throws error if DB unavailable
    (See Document 15c for database details)
    ↓
 9️⃣ SERVER → OPENAI
@@ -295,16 +294,9 @@ this.server.tool(
     // Step 1: Log the MCP call
     LogService.mcp(`Getting loan summary for ${loanId}`);
 
-    // Step 2: Call the database service
-    if (process.env.USE_DATABASE === "true") {
-      // THIS IS THE DATABASE CALL!
-      const loanData = await mcpDatabaseService.getLoanSummary(loanId);
-      return loanData;
-    } else {
-      // Fallback to JSON if database is not enabled
-      const loanData = await dataService.getLoanSummary(loanId);
-      return loanData;
-    }
+    // Step 2: Call the database service (REQUIRED, no fallback)
+    const loanData = await mcpDatabaseService.getLoanSummary(loanId);
+    return loanData;
   }
 );
 
@@ -316,17 +308,10 @@ this.server.tool(
   },
   async ({ borrowerId }) => {
     // The MCP function calls mcpDatabaseService
-    if (process.env.USE_DATABASE === "true") {
-      // THIS CALLS THE DATABASE!
-      const riskData = await mcpDatabaseService.getBorrowerNonAccrualRisk(
-        borrowerId
-      );
-      return riskData;
-    } else {
-      // JSON fallback
-      const riskData = await dataService.calculateBorrowerRiskScore(borrowerId);
-      return riskData;
-    }
+    const riskData = await mcpDatabaseService.getBorrowerNonAccrualRisk(
+      borrowerId
+    );
+    return riskData;
   }
 );
 ```
@@ -338,7 +323,11 @@ this.server.tool(
 
 async getLoanSummary(loanId) {
     // THIS IS WHERE THE ACTUAL DATABASE QUERY HAPPENS!
-    if (this.isConnected) {
+    if (!this.isConnected) {
+        throw new Error("Database connection required");
+    }
+
+    try {
         const query = `
             SELECT
                 l.id,
@@ -360,10 +349,10 @@ async getLoanSummary(loanId) {
         if (result && result.length > 0) {
             return this.formatLoanSummary(result[0]);
         }
+    } catch (error) {
+        LogService.error('Database query failed', error);
+        throw error; // Propagate error to caller
     }
-
-    // If database not connected, fallback to JSON
-    return await dataService.getLoanSummary(loanId);
 }
 ```
 
@@ -371,10 +360,10 @@ async getLoanSummary(loanId) {
 > See [README-15c-MCP-DATABASE-CONNECTION-EXPLAINED.md](./README-15c-MCP-DATABASE-CONNECTION-EXPLAINED.md) for:
 >
 > - Complete database architecture
-> - SQL vs JSON fallback system
-> - Connection pooling and security
-> - Error handling and recovery
-> - Performance optimization
+
+- Connection security and pooling
+- Error handling and recovery
+- Performance optimization
 
 ### Client Authentication
 
@@ -412,7 +401,7 @@ const authService = {
 
 ### Q: What if the server is down?
 
-**A:** Built-in fallbacks:
+**A:** Built-in fail-fast handling:
 
 ```javascript
 // Client handles server errors

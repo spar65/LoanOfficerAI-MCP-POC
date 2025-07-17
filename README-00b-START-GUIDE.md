@@ -26,7 +26,7 @@ npm run check
 - ✅ Validates Node.js and npm versions
 - ✅ Checks Docker installation and containers
 - ✅ Verifies required files exist
-- ✅ Tests database connectivity (if configured)
+- ✅ Tests database connectivity (required)
 - ✅ Confirms environment readiness
 
 ### Step 3: Setup & Configure
@@ -39,7 +39,7 @@ npm run setup
 
 - 🔑 Prompts for OpenAI API key
 - 📝 Creates environment files (.env)
-- 🗄️ Sets up database (optional)
+- 🗄️ Sets up required database
 - 🧪 Runs comprehensive tests
 - 🔧 Fixes any issues found
 
@@ -135,7 +135,7 @@ After `npm start`:
 ### "Database connection failed"
 
 **Cause**: Database not configured  
-**Solution**: Database is optional - app works with JSON files
+**Solution**: Database is required - ensure SQL Server is running and .env is configured
 
 ### "OpenAI API key required"
 
@@ -146,7 +146,7 @@ After `npm start`:
 
 - **Server**: http://localhost:3001 (API + MCP functions)
 - **Client**: http://localhost:3000 (React UI + Chatbot)
-- **Database**: SQL Server container (if configured)
+- **Database**: SQL Server (required for operation)
 
 ## Test the Chatbot
 

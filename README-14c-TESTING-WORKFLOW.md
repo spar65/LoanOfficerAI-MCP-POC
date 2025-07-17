@@ -137,3 +137,5 @@ You know it's working when:
 - Setup script completes all 5 verification phases
 - Test suite shows 70/70 tests passing
 - You can start both server and client successfully
+
+> **Testing Update:** All fallback test paths have been removed; tests fail if SQL DB is unreachable.

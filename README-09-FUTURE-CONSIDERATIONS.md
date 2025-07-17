@@ -123,7 +123,7 @@
 **Priority 2: Enhanced AI Capabilities (12-15 hours)**
 
 - Add support for multiple AI models (Claude, Gemini, etc.)
-- Implement AI model fallback and redundancy
+- Implement AI model redundancy (no JSON data fallback)
 - Add AI response quality monitoring
 - Create custom AI training for domain-specific tasks
 

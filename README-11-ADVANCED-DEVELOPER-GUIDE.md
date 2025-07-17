@@ -1184,3 +1184,5 @@ The system is ready for production deployment with enterprise-grade reliability,
 - **Security Audit**: Conduct comprehensive security assessment
 - **Performance Tuning**: Optimize based on production load patterns
 - **Business Expansion**: Add additional MCP functions for new use cases
+
+> **UPDATE 2025-07-16:** All code examples referring to `fallbackToJSON()` are retained only as historical context and are _not_ used in production. The live service is SQL-only.

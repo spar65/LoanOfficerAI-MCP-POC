@@ -150,11 +150,11 @@ server/
 │   ├── authMiddleware.js    # Authentication middleware
 │   ├── authRoutes.js        # Authentication endpoints
 │   └── userService.js       # User management
-├── data/                    # JSON data files (fallback only)
-│   ├── borrowers.json       # Borrower fallback data
-│   ├── loans.json           # Loan fallback data
-│   ├── payments.json        # Payment history fallback
-│   └── collateral.json      # Collateral fallback data
+├── data/                    # JSON data files (test fixtures only)
+│   ├── borrowers.json       # Mock borrower data (test fixtures)
+│   ├── loans.json           # Mock loan data (test fixtures)
+│   ├── payments.json        # Mock payment history (test fixtures)
+│   └── collateral.json      # Mock collateral data (test fixtures)
 ├── middleware/              # Express middleware
 │   ├── authMiddleware.js    # JWT validation
 │   ├── errorHandler.js      # Global error handling

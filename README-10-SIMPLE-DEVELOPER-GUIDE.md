@@ -368,7 +368,7 @@ Overall Results:
 
 - **Real Data**: All information comes from SQL Server database
 - **Fast Queries**: Optimized database queries for quick responses
-- **Reliable**: Automatic fallback to JSON files if database unavailable
+- **Reliable**: Fail-fast with clear errors if database unavailable (no JSON fallback)
 - **Scalable**: Can handle thousands of loans and borrowers
 
 ### AI Integration Benefits

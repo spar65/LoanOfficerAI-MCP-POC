@@ -253,3 +253,5 @@ sudo usermod -aG docker $USER
 - Review READMEs for more info
 
 For issues, check logs in server/logs/ or run troubleshooting scripts.
+
+> **NOTE:** All setup steps now presume a running SQL Server; remove any fallback flags you may see in older guides.

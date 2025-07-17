@@ -394,3 +394,5 @@ The LoanOfficerAI MCP POC is production-ready with:
 ---
 
 _This document represents the complete testing strategy and results for the LoanOfficerAI MCP POC. All core business functionality has been verified and is operational._
+
+> **UPDATE 2025-07-16:** Tests now run against SQL database exclusively. Fallback scenarios have been removed.

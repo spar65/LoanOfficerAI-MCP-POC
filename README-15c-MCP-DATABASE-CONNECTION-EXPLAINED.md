@@ -34,15 +34,17 @@ Think of MCP's database connection like a **secure vault**:
 ```
 MCP Function Called
         ↓
+Check Database Connection (Required)
+        ↓
 mcpDatabaseService
         ↓
-Validate Connection
+Validate Parameters
         ↓
 Execute SQL Query
         ↓
 Format Result
         ↓
-Return Data
+Return Data (or Throw Error if Connection Fails)
 ```
 
 ## 💾 SQL Database Configuration
@@ -117,7 +119,7 @@ class MCPDatabaseService {
 async getLoanSummary(loanId) {
     // Validate connection first
     if (!this.isConnected) {
-        throw new Error("Database connection not available");
+        throw new Error("Database connection required. Please ensure SQL Server is running and properly configured.");
     }
 
     try {
@@ -132,20 +134,15 @@ async getLoanSummary(loanId) {
                 l.interestRate,
                 l.termMonths,
                 l.status,
-                l.createdAt,
-                l.updatedAt,
                 b.name as borrowerName,
-                b.farmName,
-                b.creditScore
+                b.farmName
             FROM loans l
             INNER JOIN borrowers b ON l.borrowerId = b.id
             WHERE l.id = @loanId
         `;
 
         // Execute with parameters (safe from SQL injection)
-        const result = await this.db.query(query, {
-            loanId: loanId
-        });
+        const result = await this.db.query(query, { loanId });
 
         if (!result || result.length === 0) {
             throw new Error(`Loan ${loanId} not found`);
@@ -200,7 +197,7 @@ class DatabaseManager {
     try {
       const request = this.pool.request();
 
-      // Add parameters safely (prevents SQL injection)
+      // Add parameters safely
       Object.keys(params).forEach((key) => {
         request.input(key, params[key]);
       });
@@ -228,7 +225,7 @@ class DatabaseManager {
 
 async getBorrowerNonAccrualRisk(borrowerId) {
     if (!this.isConnected) {
-        throw new Error("Database connection required");
+        throw new Error("Database connection required. Please ensure SQL Server is running and properly configured.");
     }
 
     // Complex SQL with multiple CTEs (Common Table Expressions)
@@ -372,7 +369,7 @@ try {
   return data;
 } catch (error) {
   LogService.error("Database operation failed", error);
-  throw new Error("Service temporarily unavailable");
+  throw new Error("Service temporarily unavailable - database required");
 }
 ```
 
@@ -404,7 +401,7 @@ try {
 
 ## 🎓 Key Takeaways
 
-1. **MCP Uses SQL Server Exclusively** - No fallback systems
+1. **MCP Uses SQL Server Exclusively** - Database connection is required
 2. **Connection Required** - System won't function without database
 3. **Security First** - Parameterized queries, encryption, proper auth
 4. **Connection Pooling** - Efficient reuse of database connections

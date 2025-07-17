@@ -2,6 +2,8 @@
 
 This guide provides step-by-step instructions for setting up the LoanOfficerAI MCP system on Windows with SQL Server LocalDB or Express. Updated for full database integration and production-ready configuration.
 
+> **NOTE:** This appendix reflects a mandatory SQL Server setup—no JSON fallback files are used.
+
 ## Prerequisites
 
 - Windows 10/11 or Windows Server 2019+

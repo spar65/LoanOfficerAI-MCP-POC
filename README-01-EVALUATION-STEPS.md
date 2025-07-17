@@ -98,7 +98,7 @@ npm run setup
 **When prompted:**
 
 - **OpenAI API Key**: Enter your API key from [platform.openai.com](https://platform.openai.com/api-keys)
-- **Database Setup**: Choose option 3 (Skip) for evaluation
+- **Database Setup**: Choose option 1 or 2 (required for operation)
 - **Logging Level**: Press Enter for default (info)
 
 _Expected output:_
@@ -106,7 +106,7 @@ _Expected output:_
 ```
 ✅ Environment files created
 ✅ OpenAI API key configured
-✅ Database fallback enabled
+✅ Database connection established
 ✅ All tests passed (10/10)
 🎉 Setup completed successfully!
 ```
@@ -156,7 +156,7 @@ _Expected output:_
     },
     "database": {
       "status": "connected",
-      "type": "json_fallback"
+      "type": "sql_server"
     }
   }
 }
@@ -192,8 +192,8 @@ _Expected: JSON responses with function list and loan data_
 
 ```
 1. "Show me all active loans"
-2. "What are the details for loan L001?"
-3. "What's the status of loan L002?"
+2. "What are the details for loan L001"
+3. "What's the status of loan L002"
 4. "Give me a summary of our loan portfolio"
 ```
 
@@ -203,8 +203,9 @@ _Expected: Natural language responses with actual loan data_
 
 ```
 5. "What's the default risk for borrower B001?"
-6. "Is the collateral sufficient for loan L001?"
+6. "Is there a risk that borrower B001 will become non-accrual?"
 7. "Which farmers are at high risk of default?"
+8. "Is the collateral sufficient for loan L001?"
 ```
 
 _Expected: Risk scores, assessments, and recommendations_
@@ -212,9 +213,9 @@ _Expected: Risk scores, assessments, and recommendations_
 #### 5.2.3 Advanced Analytics
 
 ```
-8. "What's the crop yield risk for borrower B002?"
-9. "How would a 10% corn price drop affect our portfolio?"
-10. "What restructuring options are available for loan L002?"
+9. "What's the crop yield risk for borrower B002 this season?"
+10. "How would a 10% corn price drop affect our portfolio?"
+11. "What restructuring options are available for loan L002?"
 ```
 
 _Expected: Detailed analysis with specific recommendations_
@@ -245,14 +246,13 @@ _Expected: Detailed analysis with specific recommendations_
 
 ### 6.2 Database Integration Status
 
-**System uses JSON fallback for evaluation** (SQL Server ready for production)
+**System uses SQL Server database for evaluation**
 
 **Check data sources:**
 
 ```bash
-# View available data
-ls server/data/
-# Should show: borrowers.json, loans.json, payments.json, etc.
+curl http://localhost:3001/api/system/status
+# Should show "database": { "connected": true }
 ```
 
 ### 6.3 Logging and Monitoring
@@ -265,47 +265,9 @@ ls server/data/
 
 ---
 
-## 🎯 STEP 7: EVALUATION CRITERIA
+## 🎪 STEP 7: DEMONSTRATION SCENARIOS
 
-### 7.1 Functional Requirements ✅
-
-| Feature                  | Status | Notes                                    |
-| ------------------------ | ------ | ---------------------------------------- |
-| **AI Chatbot Interface** | ✅     | Natural language loan queries            |
-| **16 MCP Functions**     | ✅     | All agricultural lending operations      |
-| **OpenAI Integration**   | ✅     | GPT-4o with function calling             |
-| **Database Operations**  | ✅     | JSON fallback, SQL Server ready          |
-| **Risk Assessment**      | ✅     | AI-powered default risk analysis         |
-| **Predictive Analytics** | ✅     | Market impact, yield risk, restructuring |
-| **Authentication**       | ✅     | JWT-based secure access                  |
-| **Real-time Monitoring** | ✅     | System health and performance            |
-
-### 7.2 Technical Architecture ✅
-
-| Component          | Status | Implementation                     |
-| ------------------ | ------ | ---------------------------------- |
-| **Frontend**       | ✅     | React with Material-UI             |
-| **Backend**        | ✅     | Node.js/Express server             |
-| **AI Integration** | ✅     | OpenAI GPT-4o with secure proxy    |
-| **MCP Protocol**   | ✅     | 16 functions, structured responses |
-| **Database**       | ✅     | Hybrid SQL Server + JSON fallback  |
-| **Security**       | ✅     | API key protection, JWT auth       |
-| **Logging**        | ✅     | Winston with MCP-specific tracking |
-| **Testing**        | ✅     | Comprehensive test suite           |
-
-### 7.3 Business Value ✅
-
-- **✅ Loan Officer Productivity**: AI assistant reduces lookup time by 70%
-- **✅ Risk Management**: Automated risk assessment and alerts
-- **✅ Decision Support**: AI-powered recommendations for all queries
-- **✅ Compliance**: Complete audit trail and logging
-- **✅ Scalability**: Enterprise-ready architecture
-
----
-
-## 🎪 STEP 8: DEMONSTRATION SCENARIOS
-
-### 8.1 Loan Officer Daily Workflow
+### 7.1 Loan Officer Daily Workflow
 
 **Scenario**: "I need to review borrower B001's portfolio"
 
@@ -316,7 +278,7 @@ ls server/data/
 
 _Demonstrate: Complete loan review in under 2 minutes_
 
-### 8.2 Risk Management Review
+### 7.2 Risk Management Review
 
 **Scenario**: "Weekly portfolio risk assessment"
 
@@ -326,7 +288,7 @@ _Demonstrate: Complete loan review in under 2 minutes_
 
 _Demonstrate: AI-powered risk insights with specific recommendations_
 
-### 8.3 Market Analysis
+### 7.3 Market Analysis
 
 **Scenario**: "Commodity price impact analysis"
 
@@ -338,9 +300,9 @@ _Demonstrate: Predictive analytics for proactive management_
 
 ---
 
-## 📋 STEP 9: EVALUATION CHECKLIST
+## 📋 STEP 8: EVALUATION CHECKLIST
 
-### 9.1 Installation Success ✅
+### 8.1 Installation Success ✅
 
 - [ ] Node.js installed and working
 - [ ] Bootstrap completed without errors
@@ -349,7 +311,7 @@ _Demonstrate: Predictive analytics for proactive management_
 - [ ] Application started automatically
 - [ ] Browser opened to http://localhost:3000
 
-### 9.2 Core Functionality ✅
+### 8.2 Core Functionality ✅
 
 - [ ] Login works with test credentials
 - [ ] AI chatbot responds to queries
@@ -358,15 +320,15 @@ _Demonstrate: Predictive analytics for proactive management_
 - [ ] Error handling works (invalid inputs)
 - [ ] Response times under 3 seconds
 
-### 9.3 Technical Validation ✅
+### 8.3 Technical Validation ✅
 
 - [ ] System health endpoint returns "operational"
 - [ ] MCP functions endpoint lists 16 functions
 - [ ] Server logs show MCP function calls
-- [ ] Database fallback mechanism works
+- [ ] Database connection is active
 - [ ] Authentication protects API endpoints
 
-### 9.4 Business Value ✅
+### 8.4 Business Value ✅
 
 - [ ] Reduces loan officer research time
 - [ ] Provides actionable risk insights
@@ -395,9 +357,6 @@ npm install
 cd server && npm install
 cd ../client && npm install
 cd ..
-
-# Then continue with setup
-npm run setup
 ```
 
 #### "Server won't start"
@@ -436,34 +395,7 @@ npm run setup
 
 ---
 
-## 🎉 SUCCESS CRITERIA SUMMARY
-
-### ✅ MINIMUM VIABLE DEMONSTRATION
-
-- **Setup Time**: <5 minutes with bootstrap script
-- **Core Functions**: 16 MCP functions operational
-- **AI Integration**: Natural language query processing
-- **Response Time**: <3 seconds average
-- **Error Handling**: Graceful failure management
-
-### ✅ PRODUCTION READINESS INDICATORS
-
-- **Architecture**: Enterprise-grade 3-tier design
-- **Security**: API key protection, JWT authentication
-- **Scalability**: Connection pooling, database integration ready
-- **Monitoring**: Health checks, comprehensive logging
-- **Testing**: Automated test suite with 100% coverage
-
-### ✅ BUSINESS VALUE VALIDATION
-
-- **Productivity**: AI assistant reduces loan review time by 70%
-- **Risk Management**: Automated risk scoring with real-time analysis
-- **Decision Support**: Actionable recommendations for 100% of queries
-- **Compliance**: Complete audit trail for regulatory requirements
-
----
-
-## 📞 EVALUATION SUPPORT
+## 🎯 EVALUATION SUPPORT
 
 ### Contact Information
 

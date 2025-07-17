@@ -1,5 +1,7 @@
 # 🎯 Chatbot Sections to MCP Functions Mapping
 
+> **NOTE (2025-07-16):** This document has been updated for a strict SQL database requirement; legacy fallback descriptions no longer apply.
+
 ## ✅ CORRECTED MCP Function Inventory
 
 **REALITY CHECK**: The system actually has **16 implemented functions**, not 19 as previously documented.
