@@ -1,3 +1,5 @@
+# README-14b-APPENDIX-SETUP-WINDOWS.md
+
 # LoanOfficerAI MCP - Windows Setup Guide
 
 This guide provides step-by-step instructions for setting up the LoanOfficerAI MCP system on Windows with SQL Server LocalDB or Express. Updated for full database integration and production-ready configuration.

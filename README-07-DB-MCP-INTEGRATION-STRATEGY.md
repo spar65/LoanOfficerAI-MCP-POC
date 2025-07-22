@@ -1,3 +1,5 @@
+# README-07-DB-MCP-INTEGRATION-STRATEGY.md
+
 # LoanOfficerAI - Database & MCP Integration Strategy
 
 ## ✅ Current Status: PRODUCTION-READY DATABASE INTEGRATION

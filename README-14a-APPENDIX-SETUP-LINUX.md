@@ -1,4 +1,6 @@
-# LoanOfficerAI MCP - Linux Setup Guide
+# README-14a-APPENDIX-SETUP-LINUX.md
+
+# Loan OfficerAI MCP - Linux Setup Guide
 
 This guide provides step-by-step instructions for setting up the LoanOfficerAI MCP system on Linux with Docker SQL Server. Updated for full database integration and production-ready configuration.
 

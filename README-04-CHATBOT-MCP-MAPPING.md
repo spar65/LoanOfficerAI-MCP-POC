@@ -1,3 +1,5 @@
+# README-04-CHATBOT-MCP-MAPPING.md
+
 # 🎯 Chatbot Sections to MCP Functions Mapping
 
 > **NOTE (2025-07-16):** This document has been updated for a strict SQL database requirement; legacy fallback descriptions no longer apply.

@@ -1,3 +1,5 @@
+# README-06-LOGGING.md
+
 # LoanOfficerAI MCP - Logging Implementation & Strategy
 
 ## ✅ Current Status: PRODUCTION-READY LOGGING SYSTEM

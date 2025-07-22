@@ -1,6 +1,6 @@
-## Strategic AI-MCP Implementation Plan
+# README-12a-EXECUTIVE-OPPORTUNITY
 
-### README-12a-EXECUTIVE-OPPORTUNITY
+## Strategic AI-MCP Implementation Plan
 
 ### Farm Credit Bank of Texas (FCBT)
 

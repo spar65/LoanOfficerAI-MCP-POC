@@ -1,3 +1,5 @@
+# README.md
+
 # Loan Officer AI - MCP Proof of Concept - Updated July 2025
 
 A production-ready proof-of-concept demonstrating AI-powered agricultural lending intelligence with Model Completion Protocol (MCP) integration and complete SQL Server database integration.

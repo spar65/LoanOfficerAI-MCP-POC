@@ -1,3 +1,5 @@
+# README-05-OPENAI-INTEGRATION.md
+
 # LoanOfficerAI - OpenAI Integration Documentation
 
 ## ✅ Current Status: PRODUCTION-READY AI INTEGRATION
