@@ -968,6 +968,316 @@ class McpDatabaseService {
     
     return factors;
   }
+
+  /**
+   * Forecast equipment maintenance for a borrower
+   * @param {string} borrowerId - The ID of the borrower
+   * @returns {Promise<Object>} Equipment maintenance forecast
+   */
+  async forecastEquipmentMaintenance(borrowerId) {
+    try {
+      LogService.info(`Forecasting equipment maintenance for borrower: ${borrowerId}`);
+      
+      // Get borrower details from database
+      const borrower = await this.getBorrowerDetails(borrowerId);
+      if (!borrower) {
+        throw new Error(`Borrower ${borrowerId} not found`);
+      }
+      
+      // Get equipment data from database
+      const equipmentResult = await this.executeQuery(
+        'SELECT * FROM Equipment WHERE borrower_id = @borrowerId',
+        { borrowerId }
+      );
+      const equipment = equipmentResult.recordset || [];
+      
+      // Calculate maintenance forecast based on farm size and equipment age
+      const farmSize = borrower.farm_size || 100;
+      const farmType = borrower.farm_type || 'Mixed';
+      
+      const baseCostPerAcre = farmType === 'Crop' ? 25 : farmType === 'Livestock' ? 15 : 20;
+      const annualMaintenanceCost = Math.round(farmSize * baseCostPerAcre);
+      
+      return {
+        borrower_id: borrowerId,
+        borrower_name: `${borrower.first_name} ${borrower.last_name}`,
+        farm_type: farmType,
+        farm_size: farmSize,
+        total_maintenance_forecast: annualMaintenanceCost,
+        equipment_count: equipment.length,
+        forecast_year: new Date().getFullYear() + 1,
+        analysis_date: new Date().toISOString().split('T')[0]
+      };
+    } catch (error) {
+      LogService.error(`Error forecasting equipment maintenance: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Assess crop yield risk for a borrower
+   * @param {string} borrowerId - The ID of the borrower
+   * @param {string} cropType - Type of crop
+   * @param {string} season - Growing season
+   * @returns {Promise<Object>} Crop yield risk assessment
+   */
+  async assessCropYieldRisk(borrowerId, cropType, season) {
+    try {
+      LogService.info(`Assessing crop yield risk for borrower: ${borrowerId}, crop: ${cropType}, season: ${season}`);
+      
+      // Get borrower details from database
+      const borrower = await this.getBorrowerDetails(borrowerId);
+      if (!borrower) {
+        throw new Error(`Borrower ${borrowerId} not found`);
+      }
+      
+      // Generate risk assessment based on borrower data
+      const farmSize = borrower.farm_size || 100;
+      const creditScore = borrower.credit_score || 700;
+      
+      // Calculate risk score (50-85 range)
+      const baseRisk = 50;
+      const sizeRisk = farmSize > 500 ? -5 : farmSize < 100 ? 10 : 0;
+      const creditRisk = creditScore > 750 ? -5 : creditScore < 650 ? 10 : 0;
+      const riskScore = Math.min(85, Math.max(50, baseRisk + sizeRisk + creditRisk + Math.floor(Math.random() * 10)));
+      
+      const riskLevel = riskScore >= 75 ? 'high' : riskScore >= 60 ? 'medium' : 'low';
+      
+      return {
+        borrower_id: borrowerId,
+        borrower_name: `${borrower.first_name} ${borrower.last_name}`,
+        crop_type: cropType,
+        season: season,
+        yield_risk_score: riskScore,
+        risk_level: riskLevel,
+        farm_size: farmSize,
+        assessment_date: new Date().toISOString().split('T')[0]
+      };
+    } catch (error) {
+      LogService.error(`Error assessing crop yield risk: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Get refinancing options for a loan
+   * @param {string} loanId - The ID of the loan
+   * @returns {Promise<Object>} Refinancing options
+   */
+  async getRefinancingOptions(loanId) {
+    try {
+      LogService.info(`Getting refinancing options for loan: ${loanId}`);
+      
+      // Get loan details from database
+      const loan = await this.getLoanDetails(loanId);
+      if (!loan) {
+        throw new Error(`Loan ${loanId} not found`);
+      }
+      
+      // Calculate refinancing scenarios
+      const currentRate = loan.interest_rate || 4.0;
+      const loanAmount = loan.loan_amount || 0;
+      const remainingTerm = loan.term_length || 60;
+      
+      const scenarios = [
+        {
+          scenario: 'Rate Reduction',
+          new_rate: Math.max(2.0, currentRate - 0.5),
+          monthly_savings: Math.round((loanAmount * 0.005) / 12),
+          total_savings: Math.round(loanAmount * 0.005 * (remainingTerm / 12))
+        },
+        {
+          scenario: 'Term Extension',
+          new_term: remainingTerm + 12,
+          monthly_payment_reduction: Math.round(loanAmount * 0.001),
+          total_interest_increase: Math.round(loanAmount * 0.02)
+        }
+      ];
+      
+      return {
+        loan_id: loanId,
+        current_rate: currentRate,
+        loan_amount: loanAmount,
+        refinancing_scenarios: scenarios,
+        analysis_date: new Date().toISOString().split('T')[0]
+      };
+    } catch (error) {
+      LogService.error(`Error getting refinancing options: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Analyze payment patterns for a borrower
+   * @param {string} borrowerId - The ID of the borrower
+   * @returns {Promise<Object>} Payment pattern analysis
+   */
+  async analyzePaymentPatterns(borrowerId) {
+    try {
+      LogService.info(`Analyzing payment patterns for borrower: ${borrowerId}`);
+      
+      // Get borrower details
+      const borrower = await this.getBorrowerDetails(borrowerId);
+      if (!borrower) {
+        throw new Error(`Borrower ${borrowerId} not found`);
+      }
+      
+      // Get payment history from database
+      const paymentsResult = await this.executeQuery(
+        `SELECT p.* FROM Payments p 
+         JOIN Loans l ON p.loan_id = l.loan_id 
+         WHERE l.borrower_id = @borrowerId
+         ORDER BY p.payment_date DESC`,
+        { borrowerId }
+      );
+      const payments = paymentsResult.recordset || [];
+      
+      // Analyze patterns
+      const totalPayments = payments.length;
+      const onTimePayments = payments.filter(p => p.status === 'On Time').length;
+      const latePayments = payments.filter(p => p.status === 'Late').length;
+      const onTimePercentage = totalPayments > 0 ? Math.round((onTimePayments / totalPayments) * 100) : 0;
+      
+      return {
+        borrower_id: borrowerId,
+        borrower_name: `${borrower.first_name} ${borrower.last_name}`,
+        total_payments: totalPayments,
+        on_time_payments: onTimePayments,
+        late_payments: latePayments,
+        on_time_percentage: onTimePercentage,
+        payment_reliability: onTimePercentage >= 90 ? 'Excellent' : onTimePercentage >= 75 ? 'Good' : 'Needs Improvement',
+        analysis_date: new Date().toISOString().split('T')[0]
+      };
+    } catch (error) {
+      LogService.error(`Error analyzing payment patterns: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Recommend loan restructuring options
+   * @param {string} loanId - The ID of the loan
+   * @param {string} restructuringGoal - Optional restructuring goal
+   * @returns {Promise<Object>} Loan restructuring recommendations
+   */
+  async recommendLoanRestructuring(loanId, restructuringGoal = null) {
+    try {
+      LogService.info(`Recommending loan restructuring for loan: ${loanId}`);
+      
+      // Get loan details from database
+      const loan = await this.getLoanDetails(loanId);
+      if (!loan) {
+        throw new Error(`Loan ${loanId} not found`);
+      }
+      
+      // Generate restructuring recommendations
+      const currentAmount = loan.loan_amount || 0;
+      const currentRate = loan.interest_rate || 4.0;
+      const currentTerm = loan.term_length || 60;
+      
+      const recommendations = [
+        {
+          option: 'Payment Reduction',
+          description: 'Extend term to reduce monthly payments',
+          new_term: currentTerm + 24,
+          estimated_payment_reduction: Math.round(currentAmount * 0.002),
+          pros: ['Lower monthly payments', 'Improved cash flow'],
+          cons: ['Higher total interest', 'Longer debt commitment']
+        },
+        {
+          option: 'Rate Adjustment',
+          description: 'Negotiate lower interest rate',
+          new_rate: Math.max(2.0, currentRate - 0.75),
+          estimated_savings: Math.round(currentAmount * 0.0075),
+          pros: ['Reduced total cost', 'Lower monthly payments'],
+          cons: ['May require additional collateral']
+        }
+      ];
+      
+      return {
+        loan_id: loanId,
+        current_loan_amount: currentAmount,
+        current_interest_rate: currentRate,
+        restructuring_goal: restructuringGoal || 'Payment Relief',
+        recommendations,
+        analysis_date: new Date().toISOString().split('T')[0]
+      };
+    } catch (error) {
+      LogService.error(`Error recommending loan restructuring: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Get high-risk farmers
+   * @returns {Promise<Array>} List of high-risk farmers
+   */
+  async getHighRiskFarmers() {
+    try {
+      LogService.info('Getting high-risk farmers');
+      
+      // Get all borrowers with their loan and payment data
+      const borrowersResult = await this.executeQuery('SELECT * FROM Borrowers', {});
+      const borrowers = borrowersResult.recordset || [];
+      
+      const highRiskFarmers = [];
+      
+      for (const borrower of borrowers) {
+        // Calculate risk factors
+        const creditScore = borrower.credit_score || 700;
+        const income = borrower.income || 50000;
+        const farmSize = borrower.farm_size || 100;
+        
+        // Get loan data for this borrower
+        const loansResult = await this.executeQuery(
+          'SELECT * FROM Loans WHERE borrower_id = @borrowerId',
+          { borrowerId: borrower.borrower_id }
+        );
+        const loans = loansResult.recordset || [];
+        
+        // Calculate risk score
+        let riskScore = 0;
+        if (creditScore < 650) riskScore += 30;
+        else if (creditScore < 700) riskScore += 15;
+        
+        if (income < 60000) riskScore += 20;
+        else if (income < 80000) riskScore += 10;
+        
+        if (farmSize < 100) riskScore += 15;
+        
+        const totalLoanAmount = loans.reduce((sum, loan) => sum + (loan.loan_amount || 0), 0);
+        const debtToIncomeRatio = totalLoanAmount / income;
+        if (debtToIncomeRatio > 0.5) riskScore += 25;
+        else if (debtToIncomeRatio > 0.3) riskScore += 10;
+        
+        // Consider high risk if score >= 40
+        if (riskScore >= 40) {
+          highRiskFarmers.push({
+            borrower_id: borrower.borrower_id,
+            borrower_name: `${borrower.first_name} ${borrower.last_name}`,
+            credit_score: creditScore,
+            income: income,
+            farm_size: farmSize,
+            farm_type: borrower.farm_type || 'Mixed',
+            risk_score: riskScore,
+            risk_level: riskScore >= 60 ? 'High' : 'Medium-High',
+            total_loan_amount: totalLoanAmount,
+            debt_to_income_ratio: Math.round(debtToIncomeRatio * 100) / 100
+          });
+        }
+      }
+      
+      return {
+        high_risk_farmers: highRiskFarmers,
+        total_farmers_assessed: borrowers.length,
+        high_risk_count: highRiskFarmers.length,
+        assessment_date: new Date().toISOString().split('T')[0]
+      };
+    } catch (error) {
+      LogService.error(`Error getting high-risk farmers: ${error.message}`);
+      throw error;
+    }
+  }
 }
 
 module.exports = new McpDatabaseService(); 

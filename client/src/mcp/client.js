@@ -117,25 +117,83 @@ const mcpClient = {
   },
   
   async getLoanPayments(loanId) {
-    try {
-      console.log(`Fetching payments for loan ${loanId}...`);
-      const response = await axios.get(`${this.baseURL}/loan/${loanId}/payments`, this.getConfig());
-      return response.data;
-    } catch (error) {
-      this.handleApiError(error, 'getLoanPayments');
-      throw error;
-    }
+    return this.retryRequestWithRefresh(async function(loanId) {
+      try {
+        console.log(`Fetching payments for loan ${loanId} via MCP...`);
+        
+        // Use the OpenAI chat endpoint to call the MCP function
+        const response = await axios.post(
+          `${this.baseURL}/openai/chat`,
+          {
+            messages: [
+              {
+                role: 'user',
+                content: `Get payment history for loan ${loanId}`
+              }
+            ],
+            model: 'gpt-4o'
+          },
+          this.getConfig()
+        );
+        
+        console.log('Payment history result:', response.data);
+        return {
+          success: true,
+          analysis: response.data.content,
+          loan_id: loanId
+        };
+      } catch (error) {
+        const processedError = this.handleApiError(error, 'getLoanPayments');
+        if (processedError.tokenExpired) throw processedError;
+        
+        console.error('Payment history error:', error);
+        return {
+          loan_id: loanId,
+          error: true,
+          message: `Unable to get payment history: ${error.message}`
+        };
+      }
+    }, loanId);
   },
   
   async getLoanCollateral(loanId) {
-    try {
-      console.log(`Fetching collateral for loan ${loanId}...`);
-      const response = await axios.get(`${this.baseURL}/loan/${loanId}/collateral`, this.getConfig());
-      return response.data;
-    } catch (error) {
-      this.handleApiError(error, 'getLoanCollateral');
-      throw error;
-    }
+    return this.retryRequestWithRefresh(async function(loanId) {
+      try {
+        console.log(`Fetching collateral for loan ${loanId} via MCP...`);
+        
+        // Use the OpenAI chat endpoint to call the MCP function
+        const response = await axios.post(
+          `${this.baseURL}/openai/chat`,
+          {
+            messages: [
+              {
+                role: 'user',
+                content: `Show me collateral details for loan ${loanId}`
+              }
+            ],
+            model: 'gpt-4o'
+          },
+          this.getConfig()
+        );
+        
+        console.log('Collateral details result:', response.data);
+        return {
+          success: true,
+          analysis: response.data.content,
+          loan_id: loanId
+        };
+      } catch (error) {
+        const processedError = this.handleApiError(error, 'getLoanCollateral');
+        if (processedError.tokenExpired) throw processedError;
+        
+        console.error('Collateral details error:', error);
+        return {
+          loan_id: loanId,
+          error: true,
+          message: `Unable to get collateral details: ${error.message}`
+        };
+      }
+    }, loanId);
   },
   
   async getLoanSummary() {
@@ -304,22 +362,34 @@ const mcpClient = {
     }, borrowerId, cropType, season);
   },
   
-  async analyzeMarketPriceImpact(commodity, priceChangePercent = null) {
-    return this.retryRequestWithRefresh(async function(commodity, priceChangePercent) {
+  async analyzeMarketPriceImpact(borrowerId, commodity, priceChangePercent = null) {
+    return this.retryRequestWithRefresh(async function(borrowerId, commodity, priceChangePercent) {
       try {
-        console.log(`Analyzing market price impact for ${commodity}, change: ${priceChangePercent || 'current projections'}`);
+        console.log(`Analyzing market price impact for borrower ${borrowerId}, commodity: ${commodity}, change: ${priceChangePercent || 'current projections'}`);
         
-        // Build query parameters
-        const queryParams = new URLSearchParams();
-        if (priceChangePercent) queryParams.append('price_change_percent', priceChangePercent);
-        
-        const response = await axios.get(
-          `${this.baseURL}/analytics/market-price-impact/${commodity}?${queryParams.toString()}`,
+        // Use the OpenAI chat endpoint to call the MCP function
+        const response = await axios.post(
+          `${this.baseURL}/openai/chat`,
+          {
+            messages: [
+              {
+                role: 'user',
+                content: `Analyze market price impact for borrower ${borrowerId} with commodity ${commodity} and price change ${priceChangePercent || '-10%'}`
+              }
+            ],
+            model: 'gpt-4o'
+          },
           this.getConfig()
         );
         
         console.log('Market price impact analysis result:', response.data);
-        return response.data;
+        return {
+          success: true,
+          analysis: response.data.content,
+          borrower_id: borrowerId,
+          commodity: commodity,
+          price_change_percent: priceChangePercent
+        };
       } catch (error) {
         const processedError = this.handleApiError(error, 'analyzeMarketPriceImpact');
         
@@ -328,6 +398,7 @@ const mcpClient = {
         
         // Otherwise return graceful fallback
         return {
+          borrower_id: borrowerId,
           commodity: commodity,
           error: true,
           message: `Unable to analyze market price impact: ${error.message}`,
@@ -336,7 +407,7 @@ const mcpClient = {
           portfolio_impact_summary: "Analysis unavailable due to data limitations or connectivity issues"
         };
       }
-    }, commodity, priceChangePercent);
+    }, borrowerId, commodity, priceChangePercent);
   },
   
   getMockMarketPriceImpact(borrowerId, commodityTypes) {

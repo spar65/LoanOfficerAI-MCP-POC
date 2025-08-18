@@ -102,34 +102,36 @@ The server will run at http://localhost:3001.
   - Requires authentication token
   - Accepts messages array and function definitions
   - Supports function calling for structured data retrieval
-  - Integrates with all 16 MCP functions
+  - Integrates with all 18 MCP functions
 
-## MCP Functions (16 Total)
+## MCP Functions (18 Total)
 
-### Loan Functions (5)
+### Basic Loan Information Functions (7)
 
 - `getLoanDetails` - Get detailed loan information from database
 - `getLoanStatus` - Get loan status from database
 - `getLoanSummary` - Get portfolio summary from database
 - `getActiveLoans` - Get all active loans from database
 - `getLoansByBorrower` - Get loans for specific borrower from database
+- `getLoanPayments` - Get payment history for specific loan from database
+- `getLoanCollateral` - Get collateral information for specific loan from database
 
-### Risk Assessment Functions (3)
+### Borrower & Risk Assessment Functions (4)
 
+- `getBorrowerDetails` - Get detailed borrower information from database
 - `getBorrowerDefaultRisk` - Calculate default risk from database
 - `getBorrowerNonAccrualRisk` - Calculate non-accrual risk from database
 - `evaluateCollateralSufficiency` - Evaluate collateral from database
 
-### Analytics Functions (8)
+### Predictive Analytics Functions (7)
 
-- `recommendLoanRestructuring` - AI-powered restructuring recommendations
-- `assessCropYieldRisk` - Crop risk analysis
-- `analyzeMarketPriceImpact` - Market impact analysis
+- `analyzeMarketPriceImpact` - Market price impact analysis for specific borrowers
 - `forecastEquipmentMaintenance` - Equipment maintenance forecasting
-- `getRefinancingOptions` - Refinancing option analysis
-- `analyzePaymentPatterns` - Payment behavior analysis
-- `getHighRiskFarmers` - High-risk borrower identification
-- `getBorrowerDetails` - Detailed borrower information from database
+- `assessCropYieldRisk` - Crop yield risk analysis for agricultural loans
+- `getRefinancingOptions` - Refinancing option analysis and recommendations
+- `analyzePaymentPatterns` - Payment behavior pattern analysis
+- `recommendLoanRestructuring` - AI-powered loan restructuring recommendations
+- `getHighRiskFarmers` - High-risk borrower identification across portfolio
 
 ## Testing
 

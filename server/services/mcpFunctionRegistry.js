@@ -346,22 +346,22 @@ const registry = {
    * Get loans for a specific borrower
    */
   getLoansByBorrower: MCPServiceWithLogging.createFunction('getLoansByBorrower', async (args) => {
-    const { borrower } = args;
+    const { borrower_id } = args;
     
-    if (!borrower) {
-      throw new Error('Borrower name is required');
+    if (!borrower_id) {
+      throw new Error('Borrower ID is required');
     }
     
     try {
-      LogService.info(`Fetching loans for borrower: ${borrower}`);
+      LogService.info(`Fetching loans for borrower ID: ${borrower_id}`);
       // Use database service directly instead of callInternalApi
-      return await mcpDatabaseService.getLoansByBorrower(borrower);
+      return await mcpDatabaseService.getLoansByBorrowerId(borrower_id);
     } catch (error) {
       LogService.error(`Error fetching loans for borrower: ${error.message}`);
       return {
         error: true,
         message: `Could not retrieve loans for borrower: ${error.message}`,
-        borrower
+        borrower_id
       };
     }
   }),
@@ -511,31 +511,167 @@ const registry = {
   // For now, they will call dataService directly
   
   forecastEquipmentMaintenance: MCPServiceWithLogging.createFunction('forecastEquipmentMaintenance', async (args) => {
-    return dataService.forecastEquipmentMaintenance(args.borrower_id);
+    try {
+      LogService.info(`Forecasting equipment maintenance for borrower ID: ${args.borrower_id}`);
+      // Use database service directly instead of dataService JSON files
+      return await mcpDatabaseService.forecastEquipmentMaintenance(args.borrower_id);
+    } catch (error) {
+      LogService.error(`Error forecasting equipment maintenance: ${error.message}`);
+      return {
+        error: true,
+        message: `Could not forecast equipment maintenance: ${error.message}`,
+        borrower_id: args.borrower_id
+      };
+    }
   }),
   
   assessCropYieldRisk: MCPServiceWithLogging.createFunction('assessCropYieldRisk', async (args) => {
-    return dataService.assessCropYieldRisk(args.borrower_id, args.crop_type, args.season);
+    try {
+      LogService.info(`Assessing crop yield risk for borrower ID: ${args.borrower_id}, crop: ${args.crop_type}, season: ${args.season}`);
+      // Use database service directly instead of dataService JSON files
+      return await mcpDatabaseService.assessCropYieldRisk(args.borrower_id, args.crop_type, args.season);
+    } catch (error) {
+      LogService.error(`Error assessing crop yield risk: ${error.message}`);
+      return {
+        error: true,
+        message: `Could not assess crop yield risk: ${error.message}`,
+        borrower_id: args.borrower_id,
+        crop_type: args.crop_type,
+        season: args.season
+      };
+    }
   }),
   
   analyzeMarketPriceImpact: MCPServiceWithLogging.createFunction('analyzeMarketPriceImpact', async (args) => {
-    return dataService.analyzeMarketPriceImpact(args.commodity, args.price_change_percent);
+    const { borrower_id, commodity, price_change_percent } = args;
+    
+    try {
+      // Get borrower details from database to understand their farm operation
+      const borrower = await mcpDatabaseService.getBorrowerDetails(borrower_id);
+      if (!borrower) {
+        throw new Error(`Borrower ${borrower_id} not found`);
+      }
+      
+      // Get all loans for this borrower from database
+      const loans = await mcpDatabaseService.getLoansByBorrowerId(borrower_id);
+      
+      // Parse price change
+      const priceChange = parseFloat(price_change_percent.toString().replace('%', ''));
+      
+      // Determine commodity exposure based on farm type and loans
+      const farmType = borrower.farm_type || 'Mixed';
+      let commodityExposure = 0;
+      let affectedLoans = [];
+      
+      // Map farm types to commodity relevance
+      const farmTypeCommodityMap = {
+        'Crop': ['corn', 'wheat', 'soybeans', 'cotton', 'rice'],
+        'Livestock': ['livestock', 'corn'], // livestock farms also use corn for feed
+        'Dairy': ['dairy', 'corn'], // dairy farms also use corn for feed
+        'Mixed': ['corn', 'soybeans', 'wheat', 'livestock', 'dairy']
+      };
+      
+      const relevantCommodities = farmTypeCommodityMap[farmType] || ['corn'];
+      
+      if (relevantCommodities.includes(commodity.toLowerCase())) {
+        // Calculate exposure based on loan amounts and farm type
+        affectedLoans = loans.filter(loan => loan.status === 'Active');
+        commodityExposure = affectedLoans.reduce((total, loan) => total + (loan.loan_amount || 0), 0);
+      }
+      
+      // Calculate financial impact
+      const impactMultiplier = Math.abs(priceChange) / 100;
+      const estimatedImpact = commodityExposure * impactMultiplier * 0.3; // 30% correlation factor
+      
+      // Generate recommendations based on impact
+      const recommendations = [];
+      if (estimatedImpact > 5000) {
+        recommendations.push('Consider hedging strategies to mitigate price volatility risk');
+        recommendations.push('Review cash flow projections in light of price changes');
+      } else if (estimatedImpact > 1000) {
+        recommendations.push('Monitor market trends closely for potential further impacts');
+      } else {
+        recommendations.push('Continue standard monitoring procedures');
+        recommendations.push('Consider reviewing loan terms due to stable market conditions');
+      }
+      
+      return {
+        borrower_id,
+        borrower_name: `${borrower.first_name} ${borrower.last_name}`,
+        farm_type: farmType,
+        commodity,
+        price_change_percent,
+        total_portfolio_exposure: commodityExposure,
+        estimated_impact: Math.round(estimatedImpact),
+        affected_loans: affectedLoans.length,
+        impact_level: estimatedImpact > 5000 ? 'high' : estimatedImpact > 1000 ? 'medium' : 'minimal',
+        recommendations,
+        analysis_date: new Date().toISOString().split('T')[0]
+      };
+      
+    } catch (error) {
+      LogService.error(`Error in analyzeMarketPriceImpact: ${error.message}`, args);
+      throw error;
+    }
   }),
   
   getRefinancingOptions: MCPServiceWithLogging.createFunction('getRefinancingOptions', async (args) => {
-    return dataService.getRefinancingOptions(args.loan_id);
+    try {
+      LogService.info(`Getting refinancing options for loan ID: ${args.loan_id}`);
+      // Use database service directly instead of dataService JSON files
+      return await mcpDatabaseService.getRefinancingOptions(args.loan_id);
+    } catch (error) {
+      LogService.error(`Error getting refinancing options: ${error.message}`);
+      return {
+        error: true,
+        message: `Could not get refinancing options: ${error.message}`,
+        loan_id: args.loan_id
+      };
+    }
   }),
   
   analyzePaymentPatterns: MCPServiceWithLogging.createFunction('analyzePaymentPatterns', async (args) => {
-    return dataService.analyzePaymentPatterns(args.borrower_id);
+    try {
+      LogService.info(`Analyzing payment patterns for borrower ID: ${args.borrower_id}`);
+      // Use database service directly instead of dataService JSON files
+      return await mcpDatabaseService.analyzePaymentPatterns(args.borrower_id);
+    } catch (error) {
+      LogService.error(`Error analyzing payment patterns: ${error.message}`);
+      return {
+        error: true,
+        message: `Could not analyze payment patterns: ${error.message}`,
+        borrower_id: args.borrower_id
+      };
+    }
   }),
   
   recommendLoanRestructuring: MCPServiceWithLogging.createFunction('recommendLoanRestructuring', async (args) => {
-    return dataService.recommendLoanRestructuring(args.loan_id, args.restructuring_goal);
+    try {
+      LogService.info(`Recommending loan restructuring for loan ID: ${args.loan_id}`);
+      // Use database service directly instead of dataService JSON files
+      return await mcpDatabaseService.recommendLoanRestructuring(args.loan_id, args.restructuring_goal);
+    } catch (error) {
+      LogService.error(`Error recommending loan restructuring: ${error.message}`);
+      return {
+        error: true,
+        message: `Could not recommend loan restructuring: ${error.message}`,
+        loan_id: args.loan_id
+      };
+    }
   }),
   
   getHighRiskFarmers: MCPServiceWithLogging.createFunction('getHighRiskFarmers', async () => {
-    return dataService.getHighRiskFarmers();
+    try {
+      LogService.info('Getting high-risk farmers');
+      // Use database service directly instead of dataService JSON files
+      return await mcpDatabaseService.getHighRiskFarmers();
+    } catch (error) {
+      LogService.error(`Error getting high-risk farmers: ${error.message}`);
+      return {
+        error: true,
+        message: `Could not get high-risk farmers: ${error.message}`
+      };
+    }
   })
 };
 
@@ -602,6 +738,36 @@ const functionSchemas = {
         }
       },
       required: ['borrower_id']
+    }
+  },
+  
+  getLoanPayments: {
+    name: 'getLoanPayments',
+    description: 'Get payment history for a specific loan',
+    parameters: {
+      type: 'object',
+      properties: {
+        loan_id: {
+          type: 'string',
+          description: 'ID of the loan to retrieve payment history for'
+        }
+      },
+      required: ['loan_id']
+    }
+  },
+  
+  getLoanCollateral: {
+    name: 'getLoanCollateral',
+    description: 'Get collateral information for a specific loan',
+    parameters: {
+      type: 'object',
+      properties: {
+        loan_id: {
+          type: 'string',
+          description: 'ID of the loan to retrieve collateral for'
+        }
+      },
+      required: ['loan_id']
     }
   },
   
@@ -717,20 +883,24 @@ const functionSchemas = {
   
   analyzeMarketPriceImpact: {
     name: 'analyzeMarketPriceImpact',
-    description: 'Analyze the impact of market prices on a borrower',
+    description: 'Analyze the impact of market price changes on a specific borrower for a commodity',
     parameters: {
       type: 'object',
       properties: {
+        borrower_id: {
+          type: 'string',
+          description: 'ID of the borrower to analyze market impact for'
+        },
         commodity: {
           type: 'string',
-          description: 'Name of the commodity'
+          description: 'Name of the commodity (corn, wheat, soybeans, cotton, rice, livestock, dairy)'
         },
         price_change_percent: {
           type: 'string',
-          description: 'Percentage change in commodity prices'
+          description: 'Percentage change in commodity prices (e.g., "+10%", "-5%")'
         }
       },
-      required: ['commodity', 'price_change_percent']
+      required: ['borrower_id', 'commodity', 'price_change_percent']
     }
   },
   

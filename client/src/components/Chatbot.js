@@ -25,6 +25,14 @@ import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
 import DescriptionIcon from '@mui/icons-material/Description';
 import PaymentsIcon from '@mui/icons-material/Payments';
 import AssessmentIcon from '@mui/icons-material/Assessment';
+import ShowChartIcon from '@mui/icons-material/ShowChart';
+import HistoryIcon from '@mui/icons-material/History';
+import SecurityIcon from '@mui/icons-material/Security';
+import InfoIcon from '@mui/icons-material/Info';
+import GroupIcon from '@mui/icons-material/Group';
+import BuildIcon from '@mui/icons-material/Build';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import WarningIcon from '@mui/icons-material/Warning';
 
 // Define MCP function schemas for OpenAI
 const MCP_FUNCTIONS = [
@@ -179,20 +187,24 @@ const MCP_FUNCTIONS = [
   },
   {
     name: "analyzeMarketPriceImpact",
-    description: "Analyze how changes in agricultural commodity prices would impact loans and borrowers. Identifies vulnerable loans and quantifies potential financial impacts.",
+    description: "Analyze the impact of market price changes on a specific borrower for a commodity",
     parameters: {
       type: "object",
       properties: {
+        borrower_id: {
+          type: "string",
+          description: "ID of the borrower to analyze market impact for"
+        },
         commodity: {
           type: "string",
-          description: "The agricultural commodity to analyze (e.g., corn, wheat, livestock)"
+          description: "Name of the commodity (corn, wheat, soybeans, cotton, rice, livestock, dairy)"
         },
         price_change_percent: {
           type: "string",
-          description: "Optional: The percentage price change to analyze (e.g., '-10%', '+15%'). If not provided, current market projections will be used."
+          description: "Percentage change in commodity prices (e.g., '+10%', '-5%')"
         }
       },
-      required: ["commodity"]
+      required: ["borrower_id", "commodity", "price_change_percent"]
     }
   },
   {
@@ -315,8 +327,9 @@ const Chatbot = ({ onClose }) => {
             break;
             
           case 'analyzeMarketPriceImpact':
-            console.log(`Analyzing market price impact for ${args.commodity}, change: ${args.price_change_percent || 'current projections'}`);
+            console.log(`Analyzing market price impact for borrower ${args.borrower_id}, commodity: ${args.commodity}, change: ${args.price_change_percent || 'current projections'}`);
             result = await mcpClient[name](
+              args.borrower_id,
               args.commodity,
               args.price_change_percent || null
             );
@@ -444,10 +457,22 @@ const Chatbot = ({ onClose }) => {
     }
     
     const text = message.text.toLowerCase();
-    if (text.includes('payment history')) {
+    if (text.includes('payment history') || text.includes('payment patterns')) {
       return <PaymentsIcon />;
     } else if (text.includes('collateral')) {
-      return <DescriptionIcon />;
+      return <SecurityIcon />;
+    } else if (text.includes('market price') || text.includes('price impact') || text.includes('commodity') || text.includes('corn') || text.includes('soybeans') || text.includes('wheat')) {
+      return <ShowChartIcon />;
+    } else if (text.includes('equipment maintenance') || text.includes('maintenance forecast')) {
+      return <BuildIcon />;
+    } else if (text.includes('refinancing') || text.includes('restructuring')) {
+      return <TrendingUpIcon />;
+    } else if (text.includes('high risk') || text.includes('risk farmers')) {
+      return <WarningIcon />;
+    } else if (text.includes('borrower details') || text.includes('borrower information')) {
+      return <PersonIcon />;
+    } else if (text.includes('loan details') || text.includes('loan information')) {
+      return <InfoIcon />;
     } else if (text.includes('amount:')) {
       return <AttachMoneyIcon />;
     } else if (text.includes('portfolio summary')) {
@@ -589,6 +614,38 @@ const Chatbot = ({ onClose }) => {
             variant="outlined" 
             onClick={() => setInput('What is the status of loan L001?')} 
           />
+          <Chip 
+            label="Payment History" 
+            size="small" 
+            color="primary" 
+            variant="outlined" 
+            icon={<HistoryIcon />}
+            onClick={() => setInput('Show me payment history for loan L001')} 
+          />
+          <Chip 
+            label="Collateral Details" 
+            size="small" 
+            color="primary" 
+            variant="outlined" 
+            icon={<SecurityIcon />}
+            onClick={() => setInput('Show me collateral for loan L001')} 
+          />
+          <Chip 
+            label="Loan Details" 
+            size="small" 
+            color="primary" 
+            variant="outlined" 
+            icon={<InfoIcon />}
+            onClick={() => setInput('Show me details for loan L001')} 
+          />
+          <Chip 
+            label="Borrower Loans" 
+            size="small" 
+            color="primary" 
+            variant="outlined" 
+            icon={<GroupIcon />}
+            onClick={() => setInput('Show me loans for borrower B001')} 
+          />
           
           {/* Risk Assessment */}
           <Typography variant="caption" sx={{ width: '100%', mt: 1, mb: 0.5, color: 'text.secondary' }}>
@@ -615,6 +672,14 @@ const Chatbot = ({ onClose }) => {
             variant="outlined" 
             onClick={() => setInput('What is the non-accrual risk for borrower B003?')} 
           />
+          <Chip 
+            label="Borrower Details" 
+            size="small" 
+            color="error" 
+            variant="outlined" 
+            icon={<PersonIcon />}
+            onClick={() => setInput('Show me details for borrower B001')} 
+          />
           
           {/* Predictive Analytics */}
           <Typography variant="caption" sx={{ width: '100%', mt: 1, mb: 0.5, color: 'text.secondary' }}>
@@ -632,6 +697,7 @@ const Chatbot = ({ onClose }) => {
             size="small" 
             color="success" 
             variant="outlined" 
+            icon={<ShowChartIcon />}
             onClick={() => setInput('How will market prices impact borrower B001?')} 
           />
           <Chip 
@@ -640,6 +706,38 @@ const Chatbot = ({ onClose }) => {
             color="success" 
             variant="outlined" 
             onClick={() => setInput('Recommend loan restructuring options for L003')} 
+          />
+          <Chip 
+            label="Equipment Maintenance" 
+            size="small" 
+            color="success" 
+            variant="outlined" 
+            icon={<BuildIcon />}
+            onClick={() => setInput('Forecast equipment maintenance for borrower B001')} 
+          />
+          <Chip 
+            label="Refinancing Options" 
+            size="small" 
+            color="success" 
+            variant="outlined" 
+            icon={<TrendingUpIcon />}
+            onClick={() => setInput('Get refinancing options for loan L001')} 
+          />
+          <Chip 
+            label="Payment Patterns" 
+            size="small" 
+            color="success" 
+            variant="outlined" 
+            icon={<PaymentsIcon />}
+            onClick={() => setInput('Analyze payment patterns for borrower B001')} 
+          />
+          <Chip 
+            label="High Risk Farmers" 
+            size="small" 
+            color="success" 
+            variant="outlined" 
+            icon={<WarningIcon />}
+            onClick={() => setInput('Show me high risk farmers')} 
           />
         </Box>
       </Box>

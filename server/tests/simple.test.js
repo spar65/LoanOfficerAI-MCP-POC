@@ -67,14 +67,14 @@ describe('LoanOfficerAI MCP Integration Tests', () => {
 
   describe('Predictive Analytics Tests', () => {
     test('should recommend loan restructuring', async () => {
-      const restructuring = await dataService.recommendLoanRestructuring('L001');
-      assert(Array.isArray(restructuring.restructuring_options), 'Restructuring should have restructuring_options array');
-      assert(restructuring.restructuring_options.length > 0, 'Should have at least one restructuring option');
-      console.log(`✅ Generated ${restructuring.restructuring_options.length} restructuring options`);
+      const restructuring = await mcpDatabaseService.recommendLoanRestructuring('L001');
+      assert(Array.isArray(restructuring.recommendations), 'Restructuring should have recommendations array');
+      assert(restructuring.recommendations.length > 0, 'Should have at least one restructuring option');
+      console.log(`✅ Generated ${restructuring.recommendations.length} restructuring options`);
     });
 
     test('should assess crop yield risk', async () => {
-      const riskAssessment = await dataService.assessCropYieldRisk('B001', 'corn', 'current');
+      const riskAssessment = await mcpDatabaseService.assessCropYieldRisk('B001', 'corn', 'current');
       assert(typeof riskAssessment.yield_risk_score === 'number', 'Yield risk score should be a number');
       assert(riskAssessment.crop_type === 'corn', 'Should assess correct crop type');
       console.log(`✅ Crop yield risk score: ${riskAssessment.yield_risk_score}`);
@@ -88,7 +88,7 @@ describe('LoanOfficerAI MCP Integration Tests', () => {
     });
 
     test('should get high risk farmers', async () => {
-      const highRiskFarmers = await dataService.getHighRiskFarmers();
+      const highRiskFarmers = await mcpDatabaseService.getHighRiskFarmers();
       assert(Array.isArray(highRiskFarmers.high_risk_farmers), 'High risk farmers should have high_risk_farmers array');
       console.log(`✅ Identified ${highRiskFarmers.high_risk_farmers.length} high risk farmers`);
     });

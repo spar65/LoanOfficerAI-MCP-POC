@@ -4,28 +4,38 @@
 
 > **NOTE (2025-07-16):** This document has been updated for a strict SQL database requirement; legacy fallback descriptions no longer apply.
 
-## ✅ CORRECTED MCP Function Inventory
+## ✅ COMPLETE MCP Function Inventory
 
-**REALITY CHECK**: The system actually has **16 implemented functions**, not 19 as previously documented.
+**UPDATED AUGUST 2025**: The system now has **18 fully implemented functions**, all integrated with SQL Server database.
 
-### Actually Implemented MCP Functions:
+### Complete MCP Function Registry:
 
-1. `getLoanDetails` - Get detailed information about a specific loan
-2. `getLoanStatus` - Get the status of a specific loan
-3. `getLoanSummary` - Get a summary of loans in the system
-4. `getActiveLoans` - Get a list of all active loans in the system
-5. `getLoansByBorrower` - Get a list of loans for a specific borrower
-6. `getBorrowerDetails` - Get detailed information about a specific borrower
-7. `getBorrowerDefaultRisk` - Get default risk assessment for a specific borrower
-8. `getBorrowerNonAccrualRisk` - Get non-accrual risk assessment for a specific borrower
-9. `getHighRiskFarmers` - Identify farmers with high risk of default across the portfolio
-10. `evaluateCollateralSufficiency` - Evaluate collateral sufficiency for a specific loan
-11. `forecastEquipmentMaintenance` - Forecast equipment maintenance for a specific borrower
-12. `assessCropYieldRisk` - Assess crop yield risk for a specific borrower
-13. `analyzeMarketPriceImpact` - Analyze market price impact for a specific borrower
-14. `getRefinancingOptions` - Get refinancing options for a specific loan
-15. `analyzePaymentPatterns` - Analyze payment patterns for a specific borrower
-16. `recommendLoanRestructuring` - Recommend loan restructuring for a specific loan
+#### **Basic Loan Information Functions (7 functions):**
+
+1. `getLoanDetails` - Get detailed information about a specific loan from database
+2. `getLoanStatus` - Get current status of a specific loan from database
+3. `getLoanSummary` - Get portfolio summary from database
+4. `getActiveLoans` - Get all active loans from database
+5. `getLoansByBorrower` - Get loans for a specific borrower from database
+6. `getLoanPayments` - Get payment history for a specific loan from database
+7. `getLoanCollateral` - Get collateral information for a specific loan from database
+
+#### **Borrower & Risk Assessment Functions (4 functions):**
+
+8. `getBorrowerDetails` - Get detailed borrower information from database
+9. `getBorrowerDefaultRisk` - Calculate default risk assessment from database
+10. `getBorrowerNonAccrualRisk` - Calculate non-accrual risk from database
+11. `evaluateCollateralSufficiency` - Evaluate collateral adequacy from database
+
+#### **Predictive Analytics Functions (7 functions):**
+
+12. `analyzeMarketPriceImpact` - Market price impact analysis for specific borrowers
+13. `forecastEquipmentMaintenance` - Equipment maintenance forecasting
+14. `assessCropYieldRisk` - Crop yield risk analysis for agricultural loans
+15. `getRefinancingOptions` - Refinancing option analysis and recommendations
+16. `analyzePaymentPatterns` - Payment behavior pattern analysis
+17. `recommendLoanRestructuring` - AI-powered loan restructuring recommendations
+18. `getHighRiskFarmers` - High-risk borrower identification across portfolio
 
 ### ❌ Functions Previously Listed But NOT Implemented:
 

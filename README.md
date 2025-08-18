@@ -174,7 +174,7 @@ cd client && npm start
 
 **What this proves:**
 
-- ✅ All 16 MCP functions operational
+- ✅ All 18 MCP functions operational
 - ✅ AI integration working with OpenAI GPT-4o
 - ✅ Database operations functioning
 - ✅ Risk assessment algorithms validated
@@ -310,31 +310,90 @@ The setup script will validate your environment, install dependencies, set up th
 
 ## MCP Function Examples
 
-The application includes 16 MCP functions that the AI can call, all integrated with SQL Server:
+The application includes **18 MCP functions** that the AI can call, all integrated with SQL Server:
 
-### Loan Functions
+### Basic Loan Information Functions (7 functions)
 
-- `getLoanDetails`: Retrieves information about a specific loan from database
-- `getLoanStatus`: Gets current status of a loan from database
-- `getLoanSummary`: Gets portfolio-hidden summary from database
-- `getActiveLoans`: Gets all active loans from database
-- `getLoansByBorrower`: Gets loans for a specific borrower from database
+- `getLoanDetails`: Get detailed information about a specific loan from database
+- `getLoanStatus`: Get current status of a loan from database
+- `getLoanSummary`: Get portfolio summary from database
+- `getActiveLoans`: Get all active loans from database
+- `getLoansByBorrower`: Get loans for a specific borrower from database
+- `getLoanPayments`: Get payment history for a specific loan from database
+- `getLoanCollateral`: Get collateral information for a specific loan from database
 
-### Risk Assessment Functions
+### Borrower & Risk Assessment Functions (4 functions)
 
-- `getBorrowerDefaultRisk`: Analyzes loan performance data from database
-- `getBorrowerNonAccrualRisk`: Calculates non-accrual risk from database
-- `evaluateCollateralSufficiency`: Evaluates collateral adequacy from database
+- `getBorrowerDetails`: Get detailed borrower information from database
+- `getBorrowerDefaultRisk`: Calculate default risk assessment from database
+- `getBorrowerNonAccrualRisk`: Calculate non-accrual risk from database
+- `evaluateCollateralSufficiency`: Evaluate collateral adequacy from database
 
-### Analytics Functions
+### Predictive Analytics Functions (7 functions)
 
-- `recommendLoanRestructuring`: AI-powered restructuring recommendations
-- `assessCropYieldRisk`: Crop risk analysis for agricultural loans
-- `analyzeMarketPriceImpact`: Market impact analysis
+- `analyzeMarketPriceImpact`: Market price impact analysis for specific borrowers
 - `forecastEquipmentMaintenance`: Equipment maintenance forecasting
-- `getRefinancingOptions`: Refinancing option analysis
-- `analyzePaymentPatterns`: Payment behavior analysis
-- `getHighRiskFarmers`: High-risk borrower identification
+- `assessCropYieldRisk`: Crop yield risk analysis for agricultural loans
+- `getRefinancingOptions`: Refinancing option analysis and recommendations
+- `analyzePaymentPatterns`: Payment behavior pattern analysis
+- `recommendLoanRestructuring`: AI-powered loan restructuring recommendations
+- `getHighRiskFarmers`: High-risk borrower identification across portfolio
+
+## 📋 Complete MCP Function Reference
+
+### **How to Use These Functions**
+
+All 18 MCP functions are accessible through:
+
+- **Chatbot Interface**: Click the function buttons in the web UI
+- **Natural Language**: Ask questions like "What's the default risk for borrower B001?"
+- **Direct API**: Call via `/api/openai/chat` endpoint
+
+### **Function Categories & Use Cases**
+
+#### **🏦 Basic Loan Information (7 functions)**
+
+Perfect for daily loan management and customer service:
+
+- **`getLoanDetails`**: Complete loan information including terms, amounts, dates
+- **`getLoanStatus`**: Current loan status (Active, Pending, Closed)
+- **`getLoanSummary`**: Portfolio overview with totals and statistics
+- **`getActiveLoans`**: All currently active loans across the portfolio
+- **`getLoansByBorrower`**: All loans for a specific borrower
+- **`getLoanPayments`**: Complete payment history with dates and amounts
+- **`getLoanCollateral`**: Collateral details including valuations
+
+#### **⚠️ Risk Assessment (4 functions)**
+
+Essential for risk management and compliance:
+
+- **`getBorrowerDetails`**: Complete borrower profile with farm information
+- **`getBorrowerDefaultRisk`**: Probability of default with risk factors
+- **`getBorrowerNonAccrualRisk`**: Non-accrual risk assessment
+- **`evaluateCollateralSufficiency`**: Loan-to-value ratios and coverage analysis
+
+#### **🔮 Predictive Analytics (7 functions)**
+
+Advanced AI-powered insights for strategic decision making:
+
+- **`analyzeMarketPriceImpact`**: Commodity price impact on borrower portfolios
+- **`forecastEquipmentMaintenance`**: Maintenance cost predictions
+- **`assessCropYieldRisk`**: Agricultural yield risk analysis
+- **`getRefinancingOptions`**: Refinancing scenarios and recommendations
+- **`analyzePaymentPatterns`**: Payment behavior and reliability analysis
+- **`recommendLoanRestructuring`**: Restructuring options with pros/cons
+- **`getHighRiskFarmers`**: Portfolio-wide risk identification
+
+### **Example Queries That Work**
+
+```
+"Show me details for loan L001"
+"What's the payment history for loan L001?"
+"Analyze market price impact for borrower B001 with corn prices down 10%"
+"Get refinancing options for loan L001"
+"Show me high risk farmers"
+"Forecast equipment maintenance for borrower B001"
+```
 
 ## Project Structure
 
@@ -612,7 +671,7 @@ Client tests are located in the `client/src/tests` directory:
 
 The LoanOfficerAI MCP POC is **fully functional and demonstration-ready** with:
 
-- **16 working MCP functions** with 100% test success rate
+- **18 working MCP functions** with 100% test success rate
 - **Complete OpenAI integration** with secure server proxy
 - **Production-ready logging system** with comprehensive monitoring
 - **Robust authentication** with JWT token management
@@ -723,7 +782,7 @@ const tenantMiddleware = (req, res, next) => {
 
 #### This Week
 
-- [ ] **Test Current POC**: Verify all 16 MCP functions work correctly
+- [ ] **Test Current POC**: Verify all 18 MCP functions work correctly
 - [ ] **Update npm scripts**: Create proper `dev:server` and `dev:client` commands
 - [ ] **API Documentation**: Generate OpenAPI/Swagger documentation
 
