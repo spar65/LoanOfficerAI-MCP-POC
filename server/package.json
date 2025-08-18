@@ -20,8 +20,7 @@
     "test:mcp": "node run-mcp-tests.js",
     "test:all": "npm run test:mcp && npm run test:jest",
     "test:security": "node tests/helpers/security-test.js",
-    "test:database": "node ../test-db-connection.js",
-    "test:database-mcp": "node tests/mcp-core/test-database-mcp-functions.js"
+    "test:database": "node ../test-db-connection.js"
   },
   "keywords": [],
   "author": "",
