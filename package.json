@@ -32,8 +32,16 @@
     "loan",
     "openai"
   ],
-  "author": "",
-  "license": "ISC",
+  "author": "Greg Spehar <your-email@example.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/spar65/LoanOfficerAI-MCP-POC.git"
+  },
+  "bugs": {
+    "url": "https://github.com/spar65/LoanOfficerAI-MCP-POC/issues"
+  },
+  "homepage": "https://github.com/spar65/LoanOfficerAI-MCP-POC#readme",
   "devDependencies": {
     "concurrently": "^8.2.2",
     "jest": "^29.7.0",

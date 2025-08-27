@@ -1,5 +1,11 @@
 /**
- * Main server file for the Loan Officer AI API
+ * LoanOfficerAI-MCP-POC - Main server file for the Loan Officer AI API
+ * 
+ * Copyright (c) 2025 Greg Spehar
+ * Licensed under the MIT License - see LICENSE file for details
+ * 
+ * Created for the Austin AI Alliance community
+ * https://github.com/spar65/LoanOfficerAI-MCP-POC
  */
 
 // Load environment variables from .env file if present

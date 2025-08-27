@@ -11,8 +11,8 @@
     "eject": "react-scripts eject"
   },
   "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "author": "Greg Spehar <your-email@example.com>",
+  "license": "MIT",
   "description": "",
   "browserslist": {
     "production": [

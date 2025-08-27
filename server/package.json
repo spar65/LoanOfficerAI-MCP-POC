@@ -23,8 +23,8 @@
     "test:database": "node ../test-db-connection.js"
   },
   "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "author": "Greg Spehar <your-email@example.com>",
+  "license": "MIT",
   "description": "",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.1",

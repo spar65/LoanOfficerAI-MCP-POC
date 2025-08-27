@@ -1,6 +1,17 @@
-# README.md
+# LoanOfficerAI-MCP-POC
 
-# Loan Officer AI - MCP Proof of Concept - Updated July 2025
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Node.js Version](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen)](https://nodejs.org/)
+[![Tests](https://img.shields.io/badge/tests-70%2B%20passing-brightgreen)](https://github.com/spar65/LoanOfficerAI-MCP-POC)
+[![Open Source](https://img.shields.io/badge/Open%20Source-%E2%9D%A4-red)](https://github.com/spar65/LoanOfficerAI-MCP-POC)
+
+# 🚜 Loan Officer AI - MCP Proof of Concept
+
+**An open-source demonstration of AI-powered agricultural lending intelligence with Model Context Protocol (MCP) integration.**
+
+**Featuring the Enterprise MCP™ Framework - Production-ready AI integration for business environments.**
+
+Created by **Greg Spehar** for the **Austin AI Alliance** and the broader AI community.
 
 A production-ready proof-of-concept demonstrating AI-powered agricultural lending intelligence with Model Completion Protocol (MCP) integration and complete SQL Server database integration.
 
@@ -635,6 +646,58 @@ This numbered system provides a logical progression from quick evaluation to dee
 - **"How complex is this to implement?"** → Technical Guide + Architecture
 - **"What are the risks and benefits?"** → Executive Summary + Future Considerations
 - **"How do we know it's working correctly?"** → Testing Strategy + Logging
+
+## 🌟 Open Source Information
+
+### License
+
+This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
+
+### Contributing
+
+We welcome contributions from the community! Please read our [Contributing Guide](CONTRIBUTING.md) for details on:
+
+- How to set up the development environment
+- Coding standards and best practices
+- Pull request process
+- Types of contributions we're looking for
+
+### Code of Conduct
+
+This project adheres to a [Code of Conduct](CODE_OF_CONDUCT.md). By participating, you are expected to uphold this code.
+
+### Austin AI Alliance
+
+This project was created for the **Austin AI Alliance** community to demonstrate practical AI applications in financial services. Austin AI Alliance members are especially welcome to:
+
+- Use this as a learning resource
+- Adapt for your own projects
+- Present at meetups and conferences
+- Collaborate on enhancements
+
+### Recognition
+
+Special thanks to the Austin AI Alliance for fostering innovation in AI applications and providing a platform for sharing knowledge.
+
+### Enterprise MCP Framework
+
+This project demonstrates the **Enterprise MCP™** framework for production-ready AI integration:
+
+- **[Enterprise MCP Framework](ENTERPRISE_MCP_FRAMEWORK.md)**: Comprehensive methodology for business AI deployment
+- **Production Patterns**: Security, compliance, and scalability best practices
+- **Business Integration**: ERP, CRM, and database system connections
+- **Commercial Licensing**: Available for enterprise implementations
+
+### Intellectual Property Protection
+
+While this project is open source under the MIT License, certain protections are in place:
+
+- **Attribution Requirements**: See [ATTRIBUTION.md](ATTRIBUTION.md) for proper usage guidelines
+- **Trademark Notice**: Project name and branding are protected - see [TRADEMARK_NOTICE.md](TRADEMARK_NOTICE.md)
+- **Innovation Record**: Key innovations documented for defensive purposes - see [INNOVATION_RECORD.md](INNOVATION_RECORD.md)
+- **Enterprise MCP™**: Trademark framework for commercial implementations
+
+These protections ensure proper credit while maintaining open source accessibility.
 
 ## Additional Documentation
 

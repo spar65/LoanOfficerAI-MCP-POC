@@ -1,3 +1,13 @@
+/**
+ * LoanOfficerAI-MCP-POC - Main React Application
+ * 
+ * Copyright (c) 2025 Greg Spehar
+ * Licensed under the MIT License - see LICENSE file for details
+ * 
+ * Created for the Austin AI Alliance community
+ * https://github.com/spar65/LoanOfficerAI-MCP-POC
+ */
+
 import React, { useState, useEffect } from 'react';
 import { ThemeProvider, CssBaseline, Drawer, IconButton, Box, Button, Snackbar, Alert, Toolbar, AppBar, Typography } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
